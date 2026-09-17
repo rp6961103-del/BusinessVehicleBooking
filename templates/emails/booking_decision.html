@@ -1,0 +1,14 @@
+<!doctype html>
+<html><body>
+<h2>Vehicle booking {{ booking.status }}</h2>
+<p>Hello {{ booking.customer_name }},</p>
+<p>Your vehicle booking decision is <strong>{{ booking.status }}</strong>.</p>
+<ul>
+<li>Booking ID: #{{ booking.booking_id }}</li>
+<li>Vehicle: {{ booking.vehicle_name }}{% if booking.vehicle_type %} ({{ booking.vehicle_type }}){% endif %}</li>
+<li>Owner: {{ booking.owner_name or 'Registered Owner' }}{% if booking.owner_phone %} ({{ booking.owner_phone }}){% endif %}</li>
+<li>Route: {{ booking.from_location }} to {{ booking.to_location }}</li>
+<li>Booking date: {{ booking.booking_date }}</li>
+<li>Rent: Rs. {{ booking.rent }}</li>
+</ul>
+</body></html>

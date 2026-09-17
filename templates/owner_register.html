@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Owner Registration | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+
+<header>
+    <a href="/" class="logo">
+        <span>🚚</span> Business Vehicle Booking
+    </a>
+    <nav>
+        <a href="/">Back to Home</a>
+        <a href="/ownerlogin">Owner Login</a>
+        <a href="/farmer-ai">🌿 Farmer AI</a>
+    </nav>
+</header>
+
+<main class="container container-narrow">
+    <div class="form-card" style="border-top-color: var(--accent);">
+        <div style="text-align: center; font-size: 40px; margin-bottom: 8px;">🚛</div>
+        <h1>Vehicle Owner Registration</h1>
+        <p class="subtitle">Join as a fleet operator or independent commercial vehicle owner.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="message {{ category }}" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/ownerregister">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="owner_name">👤 Owner / Agency Name</label>
+                <input
+                    type="text"
+                    id="owner_name"
+                    name="owner_name"
+                    placeholder="Enter owner or business name"
+                    maxlength="100"
+                    required
+                    autocomplete="name"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="phone">📞 Contact Phone Number</label>
+                <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    placeholder="Enter 10-digit mobile number"
+                    pattern="[0-9]{10}"
+                    maxlength="10"
+                    required
+                    autocomplete="tel"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="email">📧 Email Address</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="owner@example.com (used for login & alerts)"
+                    maxlength="255"
+                    required
+                    autocomplete="email"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">🔑 Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Min 8 characters"
+                    minlength="8"
+                    maxlength="128"
+                    required
+                    autocomplete="new-password"
+                >
+            </div>
+
+            <button type="submit" class="btn btn-accent full-btn" style="margin-top: 10px;">
+                ✅ Complete Owner Registration
+            </button>
+        </form>
+
+        <div style="margin-top: 24px; text-align: center; border-top: 1px solid var(--line); padding-top: 18px;">
+            <p style="margin-bottom: 10px; font-size: 0.9rem; color: var(--muted);">Already an owner?</p>
+            <a href="/ownerlogin" class="btn btn-secondary full-btn">
+                👤 Sign In as Vehicle Owner
+            </a>
+            <div style="margin-top: 14px;">
+                <a href="/login" style="font-size: 0.88rem; font-weight: 600;">
+                    ← Customer portal login here
+                </a>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <p>© 2026 Business Vehicle Booking System</p>
+    <p>Owner Fleet Management Portal</p>
+</footer>
+
+</body>
+</html>

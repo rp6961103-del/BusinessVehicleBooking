@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<body>
+<h2>Demo Payment Confirmation - Booking #{{ payment.booking_id }}</h2>
+<p>Hello {{ payment.customer_name }},</p>
+<p><strong>This is a demo payment for project testing. No real money was charged.</strong></p>
+<p>Your demo payment has been recorded successfully.</p>
+<ul>
+<li>Booking ID: #{{ payment.booking_id }}</li>
+<li>Vehicle: {{ payment.vehicle_name }}{% if payment.vehicle_type %} ({{ payment.vehicle_type }}){% endif %}</li>
+<li>Route: {{ payment.route }}</li>
+<li>Amount: ₹{{ payment.amount }}</li>
+<li>Demo payment method: {{ payment.payment_method }}</li>
+<li>Demo transaction reference: {{ payment.transaction_reference }}</li>
+<li>Payment status: {{ payment.status }}</li>
+<li>Booking date: {{ payment.booking_date }}</li>
+</ul>
+<p>Thank you for testing the Business Vehicle Booking demo payment flow.</p>
+</body>
+</html>

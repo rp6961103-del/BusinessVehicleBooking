@@ -1,0 +1,14 @@
+BusinessVehicleBooking - Vehicle Booking {{ booking.status }}
+
+Hello {{ booking.customer_name }},
+
+Your vehicle booking decision is: {{ booking.status }}.
+
+Booking ID: {{ booking.booking_id }}
+Vehicle: {{ booking.vehicle_name }}{% if booking.vehicle_type %} ({{ booking.vehicle_type }}){% endif %}
+Owner: {{ booking.owner_name or 'Registered Owner' }}{% if booking.owner_phone %} ({{ booking.owner_phone }}){% endif %}
+Route: {{ booking.from_location }} -> {{ booking.to_location }}
+Booking date: {{ booking.booking_date }}
+Rent: Rs. {{ booking.rent }}
+
+Please contact the vehicle owner if you need more information.

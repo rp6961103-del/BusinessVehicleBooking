@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Login | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .admin-login { max-width: 420px; margin: 8vh auto; padding: 2rem; }
+        .admin-login form { display: grid; gap: 1rem; }
+        .admin-login input { width: 100%; box-sizing: border-box; padding: .75rem; }
+        .admin-login button { padding: .75rem 1rem; cursor: pointer; }
+        .admin-error { color: #a12622; }
+    </style>
+</head>
+<body>
+    <main class="admin-login">
+        <h1>Admin Login</h1>
+        <p>Business Vehicle Booking administration</p>
+        {% if error %}<p class="admin-error">{{ error }}</p>{% endif %}
+        <form method="POST" action="{{ url_for('adminlogin') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>
+                Username
+                <input type="text" name="username" maxlength="100" required autocomplete="username">
+            </label>
+            <label>
+                Password
+                <input type="password" name="password" required autocomplete="current-password">
+            </label>
+            <button type="submit">Sign in</button>
+        </form>
+        <p><a href="{{ url_for('home') }}">Back to home</a></p>
+    </main>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.get("available_vehicles", "Available Vehicles") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+
+<!-- =====================================================
+     HEADER
+===================================================== -->
+<header>
+    <a href="/" class="logo">
+        <span>🚚</span> {{ t.get("vehicle_booking", "Business Vehicle Booking") }}
+    </a>
+
+    <nav aria-label="Customer Navigation">
+        <a href="/vehicles" class="active">
+            🚚 {{ t.get("available_vehicles", "Available Vehicles") }}
+        </a>
+        <a href="/mybookings">
+            📋 {{ t.get("my_bookings", "My Bookings") }}
+        </a>
+        <a href="/farmer-ai" class="nav-highlight">
+            🌿 {{ t.get("farmer_ai", "Farmer AI") }}
+        </a>
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 {{ t.get("logout", "Logout") }}</button>
+        </form>
+    </nav>
+</header>
+
+<!-- =====================================================
+     LANGUAGE BAR
+===================================================== -->
+<div class="language-bar">
+    <span>🌐 {{ t.get("language", "Language") }}:</span>
+    <form method="POST" action="{{ url_for('change_language', language='en') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='te') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
+    </form>
+</div>
+
+<main class="container">
+
+    <!-- WELCOME BANNER -->
+    <div class="page-header">
+        <h1>👋 {{ t.get("welcome", "Welcome") }}, {{ session.get("user_name") }}</h1>
+        <p>{{ t.get("available_vehicles", "Available Vehicles") }} — Select a route and book transparently with zero surge pricing.</p>
+    </div>
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- SEARCH & FILTER FORM -->
+    <form method="GET" action="/vehicles" class="filter-form" role="search">
+        <input
+            type="search"
+            name="q"
+            value="{{ filters.search or '' }}"
+            placeholder="🔍 Search name, route, or location"
+            aria-label="Search vehicles"
+        >
+
+        <select name="vehicle_type" aria-label="Filter by vehicle type">
+            <option value="">All Vehicle Types</option>
+            {% for vtype in ["Tractor", "Mini Truck", "Pickup", "Lorry", "Tipper", "JCB", "Goods Auto", "Other"] %}
+                <option value="{{ vtype }}" {% if filters.vehicle_type == vtype %}selected{% endif %}>{{ vtype }}</option>
+            {% endfor %}
+        </select>
+
+        <input
+            type="text"
+            name="location"
+            value="{{ filters.location or '' }}"
+            placeholder="📍 Location or town"
+            aria-label="Filter by location"
+        >
+
+        <input
+            type="number"
+            name="min_rent"
+            value="{{ filters.minimum_rent or '' }}"
+            min="0"
+            step="50"
+            placeholder="Min Rent (₹)"
+            aria-label="Minimum Rent"
+        >
+
+        <input
+            type="number"
+            name="max_rent"
+            value="{{ filters.maximum_rent or '' }}"
+            min="0"
+            step="50"
+            placeholder="Max Rent (₹)"
+            aria-label="Maximum Rent"
+        >
+
+        <button type="submit" class="btn btn-primary filter-button">
+            Filter
+        </button>
+
+        <a href="/vehicles" class="clear-filter">
+            Clear
+        </a>
+    </form>
+
+    <!-- VEHICLES GRID -->
+    {% if vehicles %}
+        <div class="vehicle-grid">
+            {% for vehicle in vehicles %}
+                <article class="vehicle-card">
+                    <div class="vehicle-header">
+                        <div class="vehicle-icon" aria-hidden="true">
+                            {% if vehicle[2]|lower == "tractor" %}
+                                🚜
+                            {% elif vehicle[2]|lower == "pickup" %}
+                                🛻
+                            {% elif vehicle[2]|lower == "lorry" or vehicle[2]|lower == "tipper" %}
+                                🚛
+                            {% else %}
+                                🚚
+                            {% endif %}
+                        </div>
+                        <div class="vehicle-title-group">
+                            <h2>{{ vehicle[1] }}</h2>
+                            <span class="vehicle-type-tag">{{ vehicle[2] }}</span>
+                        </div>
+                    </div>
+
+                    <div class="vehicle-body">
+                        <div class="detail-row">
+                            <span class="detail-label">📍 {{ t.get("location", "Location") }}:</span>
+                            <span class="detail-value">{{ vehicle[5] }}</span>
+                        </div>
+
+                        <div class="detail-row">
+                            <span class="detail-label">🛣️ Route:</span>
+                            <span class="detail-value route-highlight">
+                                {{ vehicle[6] }} → {{ vehicle[7] }}
+                            </span>
+                        </div>
+
+                        <div class="detail-row">
+                            <span class="detail-label">💰 Fixed Route Rent:</span>
+                            <span class="detail-value rent-pill">
+                                ₹{{ vehicle[8] }}
+                            </span>
+                        </div>
+
+                        <div class="detail-row">
+                            <span class="detail-label">📞 {{ t.get("contact", "Contact") }}:</span>
+                            <span class="detail-value">{{ vehicle[4] }}</span>
+                        </div>
+                    </div>
+
+                    <div class="vehicle-card-actions">
+                        <a href="/vehicle/{{ vehicle[0] }}" class="btn btn-secondary btn-sm">
+                            ℹ️ View Details
+                        </a>
+                        <a href="/book/{{ vehicle[0] }}?route_id={{ vehicle[9] }}" class="btn btn-primary btn-sm">
+                            🚛 {{ t.get("book_now", "Book Now") }}
+                        </a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-box">
+            <div style="font-size: 50px; margin-bottom: 12px;">🚫</div>
+            <h2>{{ t.get("no_vehicles", "No Vehicles Available") }}</h2>
+            <p>{{ t.get("no_vehicles_message", "There are currently no vehicles matching your search criteria.") }}</p>
+            <div style="margin-top: 18px;">
+                <a href="/vehicles" class="btn btn-primary">
+                    Clear Filters & Show All Vehicles
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+</main>
+
+<footer>
+    <p>© 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</p>
+    <p>{{ t.get("footer_message", "Simple transportation service for everyone.") }}</p>
+</footer>
+
+</body>
+</html>

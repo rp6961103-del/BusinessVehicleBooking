@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Admin {{ page|capitalize }} | Business Vehicle Booking</title>
+	<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+	<style>
+		.admin-shell { max-width: 1180px; margin: 0 auto; padding: 1.5rem; }
+		.admin-nav { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 2rem; }
+		.admin-nav a, .admin-nav button { padding: .55rem .8rem; text-decoration: none; }
+		.admin-nav form { margin-left: auto; }
+		.admin-nav button { cursor: pointer; }
+		.admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+		.admin-card, .admin-panel { padding: 1rem; border: 1px solid #d8dee4; background: #fff; }
+		.admin-card strong { display: block; font-size: 1.8rem; margin-top: .35rem; }
+		.admin-panel { margin-top: 1.5rem; overflow-x: auto; }
+		.admin-table { width: 100%; border-collapse: collapse; }
+		.admin-table th, .admin-table td { padding: .7rem; border-bottom: 1px solid #e2e6ea; text-align: left; white-space: nowrap; }
+		.admin-filter { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; }
+		.admin-filter input, .admin-filter select, .admin-filter button { padding: .6rem; }
+		.admin-message { padding: .7rem 1rem; border-left: 4px solid #376f51; background: #edf8f0; }
+		.admin-message-error { border-color: #a12622; background: #fff0ef; }
+		.admin-status { display: inline-block; padding: .2rem .45rem; border-radius: 999px; font-size: .85rem; }
+		.admin-status-active { color: #1d5b38; background: #e4f4e9; }
+		.admin-status-inactive { color: #7e241e; background: #fbe8e6; }
+		.admin-action { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+		@media (max-width: 640px) { .admin-shell { padding: 1rem; } .admin-nav form { margin-left: 0; } }
+	</style>
+</head>
+<body>
+<main class="admin-shell">
+	<nav class="admin-nav" aria-label="Admin navigation">
+		<strong>Admin</strong>
+		<a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+		<a href="{{ url_for('admin_customers') }}">Customers</a>
+		<a href="{{ url_for('admin_owners') }}">Owners</a>
+		<a href="{{ url_for('admin_vehicles') }}">Vehicles</a>
+		<a href="{{ url_for('admin_bookings') }}">Bookings</a>
+		<form method="POST" action="{{ url_for('admin_logout') }}">
+			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+			<button type="submit">Log out</button>
+		</form>
+	</nav>
+	{% with messages = get_flashed_messages(with_categories=true) %}
+		{% for category, message in messages %}
+			<p class="admin-message admin-message-{{ category }}">{{ message }}</p>
+		{% endfor %}
+	{% endwith %}
+
+	{% if page == "dashboard" %}
+		<h1>Admin Dashboard</h1>
+		<p>Signed in as {{ session["admin_username"] }}. This dashboard is read-only.</p>
+		<section class="admin-grid" aria-label="Platform totals">
+			<div class="admin-card">Customers<strong>{{ total_customers }}</strong></div>
+			<div class="admin-card">Owners<strong>{{ total_owners }}</strong></div>
+			<div class="admin-card">Vehicles<strong>{{ total_vehicles }}</strong></div>
+			<div class="admin-card">Bookings<strong>{{ total_bookings }}</strong></div>
+			<div class="admin-card">Pending bookings<strong>{{ pending_bookings }}</strong></div>
+			<div class="admin-card">Active vehicles<strong>{{ active_vehicles }}</strong></div>
+		</section>
+		<section class="admin-panel">
+			<h2>Recent bookings</h2>
+			<table class="admin-table">
+				<thead><tr><th>ID</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Status</th></tr></thead>
+				<tbody>
+				{% for record in recent_bookings %}
+					<tr><td>{{ record[0] }}</td><td>{{ record[1] }}</td><td>{{ record[2] }}</td><td>{{ record[3] }}</td><td>{{ record[4] }}</td></tr>
+				{% else %}
+					<tr><td colspan="5">No bookings found.</td></tr>
+				{% endfor %}
+				</tbody>
+			</table>
+		</section>
+	{% else %}
+		<h1>{{ page|capitalize }}</h1>
+		<p>Read-only administrative view.</p>
+		<section class="admin-panel">
+			<form class="admin-filter" method="GET">
+				<input type="search" name="q" value="{{ search or '' }}" placeholder="Search">
+				{% if page == "bookings" %}
+					<select name="status">
+						<option value="">All statuses</option>
+						{% for option in ("Pending", "Accepted", "Rejected") %}
+							<option value="{{ option }}" {% if status == option %}selected{% endif %}>{{ option }}</option>
+						{% endfor %}
+					</select>
+				{% endif %}
+				<button type="submit">Filter</button>
+			</form>
+			<table class="admin-table">
+				<thead>
+				{% if page == "customers" %}<tr><th>ID</th><th>Name</th><th>Phone</th><th>Status</th><th>Action</th></tr>
+				{% elif page == "owners" %}<tr><th>ID</th><th>Name</th><th>Phone</th><th>Email</th><th>Status</th><th>Action</th></tr>
+				{% elif page == "vehicles" %}<tr><th>ID</th><th>Name</th><th>Type</th><th>Owner</th><th>Location</th><th>Status</th><th>Action</th></tr>
+				{% else %}<tr><th>ID</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Status</th><th>Action</th></tr>{% endif %}
+				</thead>
+				<tbody>
+				{% for record in records %}
+					{% if page == "customers" %}
+						<tr><td>{{ record[0] }}</td><td>{{ record[1] }}</td><td>{{ record[2] }}</td><td><span class="admin-status admin-status-{{ 'active' if record[3] else 'inactive' }}">{{ "Active" if record[3] else "Inactive" }}</span></td><td>
+							<form method="POST" action="{{ url_for('admin_customer_status', customer_id=record[0]) }}" onsubmit="return confirm('Change this customer account status?');">
+								<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ 'inactive' if record[3] else 'active' }}"><button type="submit">{{ "Deactivate" if record[3] else "Reactivate" }}</button>
+							</form>
+						</td></tr>
+					{% elif page == "owners" %}
+						<tr><td>{{ record[0] }}</td><td>{{ record[1] }}</td><td>{{ record[2] }}</td><td>{{ record[3] }}</td><td><span class="admin-status admin-status-{{ 'active' if record[4] else 'inactive' }}">{{ "Active" if record[4] else "Inactive" }}</span></td><td>
+							<form method="POST" action="{{ url_for('admin_owner_status', owner_id=record[0]) }}" onsubmit="return confirm('Change this owner account status?');">
+								<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ 'inactive' if record[4] else 'active' }}"><button type="submit">{{ "Deactivate" if record[4] else "Reactivate" }}</button>
+							</form>
+						</td></tr>
+					{% elif page == "vehicles" %}
+						<tr><td>{{ record[0] }}</td><td>{{ record[1] }}</td><td>{{ record[2] }}</td><td>{{ record[3] }}</td><td>{{ record[4] }}</td><td><span class="admin-status admin-status-{{ 'active' if record[5] else 'inactive' }}">{{ "Active" if record[5] else "Inactive" }}</span></td><td>
+							<form method="POST" action="{{ url_for('admin_vehicle_status', vehicle_id=record[0]) }}" onsubmit="return confirm('Change this vehicle status?');">
+								<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ 'inactive' if record[5] else 'active' }}"><button type="submit">{{ "Deactivate" if record[5] else "Activate" }}</button>
+							</form>
+						</td></tr>
+					{% else %}
+						<tr><td>{{ record[0] }}</td><td>{{ record[1] }}</td><td>{{ record[2] }}</td><td>{{ record[3] }}</td><td>{{ record[4] }}</td><td>
+							<form method="POST" action="{{ url_for('admin_booking_status', booking_id=record[0]) }}">
+								<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="status"><option value="Pending" {% if record[4] == "Pending" %}selected{% endif %}>Pending</option><option value="Accepted" {% if record[4] == "Accepted" %}selected{% endif %}>Accepted</option><option value="Rejected" {% if record[4] == "Rejected" %}selected{% endif %}>Rejected</option></select><button type="submit">Update</button>
+							</form>
+						</td></tr>
+					{% endif %}
+				{% else %}
+					<tr><td colspan="7">No records found.</td></tr>
+				{% endfor %}
+				</tbody>
+			</table>
+		</section>
+	{% endif %}
+</main>
+</body>
+</html>

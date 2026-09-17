@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmation - BusinessVehicleBooking</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; color: #333333;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f7f6; padding: 30px 15px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1f4e79 0%, #163a5c 100%); padding: 28px 30px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: 0.5px;">
+                                🚚 BusinessVehicleBooking
+                            </h1>
+                            <p style="margin: 6px 0 0; color: #d0e1f3; font-size: 14px;">
+                                Vehicle Booking Confirmation
+                            </p>
+                        </td>
+                    </tr>
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <div style="text-align: center; margin-bottom: 24px;">
+                                <span style="display: inline-block; background-color: #e8f5e9; color: #2e7d32; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;">
+                                    ✓ Booking Request Received
+                                </span>
+                            </div>
+
+                            <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px; color: #222222;">
+                                Hello <strong>{{ booking.customer_name }}</strong>,
+                            </p>
+                            <p style="font-size: 14px; line-height: 1.6; margin: 0 0 24px; color: #555555;">
+                                Your vehicle booking request has been successfully received and saved. The current status is shown below.
+                            </p>
+
+                            <!-- Details Table -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 24px;">
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; width: 40%;">Booking ID</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b; font-weight: 700;">#{{ booking.booking_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Vehicle Name</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b; font-weight: 600;">{{ booking.vehicle_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Vehicle Type</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b;">{{ booking.vehicle_type or 'Commercial' }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Vehicle Owner</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b; font-weight: 600;">{{ booking.owner_name or 'Registered Owner' }}</td>
+                                </tr>
+                                {% if booking.owner_phone %}
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Owner Contact</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b;">{{ booking.owner_phone }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">From Location</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b;">{{ booking.from_location }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">To Location</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b;">{{ booking.to_location }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Booking Date</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b; font-weight: 600;">{{ booking.booking_date }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Rent</td>
+                                    <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 15px; color: #1f4e79; font-weight: 700;">₹{{ booking.rent }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 18px; font-size: 13px; color: #64748b;">Status</td>
+                                    <td style="padding: 12px 18px; font-size: 14px; color: #d97706; font-weight: 700;">{{ booking.status }}</td>
+                                </tr>
+                            </table>
+
+                            <!-- Thank you message -->
+                            <div style="background-color: #eff6ff; border-left: 4px solid #1f4e79; padding: 14px 18px; border-radius: 4px; margin-bottom: 24px;">
+                                <p style="margin: 0; font-size: 13px; color: #1e3a8a; line-height: 1.5;">
+                                    <strong>Thank you for choosing BusinessVehicleBooking!</strong><br>
+                                    Please keep your Booking ID <strong>#{{ booking.booking_id }}</strong> handy. The vehicle owner will review your request and update the booking status.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f1f5f9; padding: 20px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0 0 6px; font-size: 12px; color: #64748b;">
+                                © 2026 <strong>BusinessVehicleBooking</strong>. All rights reserved.
+                            </p>
+                            <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                                Heavy and commercial vehicle booking platform for farmers and businesses.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Details | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+    <a class="logo" href="/">🚚 Business Vehicle Booking</a>
+    <nav>
+        <a href="/vehicles">Vehicles</a>
+        <a href="/mybookings">My Bookings</a>
+        <a href="/farmer-ai">Farmer AI</a>
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">Logout</button>
+        </form>
+    </nav>
+</header>
+<main class="container">
+    <div class="details-showcase">
+        <div class="page-header">
+            <h1>{{ vehicle[1] }}</h1>
+            <p>{{ vehicle[2] }} • {{ vehicle[5] }}</p>
+        </div>
+
+        <div class="detail-row">
+            <span class="detail-label">Vehicle Type</span>
+            <span class="detail-value">{{ vehicle[2] }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Current/Base Location</span>
+            <span class="detail-value">{{ vehicle[5] }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Contact</span>
+            <span class="detail-value">{{ vehicle[4] }}</span>
+        </div>
+
+        <h3 style="margin-top: 24px; margin-bottom: 16px;">Available Routes & Fixed Rent</h3>
+        <div class="routes-list">
+            {% for route in routes %}
+            <div class="route-card">
+                <div>
+                    <div class="route-path">🛣️ {{ route[6] }} → {{ route[7] }}</div>
+                    <div class="route-rent">₹{{ route[8] }}</div>
+                </div>
+                <a class="btn btn-primary" href="/book/{{ route[0] }}?route_id={{ route[9] }}">Book This Vehicle</a>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top: 20px;">
+            <a class="btn btn-secondary" href="/vehicles">Back to Vehicles</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

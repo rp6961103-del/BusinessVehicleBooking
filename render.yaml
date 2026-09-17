@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: business-vehicle-booking
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: TRUSTED_PROXY_HOPS
+        value: "0"
+      - key: MAIL_ENABLED
+        value: "false"
+      - key: SECRET_KEY
+        sync: false
+      - key: MYSQL_HOST
+        sync: false
+      - key: MYSQL_PORT
+        sync: false
+      - key: MYSQL_DATABASE
+        sync: false
+      - key: MYSQL_USER
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: gemini
+      - key: AI_MODEL
+        value: gemini-3.6-flash
+      - key: GEMINI_TIMEOUT
+        value: "30"
+      - key: MAIL_SERVER
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_USE_TLS
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_DEFAULT_SENDER
+        sync: false

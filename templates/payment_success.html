@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .success-page { min-height: 80vh; display: grid; place-items: center; padding: 32px 16px; }
+        .success-card { width: min(780px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-lg); padding: 32px; }
+        .success-icon { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: #dff3e8; color: #17603c; font-size: 40px; margin: 0 auto 18px; }
+        .success-card h1 { text-align: center; color: var(--brand-dark); margin-bottom: 8px; }
+        .subtitle { text-align: center; color: var(--muted); margin-bottom: 22px; }
+        .demo-tag { display: inline-flex; margin: 0 auto 18px; align-items: center; justify-content: center; background: #edf8f2; border: 1px solid #bfe2cd; color: #17603c; border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+        .receipt { margin-top: 20px; background: #f8fbfa; border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+        .receipt-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+        .receipt-row:last-child { border-bottom: 0; }
+        .receipt-label { color: var(--muted); font-weight: 700; }
+        .receipt-value { font-weight: 800; color: var(--ink); text-align: right; }
+        .actions { display: flex; gap: 12px; margin-top: 22px; }
+        .btn { border-radius: 10px; padding: 13px 18px; text-decoration: none; font-weight: 800; display: inline-flex; justify-content: center; align-items: center; }
+        .btn-primary { background: var(--brand); color: #fff; }
+        .btn-secondary { background: var(--brand-soft); color: var(--brand-dark); }
+        @media (max-width: 640px) { .receipt-row { display: grid; grid-template-columns: 1fr; gap: 4px; } .actions { flex-direction: column; } }
+    </style>
+</head>
+<body>
+<header>
+    <a class="logo" href="/vehicles">🚚 Business Vehicle Booking</a>
+    <nav>
+        <a href="/mybookings">📋 My Bookings</a>
+        <a href="/farmer-ai">🌿 Farmer AI</a>
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 Logout</button>
+        </form>
+    </nav>
+</header>
+<main class="success-page">
+    <section class="success-card">
+        <div class="success-icon">✓</div>
+        <div class="demo-tag">Demo Payment</div>
+        <h1>✓ Payment Successful</h1>
+        <p class="subtitle">This demo payment was completed successfully and has been recorded in the system.</p>
+        <div class="receipt">
+            <div class="receipt-row"><span class="receipt-label">Booking ID</span><span class="receipt-value">#{{ booking[0] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">Vehicle</span><span class="receipt-value">{{ booking[5] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">Amount Paid</span><span class="receipt-value">₹{{ booking[10] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">Payment Method</span><span class="receipt-value">{{ booking[11] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">Transaction Reference</span><span class="receipt-value">{{ booking[12] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">Payment Status</span><span class="receipt-value">{{ booking[13] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">Date</span><span class="receipt-value">{{ booking[14] }}</span></div>
+        </div>
+        <div class="actions">
+            <a class="btn btn-primary" href="/mybookings">View Booking</a>
+            <a class="btn btn-secondary" href="/booking/{{ booking[0] }}/receipt?download=1">Download Receipt</a>
+        </div>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+    <a href="/" class="logo">🚚 Business Vehicle Booking</a>
+    <nav>
+        <a href="/vehicles">🚚 Vehicles</a>
+        <a href="/mybookings" class="active">📋 My Bookings</a>
+        <a href="/farmer-ai" class="nav-highlight">🌿 Farmer AI</a>
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 Logout</button>
+        </form>
+    </nav>
+</header>
+
+<div class="language-bar">
+    <span>🌐 {{ t.get('language', 'Language') }}:</span>
+    <form method="POST" action="{{ url_for('change_language', language='en') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='te') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
+    </form>
+</div>
+
+<main class="container">
+    <div class="page-header">
+        <h1>📋 My Bookings</h1>
+        <p>Track every route booking and rate accepted services.</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if bookings %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Booking ID</th>
+                    <th>Vehicle</th>
+                    <th>Route</th>
+                    <th>Booking Date</th>
+                    <th>Rent</th>
+                    <th>Status</th>
+                    <th>Rating</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr>
+                    <td>#{{ booking[0] }}</td>
+                    <td>
+                        <strong>{{ booking[5] }}</strong><br>
+                        <small>{{ booking[6] }}</small>
+                    </td>
+                    <td>{{ booking[7] }} → {{ booking[8] }}</td>
+                    <td>{{ booking[3] }}</td>
+                    <td>₹{{ booking[9] }}</td>
+                    <td>
+                        {% if booking[4]|lower == 'accepted' %}
+                            <span class="status status-accepted">✅ Booking Confirmed</span>
+                        {% elif booking[4]|lower == 'rejected' %}
+                            <span class="status status-rejected">❌ Booking Rejected</span>
+                        {% else %}
+                            <span class="status status-pending">⏳ Waiting for Owner Confirmation</span>
+                        {% endif %}
+                        {% if booking[4]|lower == 'accepted' %}
+                            <div style="margin-top:8px;">
+                                {% set payment_status = (booking[12] or 'Pending')|lower %}
+                                {% if payment_status == 'paid' %}
+                                    <span class="status status-accepted">✓ Payment Completed</span>
+                                {% else %}
+                                    <span class="status status-pending">Payment Status: Pending</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if booking[4]|lower == 'accepted' %}
+                            {% set payment_status = (booking[12] or 'Pending')|lower %}
+                            {% if payment_status == 'paid' %}
+                                <div style="display:grid; gap:8px;">
+                                    <div>✓ Paid: ₹{{ booking[13] or booking[9] }}</div>
+                                    {% if booking[15] %}<small>Ref: {{ booking[15] }}</small>{% endif %}
+                                    <a href="/booking/{{ booking[0] }}/payment-success" class="btn btn-primary btn-sm">View Receipt</a>
+                                </div>
+                            {% else %}
+                                <a href="/booking/{{ booking[0] }}/pay" class="btn btn-primary btn-sm">Pay Now</a>
+                            {% endif %}
+                        {% elif booking[4]|lower == 'accepted' %}
+                            —
+                        {% else %}
+                            —
+                        {% endif %}
+                        {% if booking[10] %}
+                            {% if booking[4]|lower != 'accepted' %}
+                                <div>⭐ {{ booking[10] }}/5</div>
+                                {% if booking[11] %}<small>{{ booking[11] }}</small>{% endif %}
+                            {% endif %}
+                        {% elif booking[4]|lower == 'accepted' and (booking[12] or 'Pending')|lower == 'paid' %}
+                            <div style="margin-top:8px;">Rate after service completion</div>
+                        {% elif booking[4]|lower == 'accepted' %}
+                            <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm">Rate Service</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-box" style="text-align:center;">
+        <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
+        <h2>No Bookings</h2>
+        <p>You have not made any vehicle bookings yet.</p>
+        <div style="margin-top:18px;">
+            <a href="/vehicles" class="btn btn-primary">Browse Vehicles</a>
+        </div>
+    </div>
+    {% endif %}
+</main>
+
+<footer>
+    <p>© 2026 Business Vehicle Booking</p>
+    <p>Simple transportation service for everyone.</p>
+</footer>
+</body>
+</html>

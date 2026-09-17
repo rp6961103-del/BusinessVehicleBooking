@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Owner Dashboard | Business Vehicle Booking</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+:root{--od-brand:#176b58;--od-dark:#123c34;--od-soft:#eaf5f1;--od-line:#dfe9e5;--od-bg:#f5f8f7;--od-muted:#64736f;--od-shadow:0 12px 35px rgba(22,55,48,.08)}
+body{background:var(--od-bg);color:#20302c}
+.od-wrap{width:min(1240px,94%);margin:28px auto 50px}
+.od-hero{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;padding:28px;border-radius:22px;background:linear-gradient(135deg,#123c34,#176b58);color:#fff;box-shadow:var(--od-shadow);margin-bottom:22px}
+.od-hero h1{margin:0 0 8px;font-size:32px}.od-hero p{margin:0;opacity:.86}.od-actions{display:flex;gap:9px;flex-wrap:wrap}.od-actions a{background:#fff;color:var(--od-dark);padding:11px 15px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px}
+.od-lang{display:flex;justify-content:flex-end;gap:7px;margin:0 0 14px;align-items:center;color:var(--od-muted);font-size:13px}.od-lang form{display:inline}.od-lang button{border:1px solid var(--od-line);background:#fff;border-radius:9px;padding:7px 10px;cursor:pointer}.od-lang button.active{background:var(--od-soft);color:var(--od-brand);font-weight:800}
+.od-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}.stat{background:#fff;border:1px solid var(--od-line);border-radius:16px;padding:18px;box-shadow:var(--od-shadow)}.stat-top{display:flex;justify-content:space-between;align-items:center}.stat-icon{font-size:25px}.stat-label{font-size:12px;color:var(--od-muted);font-weight:700}.stat-value{font-size:28px;font-weight:900;margin-top:7px;color:var(--od-dark)}.stat.pending .stat-value{color:#b26b00}.stat.accepted .stat-value{color:#19734f}.stat.rejected .stat-value{color:#b53a3a}
+.od-section{background:#fff;border:1px solid var(--od-line);border-radius:18px;box-shadow:var(--od-shadow);overflow:hidden;margin-bottom:22px}.od-section-head{padding:18px 20px;border-bottom:1px solid var(--od-line);display:flex;justify-content:space-between;gap:15px;align-items:center}.od-section-head h2{margin:0;color:var(--od-dark);font-size:20px}.od-section-head span{color:var(--od-muted);font-size:13px}
+.pending-panel{background:#fff9ec;border:1px solid #f1d9a5;border-radius:15px;padding:15px 17px;margin:18px 20px}.pending-panel strong{color:#8b5c0b}.pending-panel p{margin:5px 0 0;color:#6d5a35;font-size:13px}
+.table-wrap{overflow:auto}.od-table{width:100%;border-collapse:collapse;min-width:1000px}.od-table th{background:#f2f7f5;color:#46605a;padding:13px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}.od-table td{padding:14px 12px;border-top:1px solid #edf1ef;font-size:13px;vertical-align:middle}.od-table tr:hover td{background:#fbfdfc}.customer{font-weight:800;color:#20302c}.vehicle{font-weight:800;color:var(--od-brand)}.route{white-space:nowrap}.rent{font-weight:900;color:#19734f;white-space:nowrap}.status{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:900}.s-pending{background:#fff1ce;color:#8a5a00}.s-accepted{background:#dcf2e8;color:#166541}.s-rejected{background:#fbe3e3;color:#a13434}
+.action-cell{min-width:180px}.action-buttons{display:flex;gap:7px}.action-buttons form{margin:0}.action-btn{border:0;border-radius:9px;padding:9px 11px;color:#fff;font-weight:900;font-size:12px;cursor:pointer}.accept{background:#198754}.reject{background:#d94a4a}.action-btn:hover{filter:brightness(.94)}.no-action{color:#8a9692;font-size:12px}
+.empty{padding:55px 20px;text-align:center;color:var(--od-muted)}.empty .icon{font-size:42px}.empty h3{color:var(--od-dark);margin:10px 0 5px}
+@media(max-width:900px){.od-hero{flex-direction:column;align-items:flex-start}.od-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.od-wrap{width:92%}.od-hero h1{font-size:25px}.od-stats{grid-template-columns:1fr 1fr;gap:9px}.stat{padding:14px}.stat-value{font-size:23px}.od-actions{width:100%}.od-actions a{flex:1;text-align:center}.od-section-head{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+<a href="/" class="logo">🚚 {{ t.get("vehicle_booking","Business Vehicle Booking") }}</a>
+<nav>
+<a href="/owner_dashboard" class="active">📊 Dashboard</a>
+<a href="/addvehicle">🚚 Add Vehicle</a>
+<a href="/myvehicles">🚛 My Vehicles</a>
+<a href="/addroute">📍 Add Route</a>
+<form method="POST" action="/owner_logout" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">🚪 Logout</button></form>
+</nav>
+</header>
+
+<div class="od-wrap">
+<div class="od-lang">
+<span>🌐 {{ t.get("language","Language") }}</span>
+{% for code,label in [('en','English'),('te','తెలుగు'),('hi','हिन्दी')] %}
+<form method="POST" action="{{ url_for('change_language', language=code) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="{% if current_language == code %}active{% endif %}" type="submit">{{ label }}</button></form>
+{% endfor %}
+</div>
+
+<section class="od-hero">
+<div><h1>Owner Dashboard</h1><p>Welcome, <strong>{{ session.get("owner_name") }}</strong>. Manage your fleet and respond to customer booking requests.</p></div>
+<div class="od-actions"><a href="/addvehicle">+ Add Vehicle</a><a href="/addroute">+ Add Route & Rent</a></div>
+</section>
+
+<section class="od-stats">
+<div class="stat"><div class="stat-top"><span class="stat-label">TOTAL BOOKINGS</span><span class="stat-icon">📋</span></div><div class="stat-value">{{ total_bookings }}</div></div>
+<div class="stat"><div class="stat-top"><span class="stat-label">TOTAL VEHICLES</span><span class="stat-icon">🚛</span></div><div class="stat-value">{{ vehicle_count }}</div></div>
+<div class="stat"><div class="stat-top"><span class="stat-label">Active Vehicles</span><span class="stat-icon">🟢</span></div><div class="stat-value">{{ active_vehicles }}</div></div>
+<div class="stat pending"><div class="stat-top"><span class="stat-label">PENDING ACTION</span><span class="stat-icon">⏳</span></div><div class="stat-value">{{ pending_bookings }}</div></div>
+<div class="stat accepted"><div class="stat-top"><span class="stat-label">ACCEPTED</span><span class="stat-icon">✅</span></div><div class="stat-value">{{ accepted_bookings }}</div></div>
+</section>
+
+<section class="od-section">
+<div class="od-section-head"><h2>📋 Customer Booking Requests</h2><span>{{ total_bookings }} booking(s)</span></div>
+{% if pending_bookings %}
+<div class="pending-panel"><strong>⏳ {{ pending_bookings }} booking request(s) need your action.</strong><p>Review the customer, route, date and fixed rent below, then use <b>Accept</b> or <b>Reject</b>.</p></div>
+{% endif %}
+{% if bookings %}
+<div class="table-wrap"><table class="od-table">
+<thead><tr><th>ID</th><th>Customer</th><th>Phone</th><th>Email</th><th>Vehicle</th><th>Route</th><th>Date</th><th>Rent</th><th>Status</th><th>Payment</th><th>Action</th></tr></thead>
+<tbody>
+{% for booking in bookings %}
+<tr>
+<td>#{{ booking[0] }}</td>
+<td><span class="customer">{{ booking[1] }}</span></td>
+<td>{{ booking[2] }}</td>
+<td>{{ booking[3] or '—' }}</td>
+<td><span class="vehicle">{{ booking[6] }}</span><br><small>{{ booking[7] }}</small></td>
+<td class="route">{{ booking[8] or '—' }} → {{ booking[9] or '—' }}</td>
+<td>{{ booking[4] }}</td>
+<td><span class="rent">₹{{ booking[10] }}</span></td>
+<td>
+{% set st = booking[5]|lower|trim %}
+{% if st == 'pending' %}<span class="status s-pending">⏳ Pending</span>
+{% elif st == 'accepted' %}<span class="status s-accepted">✓ Accepted</span>
+{% elif st == 'rejected' %}<span class="status s-rejected">✕ Rejected</span>
+{% else %}<span class="status">{{ booking[4] }}</span>{% endif %}
+</td>
+<td>
+{% set payment_status = (booking[13] or 'Pending')|lower %}
+{% if payment_status == 'paid' %}
+<span class="status s-accepted">✓ Paid</span>
+{% else %}
+<span class="status s-pending">Pending</span>
+{% endif %}
+</td>
+<td class="action-cell">
+{% if st == 'pending' %}
+<div class="action-buttons">
+<form method="POST" action="{{ url_for('update_booking', booking_id=booking[0], status='Accepted') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="action-btn accept" type="submit">✓ Accept</button></form>
+<form method="POST" action="{{ url_for('update_booking', booking_id=booking[0], status='Rejected') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="action-btn reject" type="submit">✕ Reject</button></form>
+</div>
+{% else %}<span class="no-action">No action required</span>{% endif %}
+</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}
+<div class="empty"><div class="icon">📭</div><h3>No booking requests yet</h3><p>New customer bookings for your vehicles will appear here.</p></div>
+{% endif %}
+</section>
+
+<section class="od-section">
+<div class="od-section-head"><h2>Quick Management</h2><span>Keep your fleet information up to date</span></div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px">
+<a href="/addvehicle" style="padding:18px;border:1px solid var(--od-line);border-radius:13px;text-decoration:none;color:var(--od-dark);font-weight:800">🚚 Add Vehicle<br><small style="color:var(--od-muted)">Register a new vehicle</small></a>
+<a href="/myvehicles" style="padding:18px;border:1px solid var(--od-line);border-radius:13px;text-decoration:none;color:var(--od-dark);font-weight:800">🚛 My Vehicles<br><small style="color:var(--od-muted)">Edit and manage vehicles</small></a>
+<a href="/addroute" style="padding:18px;border:1px solid var(--od-line);border-radius:13px;text-decoration:none;color:var(--od-dark);font-weight:800">📍 Routes & Rent<br><small style="color:var(--od-muted)">Set fixed route pricing</small></a>
+</div>
+</section>
+</div>
+<footer class="footer"><p>© 2026 {{ t.get("vehicle_booking","Business Vehicle Booking") }} • Owner Management Portal</p></footer>
+</body>
+</html>

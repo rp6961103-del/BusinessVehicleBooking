@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Demo Payment | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { background: #f3f7f6; }
+        .payment-page { min-height: 80vh; display: grid; place-items: center; padding: 32px 16px; }
+        .payment-shell { width: min(960px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; }
+        .payment-header { padding: 24px 28px 18px; background: linear-gradient(135deg, #0b4d42, #146b5b); color: #fff; }
+        .demo-tag { display: inline-block; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+        .payment-header h1 { color: #fff; margin: 12px 0 6px; font-size: clamp(2rem, 4vw, 2.7rem); }
+        .payment-header p { margin: 0; color: rgba(255,255,255,0.9); }
+        .payment-body { display: grid; grid-template-columns: 1.2fr 1fr; }
+        .summary-panel, .form-panel { padding: 28px; }
+        .summary-panel { background: #f8fbfa; border-right: 1px solid var(--line); }
+        .label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; margin-top: 16px; }
+        .summary-item { padding: 12px 0; border-bottom: 1px solid var(--line); }
+        .summary-item:nth-last-child(-n+2) { border-bottom: 0; }
+        .summary-item strong { display: block; font-size: 15px; margin-top: 4px; }
+        .amount-box { margin-top: 18px; display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+        .amount-title { color: var(--muted); font-size: 13px; }
+        .amount-value { font-size: 2rem; font-weight: 900; color: var(--brand-dark); }
+        .form-panel form { display: grid; gap: 16px; }
+        .field { display: grid; gap: 8px; }
+        .field label { font-weight: 700; color: var(--ink); }
+        .field input, .field select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; background: #fff; }
+        .field input:focus, .field select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(20,107,91,0.12); outline: none; }
+        .radio-list { display: grid; gap: 12px; }
+        .radio-option { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fbfdfc; }
+        .radio-option input { width: auto; }
+        .note { padding: 12px 14px; background: #fff7e8; border: 1px solid #f4dfb0; border-radius: 11px; color: var(--warning); font-size: 14px; font-weight: 600; }
+        .submit-row { display: flex; gap: 12px; margin-top: 10px; }
+        .btn { border: 0; border-radius: 10px; padding: 13px 18px; font-size: 1rem; font-weight: 800; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; text-decoration: none; }
+        .btn-primary { background: var(--brand); color: #fff; }
+        .btn-secondary { background: var(--brand-soft); color: var(--brand-dark); }
+        .btn:disabled { opacity: 0.75; cursor: wait; }
+        .loader { display: none; align-items: center; gap: 8px; font-size: 0.95rem; color: var(--brand-dark); font-weight: 700; }
+        .loader.active { display: inline-flex; }
+        .loading-spinner { width: 16px; height: 16px; border: 2px solid rgba(20,107,91,0.2); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 760px) {
+            .payment-body { grid-template-columns: 1fr; }
+            .summary-panel { border-right: 0; border-bottom: 1px solid var(--line); }
+            .summary-grid { grid-template-columns: 1fr; }
+            .submit-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <a class="logo" href="/vehicles">🚚 Business Vehicle Booking</a>
+    <nav>
+        <a href="/mybookings">📋 My Bookings</a>
+        <a href="/farmer-ai">🌿 Farmer AI</a>
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 Logout</button>
+        </form>
+    </nav>
+</header>
+<main class="payment-page">
+    <section class="payment-shell">
+        <div class="payment-header">
+            <span class="demo-tag">DEMO PAYMENT — NO REAL MONEY</span>
+            <h1>Secure Demo Payment</h1>
+            <p>This is a project demo transaction only. No real money is charged.</p>
+        </div>
+
+        <div class="payment-body">
+            <div class="summary-panel">
+                <div class="label">Payment Summary</div>
+                <div class="summary-grid">
+                    <div class="summary-item"><span class="label">Booking ID</span><strong>#{{ booking[0] }}</strong></div>
+                    <div class="summary-item"><span class="label">Vehicle</span><strong>{{ booking[5] }}</strong></div>
+                    <div class="summary-item"><span class="label">Vehicle Type</span><strong>{{ booking[6] }}</strong></div>
+                    <div class="summary-item"><span class="label">From</span><strong>{{ booking[7] or 'Not specified' }}</strong></div>
+                    <div class="summary-item"><span class="label">To</span><strong>{{ booking[8] or 'Not specified' }}</strong></div>
+                    <div class="summary-item"><span class="label">Booking Date</span><strong>{{ booking[3] }}</strong></div>
+                    <div class="summary-item"><span class="label">Amount</span><strong>₹{{ amount }}</strong></div>
+                    <div class="summary-item"><span class="label">Booking Status</span><strong>{{ booking[4] }}</strong></div>
+                </div>
+                <div class="amount-box">
+                    <div>
+                        <div class="amount-title">Total Due</div>
+                    </div>
+                    <div class="amount-value">₹{{ amount }}</div>
+                </div>
+            </div>
+
+            <div class="form-panel">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="message {{ category }}" role="alert">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="{{ url_for('pay_booking', booking_id=booking[0]) }}" id="demo-payment-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="field">
+                        <div class="label">Payment Method</div>
+                        <div class="radio-list">
+                            <label class="radio-option">
+                                <input type="radio" name="payment_method" value="Demo Card" {% if payment_method == 'Demo Card' %}checked{% endif %}>
+                                <span>Demo Card</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="payment_method" value="Demo UPI" {% if payment_method == 'Demo UPI' %}checked{% endif %}>
+                                <span>Demo UPI</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="field" id="cardholder-field">
+                        <label for="cardholder_name">Cardholder Name</label>
+                        <input type="text" id="cardholder_name" name="cardholder_name" placeholder="Enter demo cardholder name" value="{{ request.form.get('cardholder_name','') }}">
+                    </div>
+
+                    <div class="field" id="upi-field" style="display:none;">
+                        <label for="demo_upi_id">Demo UPI ID</label>
+                        <input type="text" id="demo_upi_id" name="demo_upi_id" placeholder="demo@upi" value="{{ request.form.get('demo_upi_id','') }}">
+                    </div>
+
+                    <div class="note">Simulation only: this demo payment does not process any real card, bank, or UPI data.</div>
+
+                    <div class="submit-row">
+                        <button type="submit" class="btn btn-primary" id="pay-button">Pay ₹{{ amount }}</button>
+                        <a href="/mybookings" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    <div class="loader" id="processing-loader"><span class="loading-spinner"></span>Processing demo payment...</div>
+                </form>
+            </div>
+        </div>
+    </section>
+</main>
+<script>
+    const paymentMethodInputs = document.querySelectorAll('input[name="payment_method"]');
+    const cardField = document.getElementById('cardholder-field');
+    const upiField = document.getElementById('upi-field');
+    const form = document.getElementById('demo-payment-form');
+    const processingLoader = document.getElementById('processing-loader');
+    const payButton = document.getElementById('pay-button');
+
+    function togglePaymentFields() {
+        const selected = document.querySelector('input[name="payment_method"]:checked')?.value || 'Demo Card';
+        if (selected === 'Demo UPI') {
+            cardField.style.display = 'none';
+            upiField.style.display = 'grid';
+        } else {
+            cardField.style.display = 'grid';
+            upiField.style.display = 'none';
+        }
+    }
+
+    paymentMethodInputs.forEach((input) => input.addEventListener('change', togglePaymentFields));
+    togglePaymentFields();
+
+    form.addEventListener('submit', function () {
+        processingLoader.classList.add('active');
+        payButton.disabled = true;
+        payButton.textContent = 'Processing...';
+    });
+</script>
+</body>
+</html>

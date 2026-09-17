@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Route and Rent</title>
+</head>
+
+<body>
+
+<h2>Add Route & Rent</h2>
+
+<form method="POST">
+
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <label>Select Vehicle</label><br>
+
+    <select name="vehicle_id" required>
+
+        <option value="">-- Select Vehicle --</option>
+
+        {% for vehicle in vehicles %}
+            <option value="{{ vehicle[0] }}">
+                {{ vehicle[1] }} - {{ vehicle[2] }}
+            </option>
+        {% endfor %}
+
+    </select>
+
+    <br><br>
+
+    <label>From Location</label><br>
+    <input type="text"
+           name="from_location"
+           placeholder="Example: Tadipatri"
+           required>
+
+    <br><br>
+
+    <label>To Location</label><br>
+    <input type="text"
+           name="to_location"
+           placeholder="Example: Anantapur"
+           required>
+
+    <br><br>
+
+    <label>Rent (₹)</label><br>
+    <input type="number"
+           name="rent"
+           placeholder="Example: 2500"
+           min="1"
+           required>
+
+    <br><br>
+
+    <button type="submit">Add Route</button>
+
+</form>
+
+</body>
+</html>

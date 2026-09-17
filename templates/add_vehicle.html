@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Add Vehicle</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<header>
+
+    <div class="logo">
+        🚚 Vehicle Owner
+    </div>
+
+    <nav>
+        <a href="/owner_dashboard">Dashboard</a>
+        <a href="/myvehicles">My Vehicles</a>
+        <a href="/addroute">Add Route</a>
+        <form method="POST" action="/owner_logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">Logout</button>
+        </form>
+    </nav>
+
+</header>
+
+
+<div class="container">
+
+    <div class="form-card">
+
+        <h1>🚚 Add Vehicle</h1>
+
+        <p style="text-align:center;">
+            Add your vehicle so customers can book it.
+        </p>
+
+
+        <form method="POST" action="/addvehicle">
+
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <label>
+                Vehicle Name
+            </label>
+
+            <input
+                type="text"
+                name="vehicle_name"
+                placeholder="Example: Tata Ace"
+                required
+            >
+
+
+            <label>
+                Vehicle Type
+            </label>
+
+            <select name="vehicle_type" required>
+
+                <option value="">
+                    Select Vehicle Type
+                </option>
+
+                <option value="Tractor">
+                    🚜 Tractor
+                </option>
+
+                <option value="Mini Truck">
+                    🚚 Mini Truck
+                </option>
+
+                <option value="Pickup">
+                    🛻 Pickup
+                </option>
+
+                <option value="Lorry">
+                    🚛 Lorry
+                </option>
+
+                <option value="Goods Auto">
+                    🛺 Goods Auto
+                </option>
+
+                <option value="Other">
+                    🚚 Other
+                </option>
+
+            </select>
+
+
+            <label>
+                📞 Contact Number
+            </label>
+
+            <input
+                type="tel"
+                name="contact_number"
+                placeholder="Enter 10-digit mobile number"
+                pattern="[0-9]{10}"
+                maxlength="10"
+                required
+            >
+
+
+            <label>
+                📍 Vehicle Location
+            </label>
+
+            <input
+                type="text"
+                name="location"
+                placeholder="Example: Kanchipuram"
+                required
+            >
+
+
+            <button
+                type="submit"
+                class="btn btn-primary full-btn"
+            >
+                ✅ ADD VEHICLE
+            </button>
+
+        </form>
+
+
+        <br>
+
+
+        <a
+            href="/owner_dashboard"
+            class="btn btn-secondary full-btn"
+        >
+            ← Back to Dashboard
+        </a>
+
+    </div>
+
+</div>
+
+
+<div class="footer">
+
+    <p>
+        🚚 Business Vehicle Booking System
+    </p>
+
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>
+        {{ t["confirm_booking"] }} | {{ t["vehicle_booking"] }}
+    </title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            color: #222;
+        }
+
+        /* HEADER */
+
+        header {
+            background: white;
+            padding: 14px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1f4e79;
+            white-space: nowrap;
+        }
+
+        nav {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: white;
+            background: #1f4e79;
+            padding: 8px 13px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        nav a:hover {
+            background: #163a5c;
+        }
+
+        /* LANGUAGE */
+
+        .language-bar {
+            background: white;
+            padding: 8px 30px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+        }
+
+        .language-bar a {
+            text-decoration: none;
+            color: #1f4e79;
+            margin-left: 10px;
+            font-weight: 600;
+        }
+
+        /* MAIN */
+
+        .container {
+            width: 94%;
+            max-width: 900px;
+            margin: 30px auto;
+        }
+
+        .page-title {
+            text-align: center;
+            font-size: 24px;
+            color: #1f4e79;
+            margin-bottom: 20px;
+        }
+
+        /* BOOKING CARD */
+
+        .booking-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        /* VEHICLE */
+
+        .vehicle-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .vehicle-icon {
+            font-size: 42px;
+        }
+
+        .vehicle-name {
+            margin: 0;
+            font-size: 22px;
+            color: #1f4e79;
+        }
+
+        .vehicle-type {
+            margin: 5px 0 0;
+            color: #777;
+            font-size: 13px;
+        }
+
+        /* DETAILS */
+
+        .details {
+            margin-top: 20px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        .detail-label {
+            color: #777;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .route {
+            color: #1f4e79;
+        }
+
+        .rent {
+            color: #198754;
+            font-size: 18px;
+        }
+
+        /* FORM */
+
+        .form-section {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .form-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        input[type="date"] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 11px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input[type="date"]:focus {
+            outline: none;
+            border-color: #1f4e79;
+        }
+
+        /* BUTTONS */
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .confirm-btn {
+            flex: 1;
+            border: none;
+            padding: 12px;
+            border-radius: 7px;
+            background: #1f4e79;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .confirm-btn:hover {
+            background: #163a5c;
+        }
+
+        .back-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 7px;
+            background: #e9eef3;
+            color: #1f4e79;
+            text-align: center;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .back-btn:hover {
+            background: #dce4eb;
+        }
+
+        /* FOOTER */
+
+        footer {
+            margin-top: 40px;
+            padding: 20px;
+            background: white;
+            text-align: center;
+            border-top: 1px solid #eee;
+            color: #777;
+            font-size: 12px;
+        }
+
+        footer p {
+            margin: 5px;
+        }
+
+        /* MOBILE */
+
+        @media (max-width: 700px) {
+
+            header {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .language-bar {
+                text-align: center;
+                padding: 10px;
+            }
+
+            .booking-card {
+                padding: 18px;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .detail-value {
+                text-align: left;
+            }
+
+            .buttons {
+                flex-direction: column;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+     HEADER
+===================================================== -->
+
+<header>
+
+    <div class="logo">
+
+        🚚 {{ t["vehicle_booking"] }}
+
+    </div>
+
+
+    <nav>
+
+        <a href="/vehicles">
+            🚚 {{ t["available_vehicles"] }}
+        </a>
+
+        <a href="/mybookings">
+            📋 {{ t["my_bookings"] }}
+        </a>
+
+        <a href="/farmer-ai" style="background: #2e7d32;">
+            🌿 {{ t.get("farmer_ai", "Farmer AI") }}
+        </a>
+
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 {{ t["logout"] }}</button>
+        </form>
+
+    </nav>
+
+</header>
+
+
+<!-- =====================================================
+     LANGUAGE
+===================================================== -->
+
+<div class="language-bar">
+
+    🌐 {{ t["language"] }}
+
+    <form method="POST" action="{{ url_for('change_language', language='en') }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">🇬🇧 English</button>
+    </form>
+
+    <form method="POST" action="{{ url_for('change_language', language='te') }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">🇮🇳 తెలుగు</button>
+    </form>
+
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">🇮🇳 हिन्दी</button>
+    </form>
+
+</div>
+
+
+<!-- =====================================================
+     MAIN
+===================================================== -->
+
+<div class="container">
+
+
+    <h1 class="page-title">
+
+        📅 {{ t["confirm_booking"] }}
+
+    </h1>
+
+
+    <div class="booking-card">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+
+        <!-- VEHICLE -->
+
+        <div class="vehicle-header">
+
+            <div class="vehicle-icon">
+
+                {% if vehicle[2]|lower == "tractor" %}
+
+                    🚜
+
+                {% elif vehicle[2]|lower == "pickup" %}
+
+                    🛻
+
+                {% elif vehicle[2]|lower == "lorry" %}
+
+                    🚛
+
+                {% else %}
+
+                    🚚
+
+                {% endif %}
+
+            </div>
+
+
+            <div>
+
+                <h2 class="vehicle-name">
+
+                    {{ vehicle[1] }}
+
+                </h2>
+
+                <p class="vehicle-type">
+
+                    {{ t["vehicle_type"] }}:
+                    {{ vehicle[2] }}
+
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- VEHICLE DETAILS -->
+
+        <div class="details">
+
+            <div class="detail-row">
+                <span class="detail-label">🚚 Vehicle</span>
+                <span class="detail-value">{{ vehicle[1] }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">🧰 Type</span>
+                <span class="detail-value">{{ vehicle[2] }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">📍 Current / Base Location</span>
+                <span class="detail-value">{{ vehicle[5] }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">🛣️ Route</span>
+                <span class="detail-value route">{{ vehicle[6] }} → {{ vehicle[7] }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">📞 Contact</span>
+                <span class="detail-value">{{ vehicle[4] }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">💰 Fixed Route Rent</span>
+                <span class="detail-value rent">₹{{ vehicle[8] }}</span>
+            </div>
+
+        </div>
+
+
+        <!-- BOOKING FORM -->
+
+        <div class="form-section">
+
+            <h2>
+                📅 {{ t["booking_date"] }}
+            </h2>
+
+
+            <form method="POST">
+
+                <input type="hidden" name="route_id" value="{{ vehicle[9] }}">
+
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+
+                <label for="booking_date">
+
+                    {{ t["booking_date"] }}
+
+                </label>
+
+
+                <input
+                    type="date"
+                    min="{{ today }}"
+                    id="booking_date"
+                    name="booking_date"
+                    required
+                >
+
+
+                <div class="buttons">
+
+
+                    <a href="/vehicles"
+                       class="back-btn">
+
+                        ← {{ t["back_home"] }}
+
+                    </a>
+
+
+                    <button
+                        type="submit"
+                        class="confirm-btn">
+
+                        ✅ {{ t["confirm_booking"] }}
+
+                    </button>
+
+
+                </div>
+
+
+            </form>
+
+        </div>
+
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     FOOTER
+===================================================== -->
+
+<footer>
+
+    <p>
+        © 2026 {{ t["vehicle_booking"] }}
+    </p>
+
+    <p>
+        {{ t["footer_message"] }}
+    </p>
+
+</footer>
+
+
+</body>
+
+</html>

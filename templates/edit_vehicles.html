@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Edit Vehicle</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<header>
+
+    <div class="logo">
+        🚚 Vehicle Owner
+    </div>
+
+    <nav>
+
+        <a href="/owner_dashboard">
+            Dashboard
+        </a>
+
+        <a href="/myvehicles">
+            My Vehicles
+        </a>
+
+        <form method="POST" action="/owner_logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">Logout</button>
+        </form>
+
+    </nav>
+
+</header>
+
+
+<div class="container">
+
+    <div class="form-card">
+
+        <h1>
+            ✏️ Edit Vehicle
+        </h1>
+
+
+        <form method="POST">
+
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+
+            <label>
+                Vehicle Name
+            </label>
+
+            <input
+                type="text"
+                name="vehicle_name"
+                value="{{ vehicle[1] }}"
+                required
+            >
+
+
+            <label>
+                Vehicle Type
+            </label>
+
+            <input
+                type="text"
+                name="vehicle_type"
+                value="{{ vehicle[2] }}"
+                required
+            >
+
+
+            <label>
+                📞 Contact Number
+            </label>
+
+            <input
+                type="tel"
+                name="contact_number"
+                value="{{ vehicle[3] }}"
+                pattern="[0-9]{10}"
+                maxlength="10"
+                required
+            >
+
+
+            <label>
+                📍 Location
+            </label>
+
+            <input
+                type="text"
+                name="location"
+                value="{{ vehicle[4] }}"
+                required
+            >
+
+
+            <button
+                type="submit"
+                class="btn btn-primary full-btn"
+            >
+                💾 SAVE CHANGES
+            </button>
+
+        </form>
+
+
+        <br>
+
+
+        <a
+            href="/myvehicles"
+            class="btn btn-secondary full-btn"
+        >
+            ← BACK TO MY VEHICLES
+        </a>
+
+    </div>
+
+</div>
+
+
+<div class="footer">
+
+    <p>
+        Business Vehicle Booking System
+    </p>
+
+</div>
+
+</body>
+
+</html>

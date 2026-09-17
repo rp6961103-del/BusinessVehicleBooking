@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rate Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .rate-card { max-width: 620px; margin: 50px auto; background: #fff; border: 1px solid #e3e7ea; border-radius: 18px; padding: 30px; box-shadow: 0 8px 30px rgba(0,0,0,.06); }
+        .stars { display: flex; flex-direction: row-reverse; justify-content: flex-end; gap: 8px; margin: 18px 0; }
+        .stars label { font-size: 34px; cursor: pointer; color: #cbd5e1; transition: all .15s ease; }
+        .stars label:hover, .stars label:hover ~ label, .stars input:checked ~ label { color: #f59e0b; }
+        .stars input { display: none; }
+        textarea { width: 100%; min-height: 120px; padding: 12px; box-sizing: border-box; border: 1px solid #ccd4da; border-radius: 10px; resize: vertical; }
+        .actions { display: flex; gap: 10px; margin-top: 18px; }
+        .actions > * { flex: 1; }
+    </style>
+</head>
+<body>
+<header>
+    <a class="logo" href="/">🚚 Business Vehicle Booking</a>
+    <nav>
+        <a href="/mybookings">My Bookings</a>
+        <a href="/vehicles">Vehicles</a>
+    </nav>
+</header>
+<main class="container">
+    <section class="rate-card">
+        <h1>⭐ Rate Your Booking</h1>
+        <p><strong>{{ booking[3] }}</strong> — {{ booking[4] }}</p>
+        <p>Booking #{{ booking[0] }} · {{ booking[1] }}</p>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="stars">
+                {% for n in range(5, 0, -1) %}
+                    <label title="{{ n }} stars">
+                        <input type="radio" name="rating" value="{{ n }}" {% if booking[5] == n %}checked{% endif %}>
+                        ★
+                    </label>
+                {% endfor %}
+            </div>
+            <label for="review">Review (optional)</label>
+            <textarea id="review" name="review" maxlength="500" placeholder="How was the vehicle and owner service?">{{ booking[6] or '' }}</textarea>
+            <div class="actions">
+                <button class="btn btn-primary" type="submit">Save Rating</button>
+                <a class="btn btn-secondary" href="/mybookings">Cancel</a>
+            </div>
+        </form>
+    </section>
+</main>
+</body>
+</html>

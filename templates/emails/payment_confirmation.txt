@@ -1,0 +1,20 @@
+Demo Payment Confirmation - Booking #{{ payment.booking_id }}
+
+Hello {{ payment.customer_name }},
+
+This is a demo payment for project testing. No real money was charged.
+
+Your payment has been recorded successfully.
+
+Booking ID: {{ payment.booking_id }}
+Vehicle: {{ payment.vehicle_name }}{% if payment.vehicle_type %} ({{ payment.vehicle_type }}){% endif %}
+Route: {{ payment.route }}
+Amount: ₹{{ payment.amount }}
+Demo payment method: {{ payment.payment_method }}
+Demo transaction reference: {{ payment.transaction_reference }}
+Payment status: {{ payment.status }}
+Booking date: {{ payment.booking_date }}
+
+This is a demo payment for project testing. No real money was charged.
+
+Thank you for testing the Business Vehicle Booking demo payment flow.

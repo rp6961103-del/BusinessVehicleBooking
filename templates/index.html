@@ -10,13 +10,13 @@
 </head>
 <body class="homepage">
     <header class="home-header">
-        <a href="/" class="home-logo" aria-label="Business Vehicle Booking home">
+        <a href="/home" class="home-logo" aria-label="Business Vehicle Booking home">
             <span class="home-logo-mark" aria-hidden="true">▰</span>
             <span>Business Vehicle <strong>Booking</strong></span>
         </a>
 
         <nav class="home-nav" aria-label="Main navigation">
-            <a href="/" class="active">Home</a>
+            <a href="/home" class="active">Home</a>
             <a href="/vehicles">Vehicles</a>
             <a href="#about">About</a>
             <a href="#contact">Contact</a>
@@ -87,21 +87,6 @@
             <div class="home-ai-icon" aria-hidden="true">✦</div>
             <div><p class="home-section-kicker">Smart farming support</p><h2 id="home-ai-title">Farmer AI Assistant</h2><p>Scan crops &amp; get expert advice</p></div>
             <a href="/farmer-ai" class="home-ai-button">Try Now <span aria-hidden="true">&#8594;</span></a>
-        </section>
-
-        <section id="about" class="home-about" aria-labelledby="home-about-title">
-            <div><p class="home-section-kicker">Built for the field and the road</p><h2 id="home-about-title">One dependable place for commercial transport.</h2></div>
-            <p>Choose from agricultural and heavy vehicles, compare route-based pricing, and send a booking request to a vehicle owner with confidence.</p>
-        </section>
-
-        <section class="home-vehicle-strip" aria-labelledby="home-vehicle-title">
-            <div class="home-section-heading"><div><p class="home-section-kicker">Move more, simply</p><h2 id="home-vehicle-title">Vehicles for every kind of work</h2></div><a href="/vehicles" class="home-outline-button">View Vehicles <span aria-hidden="true">&#8594;</span></a></div>
-            <div class="home-vehicle-grid">
-                <div><span aria-hidden="true">▰</span><strong>{{ t.get("tractor", "Tractor") }}</strong><small>{{ t.get("tractor_desc", "Suitable for agricultural and goods transportation.") }}</small></div>
-                <div><span aria-hidden="true">▣</span><strong>{{ t.get("lorry", "Lorry") }}</strong><small>{{ t.get("lorry_desc", "Suitable for transporting larger loads.") }}</small></div>
-                <div><span aria-hidden="true">▤</span><strong>{{ t.get("mini_truck", "Mini Truck") }}</strong><small>{{ t.get("mini_truck_desc", "Suitable for small and medium loads.") }}</small></div>
-                <div><span aria-hidden="true">▱</span><strong>{{ t.get("pickup", "Pickup") }}</strong><small>{{ t.get("pickup_desc", "Convenient for local transportation.") }}</small></div>
-            </div>
         </section>
 
         <section id="contact" class="home-contact" aria-labelledby="home-contact-title">

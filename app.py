@@ -791,6 +791,12 @@ def verify_db_connectivity():
 # =========================================================
 
 @app.route("/")
+def account_choice():
+
+    return render_template("account_choice.html")
+
+
+@app.route("/home")
 def home():
 
     return render_template("index.html")

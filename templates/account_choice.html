@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Your Account | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
+    <meta name="description" content="Choose a customer or vehicle owner account for Business Vehicle Booking.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="account-choice-page">
+    <main class="account-choice-shell">
+        <div class="account-choice-topbar">
+            <a href="/home" class="account-choice-logo" aria-label="Business Vehicle Booking home">
+                <span class="account-choice-logo-mark" aria-hidden="true">▰</span>
+                <span>Business Vehicle <strong>Booking</strong></span>
+            </a>
+            {% include "_language_selector.html" %}
+        </div>
+
+        <section class="account-choice-content" aria-labelledby="account-choice-title">
+            <p class="account-choice-eyebrow">Agriculture meets dependable transport</p>
+            <h1 id="account-choice-title">Create Your Account</h1>
+            <p class="account-choice-intro">Choose how you want to use Business Vehicle Booking</p>
+
+            <div class="account-choice-grid">
+                <article class="account-choice-card">
+                    <div class="account-choice-icon" aria-hidden="true">&#128100;</div>
+                    <p class="account-choice-card-kicker">For Farmers &amp; Business Customers</p>
+                    <h2>Customer</h2>
+                    <p class="account-choice-description">Find and book reliable commercial vehicles for your transportation needs.</p>
+                    <div class="account-choice-actions">
+                        <a href="/register" class="account-choice-primary">Register as Customer</a>
+                        <a href="/login" class="account-choice-secondary">Customer Sign In</a>
+                    </div>
+                </article>
+
+                <article class="account-choice-card account-choice-owner-card">
+                    <div class="account-choice-icon" aria-hidden="true">&#128667;</div>
+                    <p class="account-choice-card-kicker">For Commercial Vehicle Owners</p>
+                    <h2>Vehicle Owner</h2>
+                    <p class="account-choice-description">Register your commercial vehicles and receive booking requests from customers.</p>
+                    <div class="account-choice-actions">
+                        <a href="/ownerregister" class="account-choice-primary">Register as Vehicle Owner</a>
+                        <a href="/ownerlogin" class="account-choice-secondary">Vehicle Owner Sign In</a>
+                    </div>
+                </article>
+            </div>
+
+            <a href="/home" class="account-choice-home-link">Continue to Home <span aria-hidden="true">&#8594;</span></a>
+        </section>
+    </main>
+</body>
+</html>

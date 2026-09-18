@@ -66,3 +66,170 @@ def test_both_delivery_failures_return_without_raising(monkeypatch):
         results = send_booking_notifications(BOOKING)
 
     assert results == {"customer": False, "owner": False}
+
+
+class MockResponse:
+    def __init__(self, status_code=200, json_data=None, text=""):
+        self.status_code = status_code
+        self._json_data = json_data
+        self.text = text
+        self.ok = 200 <= status_code < 300
+
+    def json(self):
+        if self._json_data is None:
+            raise ValueError("Invalid JSON")
+        return self._json_data
+
+
+def configure_google_script(monkeypatch):
+    monkeypatch.setenv("MAIL_ENABLED", "true")
+    monkeypatch.setenv("EMAIL_PROVIDER", "google_script")
+    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_URL", "https://script.google.com/macros/s/TEST_SCRIPT/exec")
+    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_TOKEN", "test-secret-token-123")
+
+
+def test_google_script_send_success(monkeypatch):
+    from app import app
+
+    configure_google_script(monkeypatch)
+
+    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
+        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
+        results = send_booking_notifications(BOOKING)
+
+    assert results == {"customer": True, "owner": True}
+    assert mock_post.call_count == 2
+    # Verify the first call (customer)
+    first_call = mock_post.call_args_list[0]
+    assert first_call.args[0] == "https://script.google.com/macros/s/TEST_SCRIPT/exec"
+    payload = first_call.kwargs["json"]
+    assert payload["token"] == "test-secret-token-123"
+    assert payload["to"] == "customer@test.example"
+    assert "Vehicle Booking Confirmation" in payload["subject"]
+    assert "Test Customer" in payload["html"]
+    assert first_call.kwargs["timeout"] == 10
+
+
+def test_google_script_send_http_failure(monkeypatch):
+    from app import app
+
+    configure_google_script(monkeypatch)
+
+    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
+        mock_post.return_value = MockResponse(status_code=500, text="Internal Server Error")
+        results = send_booking_notifications(BOOKING)
+
+    assert results == {"customer": False, "owner": False}
+
+
+def test_google_script_send_invalid_json(monkeypatch):
+    from app import app
+
+    configure_google_script(monkeypatch)
+
+    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
+        mock_post.return_value = MockResponse(status_code=200, json_data=None, text="not json")
+        results = send_booking_notifications(BOOKING)
+
+    assert results == {"customer": False, "owner": False}
+
+
+def test_google_script_send_missing_success_true(monkeypatch):
+    from app import app
+
+    configure_google_script(monkeypatch)
+
+    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
+        mock_post.return_value = MockResponse(status_code=200, json_data={"success": False, "error": "Invalid token"})
+        results = send_booking_notifications(BOOKING)
+
+    assert results == {"customer": False, "owner": False}
+
+
+def test_google_script_send_timeout_handled(monkeypatch):
+    import requests
+    from app import app
+
+    configure_google_script(monkeypatch)
+
+    with app.test_request_context(), patch("email_service.requests.post", side_effect=requests.exceptions.Timeout("Connection timed out")):
+        results = send_booking_notifications(BOOKING)
+
+    assert results == {"customer": False, "owner": False}
+
+
+def test_google_script_missing_credentials(monkeypatch):
+    from app import app
+
+    configure_google_script(monkeypatch)
+    monkeypatch.delenv("GOOGLE_EMAIL_WEBHOOK_URL")
+
+    with app.test_request_context():
+        results = send_booking_notifications(BOOKING)
+    assert results == {"customer": False, "owner": False}
+
+
+def test_google_script_is_mail_configured(monkeypatch):
+    from email_service import is_mail_configured
+
+    configure_google_script(monkeypatch)
+    assert is_mail_configured() is True
+
+    monkeypatch.delenv("GOOGLE_EMAIL_WEBHOOK_TOKEN")
+    assert is_mail_configured() is False
+
+    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_TOKEN", "token")
+    monkeypatch.setenv("MAIL_ENABLED", "false")
+    assert is_mail_configured() is False
+
+
+def test_google_script_decision_email(monkeypatch):
+    from app import app
+    from email_service import send_booking_decision_email
+
+    configure_google_script(monkeypatch)
+    decision_booking = dict(BOOKING, status="Accepted")
+
+    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
+        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
+        result = send_booking_decision_email(decision_booking)
+
+    assert result is True
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["to"] == "customer@test.example"
+    assert "Accepted" in payload["subject"]
+
+
+def test_google_script_password_reset_email(monkeypatch):
+    from app import app
+    from email_service import send_password_reset_email
+
+    configure_google_script(monkeypatch)
+
+    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
+        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
+        result = send_password_reset_email("customer@test.example", "http://test.example/reset-password/abc123token")
+
+    assert result is True
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["to"] == "customer@test.example"
+    assert "Password Reset" in payload["subject"]
+    assert "abc123token" in payload["html"]
+
+
+def test_google_script_logging_never_logs_token_and_masks_email(monkeypatch):
+    from app import app
+
+    configure_google_script(monkeypatch)
+
+    with app.test_request_context(), patch("email_service.requests.post") as mock_post, patch("email_service.logger.info") as mock_info:
+        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
+        send_booking_notifications(BOOKING)
+
+    for call in mock_info.call_args_list:
+        log_str = str(call)
+        assert "test-secret-token-123" not in log_str
+        # Recipient should be masked like cu***r@test.example
+        if "recipient=" in log_str:
+            assert "cu***r@test.example" in log_str or "ow***r@test.example" in log_str
+

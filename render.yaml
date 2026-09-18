@@ -16,6 +16,12 @@ services:
         value: "0"
       - key: MAIL_ENABLED
         value: "false"
+      - key: EMAIL_PROVIDER
+        value: google_script
+      - key: GOOGLE_EMAIL_WEBHOOK_URL
+        sync: false
+      - key: GOOGLE_EMAIL_WEBHOOK_TOKEN
+        sync: false
       - key: SECRET_KEY
         sync: false
       - key: MYSQL_HOST

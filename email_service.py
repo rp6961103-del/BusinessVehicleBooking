@@ -5,6 +5,7 @@ from email.message import EmailMessage
 
 from dotenv import load_dotenv
 from flask import render_template
+import requests
 
 
 load_dotenv()
@@ -20,20 +21,44 @@ def _enabled():
     return os.getenv("MAIL_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _mask_email(email):
+    """Mask email address for safe logging, e.g. 'cu***r@test.example'."""
+    if not email or "@" not in str(email):
+        return "***"
+    local, domain = str(email).split("@", 1)
+    if len(local) <= 2:
+        masked_local = local[:1] + "*"
+    else:
+        masked_local = local[:2] + "***" + local[-1:]
+    return f"{masked_local}@{domain}"
+
+
 def is_mail_configured():
     """Returns True if email notifications are enabled and required settings are present."""
     if not _enabled():
         return False
-    required = ("MAIL_SERVER", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_DEFAULT_SENDER")
-    configured = all(bool(os.getenv(name)) for name in required)
-    logger.warning(
-        "Email configuration loaded: server=%s, port=%s, username_configured=%s, sender_configured=%s",
-        os.getenv("MAIL_SERVER", "<missing>"),
-        os.getenv("MAIL_PORT", "<missing>"),
-        bool(os.getenv("MAIL_USERNAME")),
-        bool(os.getenv("MAIL_DEFAULT_SENDER")),
-    )
-    return configured
+    provider = os.getenv("EMAIL_PROVIDER", "smtp").strip().lower()
+    if provider == "google_script":
+        webhook_url = os.getenv("GOOGLE_EMAIL_WEBHOOK_URL")
+        webhook_token = os.getenv("GOOGLE_EMAIL_WEBHOOK_TOKEN")
+        configured = bool(webhook_url and webhook_token)
+        logger.info(
+            "Email configuration (google_script): webhook_configured=%s, token_configured=%s",
+            bool(webhook_url),
+            bool(webhook_token),
+        )
+        return configured
+    else:
+        required = ("MAIL_SERVER", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_DEFAULT_SENDER")
+        configured = all(bool(os.getenv(name)) for name in required)
+        logger.info(
+            "Email configuration (smtp): server=%s, port=%s, username_configured=%s, sender_configured=%s",
+            os.getenv("MAIL_SERVER", "<missing>"),
+            os.getenv("MAIL_PORT", "<missing>"),
+            bool(os.getenv("MAIL_USERNAME")),
+            bool(os.getenv("MAIL_DEFAULT_SENDER")),
+        )
+        return configured
 
 
 def _settings():
@@ -51,24 +76,89 @@ def _settings():
     }
 
 
-def _send(recipient, subject, template_name, context, html_template_name=None):
-    if not recipient:
+def _send_google_script(recipient, subject, html_body):
+    webhook_url = os.getenv("GOOGLE_EMAIL_WEBHOOK_URL")
+    webhook_token = os.getenv("GOOGLE_EMAIL_WEBHOOK_TOKEN")
+    if not webhook_url or not webhook_token:
+        logger.error("Google Script email webhook URL or token is missing")
         return False
+
+    masked_recipient = _mask_email(recipient)
+    payload = {
+        "token": webhook_token,
+        "to": recipient,
+        "subject": subject,
+        "html": html_body,
+    }
+
+    try:
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        status_code = response.status_code
+        logger.info(
+            "Google Script email HTTP response: recipient=%s subject=%s status=%d",
+            masked_recipient,
+            subject,
+            status_code,
+        )
+
+        if not response.ok:
+            logger.warning(
+                "Google Script email delivery failed (HTTP %d): recipient=%s subject=%s",
+                status_code,
+                masked_recipient,
+                subject,
+            )
+            return False
+
+        try:
+            data = response.json()
+        except Exception:
+            logger.warning(
+                "Google Script email response is not valid JSON: recipient=%s subject=%s status=%d",
+                masked_recipient,
+                subject,
+                status_code,
+            )
+            return False
+
+        if not (isinstance(data, dict) and (data.get("success") is True or str(data.get("success", "")).strip().lower() == "true")):
+            logger.warning(
+                "Google Script email response does not contain success=true: recipient=%s subject=%s status=%d",
+                masked_recipient,
+                subject,
+                status_code,
+            )
+            return False
+
+        logger.info(
+            "Google Script email sent successfully: recipient=%s subject=%s status=%d",
+            masked_recipient,
+            subject,
+            status_code,
+        )
+        return True
+
+    except Exception as exc:
+        logger.warning(
+            "Google Script email delivery exception: recipient=%s subject=%s error=%s",
+            masked_recipient,
+            subject,
+            type(exc).__name__,
+        )
+        return False
+
+
+def _send_smtp(recipient, subject, plain_content, html_content=None):
     settings = _settings()
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = settings["sender"]
     message["To"] = recipient
 
-    plain_content = render_template(template_name, **context)
     message.set_content(plain_content)
 
-    if html_template_name:
-        try:
-            html_content = render_template(html_template_name, **context)
-            message.add_alternative(html_content, subtype="html")
-        except Exception:
-            logger.warning("Could not render HTML email template %s; falling back to text", html_template_name)
+    if html_content:
+        message.add_alternative(html_content, subtype="html")
 
     try:
         with smtplib.SMTP(settings["server"], settings["port"], timeout=10) as smtp:
@@ -76,11 +166,31 @@ def _send(recipient, subject, template_name, context, html_template_name=None):
                 smtp.starttls()
             smtp.login(settings["username"], settings["password"])
             smtp.send_message(message)
-        logger.warning("Email sent successfully: recipient=%s subject=%s", recipient, subject)
+        logger.info("Email sent successfully via SMTP: recipient=%s subject=%s", _mask_email(recipient), subject)
         return True
     except (smtplib.SMTPException, OSError):
-        logger.exception("SMTP email delivery failed: recipient=%s subject=%s", recipient, subject)
+        logger.exception("SMTP email delivery failed: recipient=%s subject=%s", _mask_email(recipient), subject)
         return False
+
+
+def _send(recipient, subject, template_name, context, html_template_name=None):
+    if not recipient:
+        return False
+
+    plain_content = render_template(template_name, **context)
+    html_content = None
+    if html_template_name:
+        try:
+            html_content = render_template(html_template_name, **context)
+        except Exception:
+            logger.warning("Could not render HTML email template %s; falling back to text", html_template_name)
+
+    provider = os.getenv("EMAIL_PROVIDER", "smtp").strip().lower()
+    if provider == "google_script":
+        html_body = html_content if html_content else f"<div style='font-family: Arial, sans-serif; white-space: pre-wrap; line-height: 1.6;'>{plain_content}</div>"
+        return _send_google_script(recipient, subject, html_body)
+    else:
+        return _send_smtp(recipient, subject, plain_content, html_content)
 
 
 def send_booking_confirmation_to_customer(booking):

@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="admin-dashboard-page">
+    <header class="admin-topbar">
+        <div class="admin-topbar-inner">
+            <div class="admin-topbar-brand">
+                <a href="{{ url_for('configured_admin_dashboard') }}" class="admin-brand-link">
+                    <span class="admin-brand-icon" aria-hidden="true">🚜</span>
+                    <span class="admin-brand-text">
+                        <strong>Business Vehicle Booking</strong>
+                        <span class="admin-brand-pill">Admin Dashboard</span>
+                    </span>
+                </a>
+            </div>
+
+            <nav class="admin-topbar-nav" aria-label="Admin Navigation">
+                <a href="#overview" class="admin-nav-item is-active">
+                    <span class="admin-nav-icon" aria-hidden="true">▦</span>
+                    <span>Overview</span>
+                </a>
+                <a href="#bookings-section" class="admin-nav-item">
+                    <span class="admin-nav-icon" aria-hidden="true">📋</span>
+                    <span>Bookings</span>
+                </a>
+                <a href="#customers-section" class="admin-nav-item">
+                    <span class="admin-nav-icon" aria-hidden="true">👥</span>
+                    <span>Customers</span>
+                </a>
+                <a href="#owners-section" class="admin-nav-item">
+                    <span class="admin-nav-icon" aria-hidden="true">👨‍🌾</span>
+                    <span>Owners</span>
+                </a>
+                <a href="#vehicles-section" class="admin-nav-item">
+                    <span class="admin-nav-icon" aria-hidden="true">🚚</span>
+                    <span>Vehicles</span>
+                </a>
+                <a href="#payments-section" class="admin-nav-item">
+                    <span class="admin-nav-icon" aria-hidden="true">💳</span>
+                    <span>Payments</span>
+                </a>
+                <a href="#ratings-section" class="admin-nav-item">
+                    <span class="admin-nav-icon" aria-hidden="true">⭐</span>
+                    <span>Ratings</span>
+                </a>
+            </nav>
+
+            <div class="admin-topbar-actions">
+                <a href="{{ url_for('home') }}" class="admin-nav-link-subtle" title="Return to public customer website">
+                    ↗ View Site
+                </a>
+                <div class="admin-user-tag" title="Authenticated Administrator">
+                    <span class="admin-user-avatar" aria-hidden="true">👤</span>
+                    <span>{{ session.get("admin_username") or session.get("configured_admin_username") or "Admin" }}</span>
+                </div>
+                <form method="POST" action="{{ url_for('configured_admin_logout') }}" class="admin-logout-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="admin-btn admin-btn-logout">
+                        <span aria-hidden="true">⇥</span>
+                        <span>Admin Logout</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <main class="admin-content-shell">
+        <div class="admin-content-container">
+            <!-- Hero Banner -->
+            <section class="admin-page-hero" id="overview">
+                <div class="admin-hero-content">
+                    <span class="admin-eyebrow">Enterprise Operations</span>
+                    <h1>Admin Dashboard</h1>
+                    <p>Live administrative management, member directories, and operational records.</p>
+                </div>
+                <div class="admin-hero-quick-meta">
+                    <span class="admin-live-pulse" aria-hidden="true"></span>
+                    <span>Live Database Connected</span>
+                </div>
+            </section>
+
+            {% if error_message %}
+            <div class="admin-alert-box admin-alert-danger" role="alert">
+                <span class="admin-alert-icon">⚠️</span>
+                <span>{{ error_message }}</span>
+            </div>
+            {% endif %}
+
+            <!-- ==============================================
+                 1. 9 LIVE DATABASE METRICS CARDS
+                 ============================================== -->
+            <section class="admin-section" aria-label="Key Platform Metrics">
+                <div class="admin-section-header">
+                    <div>
+                        <h2>Platform Statistics</h2>
+                        <p>Real-time tallies calculated from active database tables</p>
+                    </div>
+                </div>
+
+                <div class="admin-cards-grid">
+                    <!-- 1. Total Customers -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-icon-wrap icon-customers" aria-hidden="true">
+                            <span>👥</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Total Customers</span>
+                            <strong class="admin-stat-value">{{ metrics.total_customers }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 2. Total Vehicle Owners -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-icon-wrap icon-owners" aria-hidden="true">
+                            <span>👨‍🌾</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Total Vehicle Owners</span>
+                            <strong class="admin-stat-value">{{ metrics.total_owners }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 3. Total Vehicles -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-icon-wrap icon-vehicles" aria-hidden="true">
+                            <span>🚚</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Total Vehicles</span>
+                            <strong class="admin-stat-value">{{ metrics.total_vehicles }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 4. Total Bookings -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-icon-wrap icon-bookings" aria-hidden="true">
+                            <span>📋</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Total Bookings</span>
+                            <strong class="admin-stat-value">{{ metrics.total_bookings }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 5. Pending Bookings -->
+                    <article class="admin-stat-card card-accent-pending">
+                        <div class="admin-stat-icon-wrap icon-pending" aria-hidden="true">
+                            <span>⏳</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Pending Bookings</span>
+                            <strong class="admin-stat-value">{{ metrics.pending_bookings }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 6. Accepted Bookings -->
+                    <article class="admin-stat-card card-accent-accepted">
+                        <div class="admin-stat-icon-wrap icon-accepted" aria-hidden="true">
+                            <span>✅</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Accepted Bookings</span>
+                            <strong class="admin-stat-value">{{ metrics.accepted_bookings }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 7. Rejected Bookings -->
+                    <article class="admin-stat-card card-accent-rejected">
+                        <div class="admin-stat-icon-wrap icon-rejected" aria-hidden="true">
+                            <span>❌</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Rejected Bookings</span>
+                            <strong class="admin-stat-value">{{ metrics.rejected_bookings }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 8. Total Ratings -->
+                    <article class="admin-stat-card" id="ratings-card">
+                        <div class="admin-stat-icon-wrap icon-ratings" aria-hidden="true">
+                            <span>⭐</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Total Ratings</span>
+                            <strong class="admin-stat-value">{{ metrics.total_ratings }}</strong>
+                        </div>
+                    </article>
+
+                    <!-- 9. Total Payments -->
+                    <article class="admin-stat-card" id="payments-card">
+                        <div class="admin-stat-icon-wrap icon-payments" aria-hidden="true">
+                            <span>💳</span>
+                        </div>
+                        <div class="admin-stat-body">
+                            <span class="admin-stat-label">Total Payments</span>
+                            <strong class="admin-stat-value">{{ metrics.total_payments }}</strong>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ==============================================
+                 2. RECENT BOOKINGS TABLE
+                 ============================================== -->
+            <section class="admin-section" id="bookings-section" aria-label="Recent Bookings">
+                <div class="admin-section-header">
+                    <div>
+                        <h2>Recent Bookings</h2>
+                        <p>Latest reservations across customers, vehicles, and assigned routes</p>
+                    </div>
+                    {% if recent_bookings %}
+                    <span class="admin-badge-neutral">Latest Records</span>
+                    {% endif %}
+                </div>
+
+                <div class="admin-table-panel">
+                    {% if recent_bookings %}
+                    <div class="admin-table-scroll">
+                        <table class="admin-data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="width: 110px;">Booking ID</th>
+                                    <th scope="col">Customer</th>
+                                    <th scope="col">Vehicle</th>
+                                    <th scope="col">Booking Date</th>
+                                    <th scope="col">Route</th>
+                                    <th scope="col" style="width: 130px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in recent_bookings %}
+                                <tr>
+                                    <td><span class="admin-id-badge">#{{ item.id }}</span></td>
+                                    <td><strong class="admin-customer-name">{{ item.customer }}</strong></td>
+                                    <td><span class="admin-vehicle-name">{{ item.vehicle }}</span></td>
+                                    <td><span class="admin-date-text">{{ item.booking_date }}</span></td>
+                                    <td><span class="admin-route-text">{{ item.route }}</span></td>
+                                    <td>
+                                        <span class="admin-status-badge status-{{ item.status|lower|trim }}">
+                                            {{ item.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="admin-empty-state">
+                        <span class="admin-empty-icon" aria-hidden="true">📋</span>
+                        <h3>No Bookings Recorded Yet</h3>
+                        <p>When customers reserve agricultural or transport vehicles, recent bookings will display here in real time.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- ==============================================
+                 3. MEMBER INFORMATION: CUSTOMERS
+                 ============================================== -->
+            <section class="admin-section" id="customers-section" aria-label="Registered Customers">
+                <div class="admin-section-header">
+                    <div>
+                        <h2>Registered Customers</h2>
+                        <p>Customer accounts registered on the platform</p>
+                    </div>
+                    <span class="admin-badge-neutral">{{ customers|length }} Customers</span>
+                </div>
+
+                <div class="admin-table-panel">
+                    {% if customers %}
+                    <div class="admin-table-scroll">
+                        <table class="admin-data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="width: 80px;">ID</th>
+                                    <th scope="col">Customer Name</th>
+                                    <th scope="col">Phone</th>
+                                    <th scope="col">Email</th>
+                                    <th scope="col" style="width: 120px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in customers %}
+                                <tr>
+                                    <td><span class="admin-id-badge">#{{ c.id }}</span></td>
+                                    <td><strong class="admin-customer-name">{{ c.name }}</strong></td>
+                                    <td><span>{{ c.phone }}</span></td>
+                                    <td><span class="admin-subtext">{{ c.email }}</span></td>
+                                    <td>
+                                        <span class="admin-status-badge {{ 'status-accepted' if c.is_active else 'status-rejected' }}">
+                                            {{ 'Active' if c.is_active else 'Inactive' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="admin-empty-state">
+                        <span class="admin-empty-icon" aria-hidden="true">👥</span>
+                        <h3>No Customers Registered Yet</h3>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- ==============================================
+                 4. MEMBER INFORMATION: VEHICLE OWNERS
+                 ============================================== -->
+            <section class="admin-section" id="owners-section" aria-label="Registered Vehicle Owners">
+                <div class="admin-section-header">
+                    <div>
+                        <h2>Registered Vehicle Owners</h2>
+                        <p>Commercial vehicle owners offering transportation services</p>
+                    </div>
+                    <span class="admin-badge-neutral">{{ owners|length }} Owners</span>
+                </div>
+
+                <div class="admin-table-panel">
+                    {% if owners %}
+                    <div class="admin-table-scroll">
+                        <table class="admin-data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="width: 80px;">ID</th>
+                                    <th scope="col">Owner Name</th>
+                                    <th scope="col">Phone</th>
+                                    <th scope="col">Email</th>
+                                    <th scope="col" style="width: 120px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for o in owners %}
+                                <tr>
+                                    <td><span class="admin-id-badge">#{{ o.id }}</span></td>
+                                    <td><strong class="admin-customer-name">{{ o.name }}</strong></td>
+                                    <td><span>{{ o.phone }}</span></td>
+                                    <td><span class="admin-subtext">{{ o.email }}</span></td>
+                                    <td>
+                                        <span class="admin-status-badge {{ 'status-accepted' if o.is_active else 'status-rejected' }}">
+                                            {{ 'Active' if o.is_active else 'Inactive' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="admin-empty-state">
+                        <span class="admin-empty-icon" aria-hidden="true">👨‍🌾</span>
+                        <h3>No Vehicle Owners Registered Yet</h3>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- ==============================================
+                 5. VEHICLES FLEET
+                 ============================================== -->
+            <section class="admin-section" id="vehicles-section" aria-label="Vehicles Fleet">
+                <div class="admin-section-header">
+                    <div>
+                        <h2>Fleet Vehicles</h2>
+                        <p>Registered agricultural and commercial vehicles in the system</p>
+                    </div>
+                    <span class="admin-badge-neutral">{{ vehicles|length }} Vehicles</span>
+                </div>
+
+                <div class="admin-table-panel">
+                    {% if vehicles %}
+                    <div class="admin-table-scroll">
+                        <table class="admin-data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="width: 100px;">Vehicle ID</th>
+                                    <th scope="col">Vehicle Name</th>
+                                    <th scope="col">Vehicle Type</th>
+                                    <th scope="col">Owner</th>
+                                    <th scope="col">Location</th>
+                                    <th scope="col">Contact</th>
+                                    <th scope="col" style="width: 120px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in vehicles %}
+                                <tr>
+                                    <td><span class="admin-id-badge">#{{ v.id }}</span></td>
+                                    <td><strong class="admin-vehicle-name">{{ v.name }}</strong></td>
+                                    <td><span>{{ v.type }}</span></td>
+                                    <td><span>{{ v.owner }}</span></td>
+                                    <td><span>{{ v.location }}</span></td>
+                                    <td><span>{{ v.contact }}</span></td>
+                                    <td>
+                                        <span class="admin-status-badge status-{{ v.status|lower|trim }}">
+                                            {{ v.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="admin-empty-state">
+                        <span class="admin-empty-icon" aria-hidden="true">🚚</span>
+                        <h3>No Vehicles Registered Yet</h3>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- ==============================================
+                 6. PAYMENTS INFORMATION
+                 ============================================== -->
+            <section class="admin-section" id="payments-section" aria-label="Payments Information">
+                <div class="admin-section-header">
+                    <div>
+                        <h2>Processed Payments</h2>
+                        <p>Customer transaction records recorded in the database</p>
+                    </div>
+                    <span class="admin-badge-neutral">{{ payments|length }} Records</span>
+                </div>
+
+                <div class="admin-table-panel">
+                    {% if payments %}
+                    <div class="admin-table-scroll">
+                        <table class="admin-data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="width: 100px;">Payment ID</th>
+                                    <th scope="col" style="width: 110px;">Booking ID</th>
+                                    <th scope="col">Amount</th>
+                                    <th scope="col">Payment Method</th>
+                                    <th scope="col" style="width: 120px;">Status</th>
+                                    <th scope="col">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in payments %}
+                                <tr>
+                                    <td><span class="admin-id-badge">#{{ p.id }}</span></td>
+                                    <td><span>#{{ p.booking_id }}</span></td>
+                                    <td><strong class="admin-currency">₹{{ p.amount }}</strong> <small class="admin-subtext">{{ p.currency }}</small></td>
+                                    <td><span>{{ p.method }}</span></td>
+                                    <td>
+                                        <span class="admin-status-badge status-{{ p.status|lower|trim }}">
+                                            {{ p.status }}
+                                        </span>
+                                    </td>
+                                    <td><span class="admin-date-text">{{ p.date }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="admin-empty-state">
+                        <span class="admin-empty-icon" aria-hidden="true">💳</span>
+                        <h3>No Payment Records Found</h3>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- ==============================================
+                 7. RATINGS & REVIEWS
+                 ============================================== -->
+            <section class="admin-section" id="ratings-section" aria-label="Customer Ratings & Reviews">
+                <div class="admin-section-header">
+                    <div>
+                        <h2>Ratings &amp; Reviews</h2>
+                        <p>Verified feedback submitted by customers after completed trips</p>
+                    </div>
+                    <span class="admin-badge-neutral">{{ ratings|length }} Reviews</span>
+                </div>
+
+                <div class="admin-table-panel">
+                    {% if ratings %}
+                    <div class="admin-table-scroll">
+                        <table class="admin-data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Customer</th>
+                                    <th scope="col">Vehicle</th>
+                                    <th scope="col" style="width: 130px;">Rating</th>
+                                    <th scope="col">Review</th>
+                                    <th scope="col" style="width: 140px;">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in ratings %}
+                                <tr>
+                                    <td><strong class="admin-customer-name">{{ r.customer }}</strong></td>
+                                    <td><span class="admin-vehicle-name">{{ r.vehicle }}</span></td>
+                                    <td>
+                                        <span class="admin-stars">
+                                            {% for _ in range(r.rating) %}★{% endfor %}
+                                        </span>
+                                        <small class="admin-subtext">({{ r.rating }}/5)</small>
+                                    </td>
+                                    <td><span>{{ r.review }}</span></td>
+                                    <td><span class="admin-date-text">{{ r.date }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="admin-empty-state">
+                        <span class="admin-empty-icon" aria-hidden="true">⭐</span>
+                        <h3>No Customer Ratings Submitted Yet</h3>
+                        <p>Customer ratings and feedback on completed trips will appear here.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="admin-footer">
+        <div class="admin-footer-inner">
+            <p>&copy; 2026 Business Vehicle Booking &bull; Administrative Systems</p>
+            <p class="admin-footer-secure">🔒 Secure Session Active</p>
+        </div>
+    </footer>
+</body>
+</html>
+

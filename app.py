@@ -198,7 +198,12 @@ def login_required(role):
 def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if "admin_id" not in session:
+        is_admin = (
+            "admin_id" in session
+            or session.get("admin_logged_in")
+            or session.get("configured_admin_authenticated")
+        )
+        if not is_admin:
             if "user_id" in session or "owner_id" in session:
                 return "Access denied", 403
             return redirect("/adminlogin")
@@ -208,6 +213,16 @@ def admin_required(view):
             if db is not None:
                 safe_db_rollback()
             return "Admin data is temporarily unavailable.", 503
+
+    return wrapped
+
+
+def configured_admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("admin_logged_in") and not session.get("configured_admin_authenticated"):
+            return redirect("/admin/login")
+        return view(*args, **kwargs)
 
     return wrapped
 
@@ -1342,6 +1357,292 @@ def admin_dashboard():
         active_vehicles=active_vehicles,
         recent_bookings=recent_bookings,
     )
+
+
+# =========================================================
+# CONFIGURED ADMIN LOGIN AND DASHBOARD
+# =========================================================
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def configured_admin_login():
+    if session.get("admin_logged_in") or session.get("configured_admin_authenticated"):
+        return redirect("/admin/dashboard")
+
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        configured_username = (os.getenv("ADMIN_USERNAME") or "admin").strip()
+        configured_password = os.getenv("ADMIN_PASSWORD") or "change_this_password"
+
+        if (
+            username
+            and configured_username
+            and configured_password
+            and secrets.compare_digest(username.lower(), configured_username.lower())
+            and secrets.compare_digest(password, configured_password)
+        ):
+            # Isolate admin session by removing customer/owner keys
+            for key in (
+                "user_id", "user_name", "user_phone", "user_email",
+                "owner_id", "owner_name", "owner_phone", "owner_email"
+            ):
+                session.pop(key, None)
+
+            session.permanent = True
+            session["admin_logged_in"] = True
+            session["admin_username"] = configured_username
+            session["configured_admin_authenticated"] = True
+            session["configured_admin_username"] = configured_username
+            return redirect("/admin/dashboard")
+
+        return render_template(
+            "admin_login.html",
+            login_action=url_for("configured_admin_login"),
+            error="Invalid admin username or password.",
+        ), 200
+
+    csrf_token()
+    return render_template(
+        "admin_login.html",
+        login_action=url_for("configured_admin_login"),
+    )
+
+
+@app.route("/admin/dashboard")
+@configured_admin_required
+def configured_admin_dashboard():
+    ensure_db_connection()
+    metrics = {
+        "total_customers": 0,
+        "total_owners": 0,
+        "total_vehicles": 0,
+        "total_bookings": 0,
+        "pending_bookings": 0,
+        "accepted_bookings": 0,
+        "rejected_bookings": 0,
+        "total_ratings": 0,
+        "total_payments": 0,
+    }
+    recent_bookings = []
+    customers = []
+    owners = []
+    vehicles = []
+    payments = []
+    ratings = []
+    error_message = None
+
+    try:
+        metric_queries = {
+            "total_customers": "SELECT COUNT(*) FROM users",
+            "total_owners": "SELECT COUNT(*) FROM owners",
+            "total_vehicles": "SELECT COUNT(*) FROM vehicles",
+            "total_bookings": "SELECT COUNT(*) FROM bookings",
+            "pending_bookings": "SELECT COUNT(*) FROM bookings WHERE LOWER(TRIM(status)) = 'pending'",
+            "accepted_bookings": "SELECT COUNT(*) FROM bookings WHERE LOWER(TRIM(status)) = 'accepted'",
+            "rejected_bookings": "SELECT COUNT(*) FROM bookings WHERE LOWER(TRIM(status)) = 'rejected'",
+            "total_ratings": "SELECT COUNT(*) FROM ratings",
+            "total_payments": "SELECT COUNT(*) FROM payments",
+        }
+        for name, query in metric_queries.items():
+            cursor.execute(query)
+            row = cursor.fetchone()
+            metrics[name] = row[0] if row else 0
+
+        # Recent Bookings with Route Information
+        cursor.execute(
+            """
+            SELECT
+                b.id,
+                COALESCE(b.customer_name, 'Customer') AS customer_name,
+                COALESCE(v.vehicle_name, 'Unknown Vehicle') AS vehicle_name,
+                b.booking_date,
+                vr.from_location,
+                vr.to_location,
+                b.status
+            FROM bookings b
+            LEFT JOIN vehicles v ON v.id = b.vehicle_id
+            LEFT JOIN vehicle_routes vr ON vr.id = b.route_id
+            ORDER BY b.id DESC
+            LIMIT 15
+            """
+        )
+        raw_bookings = cursor.fetchall() or []
+        for b in raw_bookings:
+            b_id, cust, veh, b_date, from_loc, to_loc, status = b[0], b[1], b[2], b[3], b[4], b[5], b[6]
+            if from_loc and to_loc:
+                route_display = f"{from_loc} → {to_loc}"
+            elif from_loc:
+                route_display = f"From {from_loc}"
+            elif to_loc:
+                route_display = f"To {to_loc}"
+            else:
+                route_display = "—"
+
+            recent_bookings.append({
+                "id": b_id,
+                "customer": cust,
+                "vehicle": veh,
+                "booking_date": b_date,
+                "route": route_display,
+                "status": status or "Pending",
+            })
+
+        # Registered Customers (passwords never queried or displayed)
+        cursor.execute(
+            "SELECT id, name, phone, COALESCE(email, '—') AS email, is_active "
+            "FROM users ORDER BY id DESC LIMIT 50"
+        )
+        raw_customers = cursor.fetchall() or []
+        customers = [
+            {
+                "id": c[0],
+                "name": c[1] or "Unknown",
+                "phone": c[2] or "—",
+                "email": c[3] or "—",
+                "is_active": bool(c[4]),
+            }
+            for c in raw_customers
+        ]
+
+        # Registered Vehicle Owners (passwords never queried or displayed)
+        cursor.execute(
+            "SELECT id, owner_name, phone, COALESCE(email, '—') AS email, is_active "
+            "FROM owners ORDER BY id DESC LIMIT 50"
+        )
+        raw_owners = cursor.fetchall() or []
+        owners = [
+            {
+                "id": o[0],
+                "name": o[1] or "Unknown",
+                "phone": o[2] or "—",
+                "email": o[3] or "—",
+                "is_active": bool(o[4]),
+            }
+            for o in raw_owners
+        ]
+
+        # Registered Vehicles
+        cursor.execute(
+            """
+            SELECT
+                v.id,
+                v.vehicle_name,
+                COALESCE(v.vehicle_type, 'General') AS vehicle_type,
+                COALESCE(o.owner_name, 'Unknown Owner') AS owner_name,
+                COALESCE(v.location, '—') AS location,
+                COALESCE(v.contact_number, '—') AS contact_number,
+                COALESCE(v.status, 'Available') AS status,
+                v.is_active
+            FROM vehicles v
+            LEFT JOIN owners o ON v.owner_id = o.id
+            ORDER BY v.id DESC
+            LIMIT 50
+            """
+        )
+        raw_vehicles = cursor.fetchall() or []
+        vehicles = [
+            {
+                "id": v[0],
+                "name": v[1],
+                "type": v[2],
+                "owner": v[3],
+                "location": v[4],
+                "contact": v[5],
+                "status": v[6],
+                "is_active": bool(v[7]),
+            }
+            for v in raw_vehicles
+        ]
+
+        # Processed Payments (no sensitive credentials)
+        cursor.execute(
+            """
+            SELECT
+                p.id,
+                p.booking_id,
+                p.amount,
+                COALESCE(p.currency, 'INR') AS currency,
+                COALESCE(p.payment_method, 'Card') AS payment_method,
+                COALESCE(p.status, 'Completed') AS status,
+                COALESCE(p.paid_at, p.created_at) AS payment_date
+            FROM payments p
+            ORDER BY p.id DESC
+            LIMIT 50
+            """
+        )
+        raw_payments = cursor.fetchall() or []
+        payments = [
+            {
+                "id": p[0],
+                "booking_id": p[1],
+                "amount": f"{p[2]:.2f}" if p[2] is not None else "0.00",
+                "currency": p[3],
+                "method": p[4],
+                "status": p[5],
+                "date": p[6].strftime("%Y-%m-%d %H:%M") if p[6] and hasattr(p[6], "strftime") else (str(p[6]) if p[6] else "—"),
+            }
+            for p in raw_payments
+        ]
+
+        # Customer Ratings & Reviews
+        cursor.execute(
+            """
+            SELECT
+                r.id,
+                r.booking_id,
+                COALESCE(b.customer_name, r.customer_phone, 'Customer') AS customer_name,
+                COALESCE(v.vehicle_name, 'Vehicle') AS vehicle_name,
+                COALESCE(r.rating, 5) AS rating,
+                COALESCE(r.review, '—') AS review,
+                r.created_at
+            FROM ratings r
+            LEFT JOIN vehicles v ON r.vehicle_id = v.id
+            LEFT JOIN bookings b ON r.booking_id = b.id
+            ORDER BY r.id DESC
+            LIMIT 50
+            """
+        )
+        raw_ratings = cursor.fetchall() or []
+        ratings = [
+            {
+                "id": r[0],
+                "booking_id": r[1],
+                "customer": r[2],
+                "vehicle": r[3],
+                "rating": r[4],
+                "review": r[5],
+                "date": r[6].strftime("%Y-%m-%d") if r[6] and hasattr(r[6], "strftime") else (str(r[6]) if r[6] else "—"),
+            }
+            for r in raw_ratings
+        ]
+
+    except Error as e:
+        logger.error("Admin dashboard database query error: %s", e)
+        safe_db_rollback()
+        error_message = "Unable to load complete real-time records from database."
+
+    return render_template(
+        "admin_dashboard.html",
+        metrics=metrics,
+        recent_bookings=recent_bookings,
+        customers=customers,
+        owners=owners,
+        vehicles=vehicles,
+        payments=payments,
+        ratings=ratings,
+        error_message=error_message,
+    )
+
+
+
+@app.route("/admin/logout", methods=["POST"])
+@configured_admin_required
+def configured_admin_logout():
+    session.pop("admin_logged_in", None)
+    session.pop("admin_username", None)
+    session.pop("configured_admin_authenticated", None)
+    session.pop("configured_admin_username", None)
+    return redirect("/admin/login")
 
 
 @app.route("/admin/customers")

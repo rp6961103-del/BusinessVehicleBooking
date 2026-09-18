@@ -24,6 +24,7 @@
 
         <div class="home-header-actions">
             {% include "_language_selector.html" %}
+            <a href="/admin/login" class="home-admin-button" title="Administrative Portal">Admin Dashboard</a>
             {% if session.get('user_id') %}
                 <a href="/mybookings" class="home-auth-link">My Bookings</a>
                 <form method="POST" action="/logout" class="home-inline-form">

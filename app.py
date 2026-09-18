@@ -27,46 +27,60 @@ from email_service import (
 from ai_disease_service import is_ai_configured, validate_image_file, analyze_crop_leaf, chat_about_crop
 
 logger = logging.getLogger(__name__)
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+IS_RENDER = bool(os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID"))
+PRODUCTION_ENVIRONMENTS = {"production", "prod"}
+IS_PRODUCTION = APP_ENV in PRODUCTION_ENVIRONMENTS or IS_RENDER
+
 logging.basicConfig(
-    level=logging.INFO if os.getenv("APP_ENV", "development").lower() in {"production", "prod"} else logging.WARNING,
+    level=logging.INFO if IS_PRODUCTION else logging.WARNING,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
-APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
-PRODUCTION_ENVIRONMENTS = {"production", "prod"}
-
 
 def validate_production_configuration():
-    if APP_ENV not in PRODUCTION_ENVIRONMENTS:
+    if not IS_PRODUCTION:
         return
 
-    required_variables = (
-        "SECRET_KEY",
-        "MYSQL_HOST",
-        "MYSQL_PORT",
-        "MYSQL_DATABASE",
-        "MYSQL_USER",
-        "MYSQL_PASSWORD",
-        "SESSION_COOKIE_SECURE",
-    )
-    missing_variables = [
-        name for name in required_variables if not os.getenv(name)
-    ]
+    missing_variables = []
+    if not (os.getenv("SECRET_KEY") or os.getenv("FLASK_SECRET_KEY")):
+        missing_variables.append("SECRET_KEY")
+    if not (os.getenv("MYSQL_HOST") or os.getenv("DB_HOST")):
+        missing_variables.append("MYSQL_HOST")
+    if not (os.getenv("MYSQL_PORT") or os.getenv("DB_PORT")):
+        missing_variables.append("MYSQL_PORT")
+    if not (os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME") or os.getenv("DB_DATABASE")):
+        missing_variables.append("MYSQL_DATABASE")
+    if not (os.getenv("MYSQL_USER") or os.getenv("DB_USER")):
+        missing_variables.append("MYSQL_USER")
+    if not (os.getenv("MYSQL_PASSWORD") or os.getenv("DB_PASSWORD")):
+        missing_variables.append("MYSQL_PASSWORD")
+
+    secure_cookie_val = (
+        os.getenv("SESSION_COOKIE_SECURE")
+        or os.getenv("FLASK_SESSION_COOKIE_SECURE")
+        or ""
+    ).strip().lower()
+    if not secure_cookie_val:
+        missing_variables.append("SESSION_COOKIE_SECURE")
+
     if missing_variables:
         raise RuntimeError(
             "Missing required production environment variable(s): "
             + ", ".join(missing_variables)
         )
 
+    resolved_host = (os.getenv("MYSQL_HOST") or os.getenv("DB_HOST") or "").strip().lower()
+    if resolved_host in {"localhost", "127.0.0.1", "::1"}:
+        raise RuntimeError(
+            "MYSQL_HOST cannot be localhost or 127.0.0.1 in production. "
+            "Configure your external production database host (e.g., Aiven MySQL)."
+        )
+
     if os.getenv("FLASK_DEBUG", "0") == "1":
         raise RuntimeError("FLASK_DEBUG must be 0 in production")
 
-    if os.getenv("SESSION_COOKIE_SECURE", "").strip().lower() not in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    if secure_cookie_val not in {"1", "true", "yes", "on"}:
         raise RuntimeError("SESSION_COOKIE_SECURE must be enabled in production")
 
 
@@ -81,7 +95,7 @@ app.secret_key = (
 )
 app.config.update(
     ENVIRONMENT=APP_ENV,
-    DEBUG=os.getenv("FLASK_DEBUG", "0") == "1" and APP_ENV not in PRODUCTION_ENVIRONMENTS,
+    DEBUG=os.getenv("FLASK_DEBUG", "0") == "1" and not IS_PRODUCTION,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=(
@@ -656,13 +670,43 @@ cursor = None
 payment_table_initialized = False
 MAX_DB_RETRIES = 3
 
-db_config = {
-    "host": os.getenv("MYSQL_HOST") or "localhost",
-    "port": int(os.getenv("MYSQL_PORT") or "3306"),
-    "user": os.getenv("MYSQL_USER") or "root",
-    "password": os.getenv("MYSQL_PASSWORD"),
-    "database": os.getenv("MYSQL_DATABASE") or "vehicle_booking"
-}
+def get_db_config():
+    host = os.getenv("MYSQL_HOST") or os.getenv("DB_HOST")
+    port = os.getenv("MYSQL_PORT") or os.getenv("DB_PORT")
+    user = os.getenv("MYSQL_USER") or os.getenv("DB_USER")
+    password = os.getenv("MYSQL_PASSWORD") or os.getenv("DB_PASSWORD")
+    database = os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME") or os.getenv("DB_DATABASE")
+
+    if not IS_PRODUCTION:
+        host = host or "localhost"
+        port = port or "3306"
+        user = user or "root"
+        database = database or "vehicle_booking"
+
+    config = {
+        "host": host,
+        "port": int(port or "3306"),
+        "user": user,
+        "password": password,
+        "database": database,
+    }
+
+    # SSL / TLS configuration for cloud MySQL (e.g. Aiven)
+    ssl_ca = os.getenv("MYSQL_SSL_CA") or os.getenv("DB_SSL_CA")
+    ssl_disabled_val = os.getenv("MYSQL_SSL_DISABLED", "").strip().lower()
+    if ssl_disabled_val in {"1", "true", "yes"}:
+        config["ssl_disabled"] = True
+    else:
+        config["ssl_disabled"] = False
+        if ssl_ca and os.path.isfile(ssl_ca):
+            config["ssl_ca"] = ssl_ca
+            config["ssl_verify_cert"] = True
+            if os.getenv("MYSQL_SSL_VERIFY_IDENTITY", "").strip().lower() in {"1", "true", "yes"}:
+                config["ssl_verify_identity"] = True
+
+    return config
+
+db_config = get_db_config()
 
 def _is_lost_connection(error):
     return getattr(error, "errno", None) in {2006, 2013}
@@ -713,20 +757,23 @@ class ResilientCursor:
 def ensure_db_connection():
     """Ensure the shared connector and cursor are connected and healthy."""
     global db, cursor
-    if not db_config["password"]:
+    if not db_config.get("password"):
+        if IS_PRODUCTION:
+            logger.error("Database connection refused: MYSQL_PASSWORD is missing in production")
         return None
     try:
         if db is None or not db.is_connected():
             _reset_db_connection()
-            db = mysql.connector.connect(**db_config)
+            connect_kwargs = {k: v for k, v in db_config.items() if v is not None}
+            db = mysql.connector.connect(**connect_kwargs)
             cursor = ResilientCursor(db.cursor())
-            logger.info("Database connection established")
+            logger.info("Database connection established to database: %s", db_config.get("database"))
         else:
             db.ping(reconnect=True, attempts=3, delay=1)
             if cursor is None:
                 cursor = ResilientCursor(db.cursor())
     except Error as error:
-        logger.error("Database connection is unavailable: %s", type(error).__name__)
+        logger.error("Database connection is unavailable: %s (%s)", type(error).__name__, str(error))
         _reset_db_connection()
     return db
 
@@ -951,6 +998,7 @@ def login():
 
         if user and user_active and password_valid:
 
+            logger.info("Customer login successful for phone ending %s", phone[-4:])
             session.clear()
             session.permanent = True
             session["user_id"] = user[0]
@@ -965,6 +1013,19 @@ def login():
             return redirect("/vehicles")
 
         else:
+
+            if not user:
+                logger.warning(
+                    "Customer login failed: account not found in database '%s' for phone ending %s",
+                    db_config.get("database"),
+                    phone[-4:],
+                )
+            elif not user_active:
+                logger.warning("Customer login failed: account inactive for customer ID %s", user[0])
+            elif not password_hash:
+                logger.warning("Customer login failed: password hash missing for customer ID %s", user[0])
+            elif not password_valid:
+                logger.warning("Customer login failed: password mismatch for customer ID %s", user[0])
 
             return f"""
             <h2>Invalid Customer Login</h2>

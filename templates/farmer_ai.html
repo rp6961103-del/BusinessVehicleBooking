@@ -67,15 +67,7 @@
 </header>
 
 <div class="topbar">
-    <span>🌐 {{ t.get('language','Language') }}</span>
-    <div>
-        {% for code,label in [('en','English'),('te','తెలుగు'),('hi','हिन्दी')] %}
-        <form method="POST" action="{{ url_for('change_language', language=code) }}" style="display:inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer">{{ label }}</button>
-        </form>
-        {% endfor %}
-    </div>
+    {% include "_language_selector.html" %}
 </div>
 
 <main class="ai-page">

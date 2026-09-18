@@ -248,6 +248,8 @@ def valid_rent(value):
 # LANGUAGE SUPPORT
 # =========================================================
 
+SUPPORTED_LANGUAGES = ("en", "te", "ta", "hi")
+
 TRANSLATIONS = {
 
     # =====================================================
@@ -451,6 +453,7 @@ TRANSLATIONS = {
         "language": "भाषा",
         "english": "English",
         "telugu": "तेलुगु",
+        "tamil": "तमिल",
         "hindi": "हिन्दी",
 
         "vehicle_booking": "वाहन बुकिंग",
@@ -535,6 +538,63 @@ TRANSLATIONS = {
         "consult_expert": "कृपया किसी कृषि विशेषज्ञ से सलाह लें",
         "analysis_failed": "विश्लेषण विफल रहा",
         "ai_service_unavailable": "एआई सेवा उपलब्ध नहीं है"
+    },
+
+    # =====================================================
+    # TAMIL
+    # =====================================================
+
+    "ta": {
+        "language": "மொழி",
+        "english": "English",
+        "telugu": "తెలుగు",
+        "tamil": "தமிழ்",
+        "hindi": "हिन्दी",
+        "vehicle_booking": "வணிக வாகன முன்பதிவு",
+        "customer": "வாடிக்கையாளர்",
+        "customer_login": "வாடிக்கையாளர் உள்நுழைவு",
+        "book_vehicle": "வாகனத்தை முன்பதிவு செய்க",
+        "login": "உள்நுழைவு",
+        "register": "பதிவு",
+        "logout": "வெளியேறு",
+        "welcome": "வரவேற்கிறோம்",
+        "back_home": "முகப்புக்குத் திரும்பு",
+        "mobile_number": "கைபேசி எண்",
+        "customer_name": "வாடிக்கையாளர் பெயர்",
+        "available_vehicles": "கிடைக்கும் வாகனங்கள்",
+        "my_bookings": "எனது முன்பதிவுகள்",
+        "vehicle_type": "வாகன வகை",
+        "location": "இடம்",
+        "from": "இருந்து",
+        "to": "வரை",
+        "rent": "வாடகை",
+        "contact": "தொடர்பு",
+        "book_now": "இப்போது முன்பதிவு செய்க",
+        "no_vehicles": "வாகனங்கள் கிடைக்கவில்லை",
+        "no_vehicles_message": "தற்போது முன்பதிவுக்கு வாகனங்கள் இல்லை.",
+        "booking_date": "முன்பதிவு தேதி",
+        "confirm_booking": "முன்பதிவை உறுதிப்படுத்து",
+        "status": "நிலை",
+        "accepted": "ஏற்கப்பட்டது",
+        "rejected": "நிராகரிக்கப்பட்டது",
+        "pending": "நிலுவையில்",
+        "no_bookings": "முன்பதிவுகள் இல்லை",
+        "no_bookings_message": "நீங்கள் இன்னும் எந்த வாகனத்தையும் முன்பதிவு செய்யவில்லை.",
+        "farmer_ai": "விவசாயி AI",
+        "farmer_ai_assistant": "விவசாய பயிர் நோய் உதவியாளர்",
+        "upload_leaf_image": "இலை படத்தை பதிவேற்றவும்",
+        "analyze_leaf": "இலையை பகுப்பாய்வு செய்க",
+        "possible_disease": "சாத்தியமான நோய்",
+        "crop": "பயிர்",
+        "confidence": "நம்பகத்தன்மை",
+        "symptoms": "அறிகுறிகள்",
+        "possible_causes": "சாத்தியமான காரணங்கள்",
+        "treatment_management": "சிகிச்சை / மேலாண்மை",
+        "prevention": "தடுப்பு",
+        "ask_ai_assistant": "AI உதவியாளரிடம் கேளுங்கள்",
+        "analysis_failed": "பகுப்பாய்வு தோல்வியடைந்தது",
+        "ai_service_unavailable": "AI சேவை கிடைக்கவில்லை",
+        "footer_message": "அனைவருக்கும் எளிய போக்குவரத்து சேவை."
     }
 
 }
@@ -562,7 +622,7 @@ def inject_language():
 def change_language(language):
     """Change the UI language while preserving the existing CSRF-protected POST flow."""
     language = (language or "").strip().lower()
-    if language not in {"en", "te", "hi"}:
+    if language not in SUPPORTED_LANGUAGES:
         language = "en"
 
     session["language"] = language
@@ -773,17 +833,6 @@ def login():
 
         user = cursor.fetchone()
         user_active = bool(user[5]) if user and len(user) > 5 else bool(user)
-        logger.warning(
-            "Customer login diagnostic: database=%s phone_suffix=%s user_found=%s user_id=%s "
-            "is_active=%s password_hash_present=%s",
-            getattr(db, "database", db_config.get("database")),
-            phone[-2:],
-            bool(user),
-            user[0] if user else None,
-            user_active,
-            bool(user[4] if user and len(user) > 4 else (user[3] if user else None)),
-        )
-
         password_hash = user[4] if user and len(user) > 4 else (user[3] if user else None)
         password_valid = False
         if password_hash:
@@ -809,28 +858,10 @@ def login():
 
         else:
 
-            if not user:
-                logger.warning("Customer login failed: account not found")
-            elif not user_active:
-                logger.warning("Customer login failed: account inactive for customer %s", user[0])
-            elif not password_hash:
-                logger.warning("Customer login failed: password hash missing for customer %s", user[0])
-            elif not password_valid:
-                logger.warning("Customer login failed: password mismatch for customer %s", user[0])
-
-            failure_heading = "Customer Not Found ❌"
-            failure_message = "This mobile number is not registered."
-            if user and not user_active:
-                failure_heading = "Customer Account Inactive ❌"
-                failure_message = "This customer account is inactive."
-            elif user and password_hash and not password_valid:
-                failure_heading = "Incorrect Password ❌"
-                failure_message = "The submitted password does not match this customer account."
-
             return f"""
-            <h2>{failure_heading}</h2>
+            <h2>Invalid Customer Login</h2>
 
-            <p>{failure_message}</p>
+            <p>The mobile number or password is incorrect.</p>
 
             <a href="/login">
             Try Again
@@ -2817,6 +2848,7 @@ def update_booking(booking_id, status):
 # =========================================================
 
 @app.route("/owner_logout", methods=["POST"])
+@login_required("owner")
 def owner_logout():
 
     session.clear()

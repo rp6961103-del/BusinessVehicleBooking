@@ -92,7 +92,8 @@ class SecurityTests(unittest.TestCase):
                 }
             )
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Customer Not Found", response.data)
+        self.assertIn(b"Invalid Customer Login", response.data)
+        self.assertIn(b"mobile number or password is incorrect", response.data)
 
     def test_owner_login_uses_password_hash(self):
         password_hash = generate_password_hash("owner-password")
@@ -219,6 +220,21 @@ class SecurityTests(unittest.TestCase):
 
     def test_language_change_requires_post(self):
         self.assertEqual(self.client.get("/set_language/te").status_code, 405)
+
+    def test_language_change_supports_tamil(self):
+        token = self.csrf_token()
+        response = self.client.post(
+            "/set_language/ta",
+            data={"csrf_token": token},
+            headers={"Referer": "/login"},
+        )
+        self.assertEqual(response.status_code, 302)
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["language"], "ta")
+
+        response = self.client.get("/login")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("தமிழ்".encode("utf-8"), response.data)
 
     def test_vehicle_details_page(self):
         fake_cursor = FakeCursor(

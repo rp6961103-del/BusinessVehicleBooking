@@ -65,23 +65,6 @@
             background: #163a5c;
         }
 
-        /* LANGUAGE */
-
-        .language-bar {
-            background: white;
-            padding: 8px 30px;
-            text-align: right;
-            border-bottom: 1px solid #eee;
-            font-size: 12px;
-        }
-
-        .language-bar a {
-            text-decoration: none;
-            color: #1f4e79;
-            margin-left: 10px;
-            font-weight: 600;
-        }
-
         /* MAIN */
 
         .container {
@@ -265,11 +248,6 @@
                 gap: 10px;
             }
 
-            .language-bar {
-                text-align: center;
-                padding: 10px;
-            }
-
             .booking-card {
                 padding: 18px;
             }
@@ -338,26 +316,7 @@
      LANGUAGE
 ===================================================== -->
 
-<div class="language-bar">
-
-    🌐 {{ t["language"] }}
-
-    <form method="POST" action="{{ url_for('change_language', language='en') }}" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit">🇬🇧 English</button>
-    </form>
-
-    <form method="POST" action="{{ url_for('change_language', language='te') }}" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit">🇮🇳 తెలుగు</button>
-    </form>
-
-    <form method="POST" action="{{ url_for('change_language', language='hi') }}" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit">🇮🇳 हिन्दी</button>
-    </form>
-
-</div>
+{% include "_language_selector.html" %}
 
 
 <!-- =====================================================

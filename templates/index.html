@@ -3,294 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ t.get("vehicle_booking", "Business Vehicle Booking") }} | Commercial & Agricultural Logistics</title>
-    <meta name="description" content="Route-based heavy vehicle booking platform for farmers and businesses. Tractors, Lorries, Mini Trucks, Pickups, and AI Crop Disease Assistant.">
+    <title>Book Commercial Vehicles with Ease | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
+    <meta name="description" content="Reliable route-based commercial vehicle booking for farmers and businesses.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script defer src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
-<body>
-
-<!-- =====================================================
-     HEADER & NAVIGATION
-===================================================== -->
-<header>
-    <a href="/" class="logo">
-        <span>🚚</span> {{ t.get("vehicle_booking", "Business Vehicle Booking") }}
-    </a>
-
-    <nav aria-label="Main Navigation">
-        <a href="/farmer-ai" class="nav-highlight">
-            🌿 {{ t.get("farmer_ai", "Farmer AI") }}
+<body class="homepage">
+    <header class="home-header">
+        <a href="/" class="home-logo" aria-label="Business Vehicle Booking home">
+            <span class="home-logo-mark" aria-hidden="true">▰</span>
+            <span>Business Vehicle <strong>Booking</strong></span>
         </a>
 
-        {% if session.get('user_id') %}
-            <a href="/vehicles">
-                🚚 {{ t.get("available_vehicles", "Available Vehicles") }}
-            </a>
-            <a href="/mybookings">
-                📋 {{ t.get("my_bookings", "My Bookings") }}
-            </a>
-            <form method="POST" action="/logout" style="display:inline;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit">🚪 {{ t.get("logout", "Logout") }} ({{ session.get('user_name') }})</button>
-            </form>
-        {% elif session.get('owner_id') %}
-            <a href="/owner_dashboard">
-                📊 Dashboard
-            </a>
-            <a href="/myvehicles">
-                🚛 My Vehicles
-            </a>
-            <a href="/addroute">
-                📍 Add Route
-            </a>
-            <form method="POST" action="/owner_logout" style="display:inline;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit">🚪 Logout ({{ session.get('owner_name') }})</button>
-            </form>
-        {% elif session.get('admin_id') %}
-            <a href="/admin_dashboard">
-                🛡️ Admin Dashboard
-            </a>
-            <form method="POST" action="/admin_logout" style="display:inline;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit">🚪 Logout</button>
-            </form>
-        {% else %}
-            <a href="/login">
-                🔐 {{ t.get("customer_login", "Customer Login") }}
-            </a>
-            <a href="/ownerlogin">
-                👤 Owner Login
-            </a>
-            <a href="/adminlogin" style="opacity: 0.85;">
-                🛡️ Admin
-            </a>
-        {% endif %}
-    </nav>
-</header>
+        <nav class="home-nav" aria-label="Main navigation">
+            <a href="/" class="active">Home</a>
+            <a href="/vehicles">Vehicles</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+        </nav>
 
-<!-- =====================================================
-     LANGUAGE SELECTOR
-===================================================== -->
-<div class="language-bar">
-    <span>🌐 {{ t.get("language", "Language") }}:</span>
-    <form method="POST" action="{{ url_for('change_language', language='en') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
-    </form>
-    <form method="POST" action="{{ url_for('change_language', language='te') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
-    </form>
-    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
-    </form>
-</div>
-
-<main class="container">
-
-    <!-- =====================================================
-         HERO SECTION
-    ===================================================== -->
-    <section class="hero">
-        <div class="hero-pill">
-            🌾 {{ t.get("simple_fast_easy", "Simple • Fast • Easy") }}
-        </div>
-        <h1>🚚 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</h1>
-        <p>
-            {{ t.get("transportation_message", "Book the right vehicle for your transportation needs.") }}
-        </p>
-
-        <div class="hero-actions">
+        <div class="home-header-actions">
+            {% include "_language_selector.html" %}
             {% if session.get('user_id') %}
-                <a href="/vehicles" class="btn btn-accent">
-                    🚚 {{ t.get("available_vehicles", "Available Vehicles") }}
-                </a>
-                <a href="/mybookings" class="btn btn-secondary">
-                    📋 {{ t.get("my_bookings", "My Bookings") }}
-                </a>
+                <a href="/mybookings" class="home-auth-link">My Bookings</a>
+                <form method="POST" action="/logout" class="home-inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="home-auth-button">Logout</button>
+                </form>
+            {% elif session.get('owner_id') %}
+                <a href="/owner_dashboard" class="home-auth-link">Dashboard</a>
+                <form method="POST" action="/owner_logout" class="home-inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="home-auth-button">Logout</button>
+                </form>
+            {% elif session.get('admin_id') %}
+                <a href="/admin_dashboard" class="home-auth-link">Dashboard</a>
+                <form method="POST" action="/admin_logout" class="home-inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="home-auth-button">Logout</button>
+                </form>
             {% else %}
-                <a href="/login" class="btn btn-accent">
-                    🚛 {{ t.get("book_vehicle", "Book a Vehicle") }}
-                </a>
-                <a href="/ownerlogin" class="btn btn-outline hero-owner-link">
-                    🚚 Vehicle Owners Portal
-                </a>
+                <a href="/login" class="home-auth-link">Login</a>
+                <a href="/ownerregister" class="home-register-link">Register</a>
             {% endif %}
-            <a href="/farmer-ai" class="btn btn-ai">
-                🌿 {{ t.get("farmer_ai_assistant", "Farmer AI Crop Disease Assistant") }}
-            </a>
         </div>
+    </header>
 
-        <div class="hero-badges">
-            <div class="hero-badge">
-                <div class="hero-badge-icon">🚜</div>
-                <div>
-                    <strong>Agricultural & Heavy Fleet</strong>
-                    <span>Tractors, Lorries, Pickups, Tippers</span>
+    <main>
+        <section class="home-hero" aria-labelledby="home-hero-title">
+            <div class="home-hero-overlay"></div>
+            <div class="home-hero-content">
+                <p class="home-eyebrow">Heavy Vehicles for a Stronger Tomorrow</p>
+                <h1 id="home-hero-title">Book Commercial Vehicles with Ease</h1>
+                <p class="home-hero-copy">Connecting farmers and business owners with reliable commercial vehicles for a better tomorrow.</p>
+                <div class="home-hero-links">
+                    <a href="/vehicles" class="home-primary-button">Explore Vehicles <span aria-hidden="true">&#8594;</span></a>
+                    <a href="/farmer-ai" class="home-hero-text-link">Try Farmer AI <span aria-hidden="true">&#8594;</span></a>
                 </div>
             </div>
-            <div class="hero-badge">
-                <div class="hero-badge-icon">🛣️</div>
-                <div>
-                    <strong>Route-Based Fixed Pricing</strong>
-                    <span>Transparent origin-destination rent</span>
-                </div>
-            </div>
-            <div class="hero-badge">
-                <div class="hero-badge-icon">🌿</div>
-                <div>
-                    <strong>Farmer AI Crop Doctor</strong>
-                    <span>Leaf disease scanner & guidance</span>
-                </div>
-            </div>
-            <div class="hero-badge">
-                <div class="hero-badge-icon">⭐</div>
-                <div>
-                    <strong>Verified Customer Reviews</strong>
-                    <span>1–5 star ratings on completed trips</span>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- =====================================================
-         VEHICLE CATEGORIES SHOWCASE
-    ===================================================== -->
-    <section class="features-section">
-        <div class="section-heading">
-            <h2>{{ t.get("vehicle_types", "Vehicle Types") }}</h2>
-            <p>Select the vehicle best suited for your payload, cargo volume, and terrain.</p>
-        </div>
-
-        <div class="feature-grid">
-            <div class="feature-card" style="text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">🚜</div>
-                <h3>{{ t.get("tractor", "Tractor") }}</h3>
-                <p>{{ t.get("tractor_desc", "Suitable for agricultural and goods transportation.") }}</p>
-                <div style="margin-top: 12px; font-weight: 700; color: var(--brand);">Field Work • Heavy Haulage</div>
-            </div>
-
-            <div class="feature-card" style="text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">🚛</div>
-                <h3>{{ t.get("lorry", "Lorry") }} / Tipper</h3>
-                <p>{{ t.get("lorry_desc", "Suitable for transporting larger loads.") }}</p>
-                <div style="margin-top: 12px; font-weight: 700; color: var(--brand);">Bulk Grain • Sugarcane • Sand</div>
-            </div>
-
-            <div class="feature-card" style="text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">🚚</div>
-                <h3>{{ t.get("mini_truck", "Mini Truck") }}</h3>
-                <p>{{ t.get("mini_truck_desc", "Suitable for small and medium loads.") }}</p>
-                <div style="margin-top: 12px; font-weight: 700; color: var(--brand);">Mandi Transit • Eicher • Tata Ace</div>
-            </div>
-
-            <div class="feature-card" style="text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">🛻</div>
-                <h3>{{ t.get("pickup", "Pickup") }}</h3>
-                <p>{{ t.get("pickup_desc", "Convenient for local transportation.") }}</p>
-                <div style="margin-top: 12px; font-weight: 700; color: var(--brand);">Bolero Maxi • Local Goods</div>
-            </div>
-        </div>
-    </section>
-
-    <!-- =====================================================
-         HOW IT WORKS
-    ===================================================== -->
-    <section class="features-section">
-        <div class="section-heading">
-            <h2>{{ t.get("how_it_works", "How It Works") }}</h2>
-            <p>Four simple steps to get your commercial or farm transportation booked.</p>
-        </div>
-
-        <div class="steps-grid">
-            <div class="step-card">
-                <div class="step-number">1</div>
-                <h3>{{ t.get("choose_vehicle", "Choose Vehicle") }}</h3>
-                <p>{{ t.get("select_suitable_vehicle", "Select a suitable vehicle.") }} Filter by type, base location, and route rent.</p>
-            </div>
-
-            <div class="step-card">
-                <div class="step-number">2</div>
-                <h3>Select Specific Route</h3>
-                <p>Examine the exact route (Origin → Destination) and pre-agreed fixed rent.</p>
-            </div>
-
-            <div class="step-card">
-                <div class="step-number">3</div>
-                <h3>{{ t.get("select_date", "Select Date") }}</h3>
-                <p>{{ t.get("choose_booking_date", "Choose your booking date.") }} Submit your reservation request instantly.</p>
-            </div>
-
-            <div class="step-card">
-                <div class="step-number">4</div>
-                <h3>{{ t.get("confirm", "Confirm") }} & Rate</h3>
-                <p>{{ t.get("confirm_your_booking", "Confirm your vehicle booking.") }} Track owner acceptance and rate your experience.</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- =====================================================
-         FARMER AI BANNER
-    ===================================================== -->
-    <section class="card" style="background: linear-gradient(135deg, #eaf5f2 0%, #ffffff 100%); border-left: 6px solid #2e7d32; padding: 32px; margin-bottom: 40px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 280px;">
-                <span style="display: inline-block; background: #dff3e8; color: #17603c; padding: 4px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">
-                    Smart Agronomy
-                </span>
-                <h2 style="margin-top: 8px; color: #0b4d42;">🌿 Need Help with Crop Leaf Disease?</h2>
-                <p style="color: var(--muted); margin-bottom: 0;">
-                    Take a photo of an affected plant leaf and let our AI assist you with likely disease detection, symptoms breakdown, safe management recommendations, and prevention guidance in English, Telugu, or Hindi.
-                </p>
-            </div>
-            <div>
-                <a href="/farmer-ai" class="btn" style="background: #2e7d32; color: #ffffff; padding: 14px 24px; font-size: 1rem;">
-                    🔍 Try Farmer AI Assistant
+            <div class="home-action-cards" aria-label="Vehicle actions">
+                <a href="/vehicles" class="home-action-card">
+                    <span class="home-action-icon" aria-hidden="true">▣</span>
+                    <span><strong>Book a Vehicle</strong><small>Find and book the right vehicle for your needs</small></span>
+                    <span class="home-action-arrow" aria-hidden="true">&#8594;</span>
+                </a>
+                <a href="/vehicles" class="home-action-card">
+                    <span class="home-action-icon" aria-hidden="true">⌁</span>
+                    <span><strong>Vehicle Routes</strong><small>Explore available routes and vehicle options</small></span>
+                    <span class="home-action-arrow" aria-hidden="true">&#8594;</span>
                 </a>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- =====================================================
-         CALL TO ACTION PORTALS
-    ===================================================== -->
-    <section class="features-section" style="margin-bottom: 20px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
-            <div class="card" style="border-top: 4px solid var(--accent); text-align: center;">
-                <div style="font-size: 40px; margin-bottom: 8px;">👨‍🌾</div>
-                <h3>For Farmers & Businesses</h3>
-                <p>Find the right vehicle for agricultural crops, construction gravel, or market supply with fixed prices.</p>
-                <a href="/login" class="btn btn-primary full-btn" style="margin-top: 12px;">
-                    🚛 {{ t.get("book_vehicle", "Book a Vehicle") }}
-                </a>
+        <section class="home-features" aria-label="Service benefits">
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">✓</span><div><h2>Secure &amp; Reliable</h2><p>Your trust is our priority</p></div></div>
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">▦</span><div><h2>Wide Vehicle Range</h2><p>From small to heavy vehicles</p></div></div>
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">⌁</span><div><h2>Route Based Pricing</h2><p>Transparent and fair rates</p></div></div>
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">24</span><div><h2>24/7 Support</h2><p>We're always here to help</p></div></div>
+        </section>
+
+        <section class="home-ai-card" aria-labelledby="home-ai-title">
+            <div class="home-ai-icon" aria-hidden="true">✦</div>
+            <div><p class="home-section-kicker">Smart farming support</p><h2 id="home-ai-title">Farmer AI Assistant</h2><p>Scan crops &amp; get expert advice</p></div>
+            <a href="/farmer-ai" class="home-ai-button">Try Now <span aria-hidden="true">&#8594;</span></a>
+        </section>
+
+        <section id="about" class="home-about" aria-labelledby="home-about-title">
+            <div><p class="home-section-kicker">Built for the field and the road</p><h2 id="home-about-title">One dependable place for commercial transport.</h2></div>
+            <p>Choose from agricultural and heavy vehicles, compare route-based pricing, and send a booking request to a vehicle owner with confidence.</p>
+        </section>
+
+        <section class="home-vehicle-strip" aria-labelledby="home-vehicle-title">
+            <div class="home-section-heading"><div><p class="home-section-kicker">Move more, simply</p><h2 id="home-vehicle-title">Vehicles for every kind of work</h2></div><a href="/vehicles" class="home-outline-button">View Vehicles <span aria-hidden="true">&#8594;</span></a></div>
+            <div class="home-vehicle-grid">
+                <div><span aria-hidden="true">▰</span><strong>{{ t.get("tractor", "Tractor") }}</strong><small>{{ t.get("tractor_desc", "Suitable for agricultural and goods transportation.") }}</small></div>
+                <div><span aria-hidden="true">▣</span><strong>{{ t.get("lorry", "Lorry") }}</strong><small>{{ t.get("lorry_desc", "Suitable for transporting larger loads.") }}</small></div>
+                <div><span aria-hidden="true">▤</span><strong>{{ t.get("mini_truck", "Mini Truck") }}</strong><small>{{ t.get("mini_truck_desc", "Suitable for small and medium loads.") }}</small></div>
+                <div><span aria-hidden="true">▱</span><strong>{{ t.get("pickup", "Pickup") }}</strong><small>{{ t.get("pickup_desc", "Convenient for local transportation.") }}</small></div>
             </div>
+        </section>
 
-            <div class="card" style="border-top: 4px solid var(--brand); text-align: center;">
-                <div style="font-size: 40px; margin-bottom: 8px;">🚚</div>
-                <h3>For Vehicle Owners</h3>
-                <p>Register your tractor, lorry, or pickup. Define multiple routes with fixed rent rates and manage bookings.</p>
-                <a href="/ownerlogin" class="btn btn-secondary full-btn" style="margin-top: 12px;">
-                    👤 Owner Login & Dashboard
-                </a>
-            </div>
-        </div>
-    </section>
+        <section id="contact" class="home-contact" aria-labelledby="home-contact-title">
+            <div><p class="home-section-kicker">Ready when you are</p><h2 id="home-contact-title">Start moving your next load.</h2></div>
+            <a href="/vehicles" class="home-primary-button">Browse Vehicles <span aria-hidden="true">&#8594;</span></a>
+        </section>
+    </main>
 
-</main>
-
-<!-- =====================================================
-     FOOTER
-===================================================== -->
-<footer>
-    <p>© 2026 <strong>{{ t.get("vehicle_booking", "Business Vehicle Booking") }}</strong></p>
-    <p>{{ t.get("footer_message", "Simple transportation service for everyone.") }}</p>
-    <p style="margin-top: 8px; font-size: 0.8rem; opacity: 0.75;">
-        Available in English • తెలుగు • हिन्दी
-    </p>
-</footer>
-
+    <footer class="home-footer"><p>© 2026 <strong>{{ t.get("vehicle_booking", "Business Vehicle Booking") }}</strong></p><p>{{ t.get("footer_message", "Simple transportation service for everyone.") }}</p></footer>
 </body>
 </html>

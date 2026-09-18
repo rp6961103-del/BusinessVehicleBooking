@@ -20,21 +20,7 @@
     </nav>
 </header>
 
-<div class="language-bar">
-    <span>🌐 {{ t.get("language", "Language") }}:</span>
-    <form method="POST" action="{{ url_for('change_language', language='en') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
-    </form>
-    <form method="POST" action="{{ url_for('change_language', language='te') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
-    </form>
-    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
-    </form>
-</div>
+{% include "_language_selector.html" %}
 
 <main class="container container-narrow">
     <div class="form-card">

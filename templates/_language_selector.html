@@ -1,0 +1,11 @@
+<details class="language-selector" aria-label="{{ t.get('language', 'Language') }}">
+    <summary>{{ t.get('language', 'Language') }} <span aria-hidden="true">▾</span></summary>
+    <div class="language-options">
+        {% for code, label in [('te', 'తెలుగు'), ('ta', 'தமிழ்'), ('en', 'English'), ('hi', 'हिन्दी')] %}
+            <form method="POST" action="{{ url_for('change_language', language=code) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="lang-btn {% if current_language == code %}active{% endif %}" {% if current_language == code %}aria-current="true"{% endif %}>{{ label }}</button>
+            </form>
+        {% endfor %}
+    </div>
+</details>

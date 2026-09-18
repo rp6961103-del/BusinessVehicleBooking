@@ -14,9 +14,21 @@ def test_database_connection_and_cleanup(test_db):
         cursor.close()
 
 
-def test_customer_registration_is_removed(app_client, seeded_data):
-    assert app_client.get("/register").status_code == 404
-    assert app_client.post("/register").status_code == 404
+def test_customer_registration_is_available(app_client, seeded_data):
+    token = csrf_token(app_client, "/register")
+    assert app_client.get("/register").status_code == 200
+    response = app_client.post(
+        "/register",
+        data={
+            "csrf_token": token,
+            "name": "New Customer",
+            "phone": "9000000003",
+            "password": "customer-password",
+            "confirm_password": "customer-password",
+        },
+    )
+    assert response.status_code == 302
+    assert response.location.endswith("/login")
 
 
 def test_customer_login_and_authentication(app_client, seeded_data):

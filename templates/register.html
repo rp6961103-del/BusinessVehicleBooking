@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Registration | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="container container-narrow">
+    <div class="form-card">
+        <h1>Customer Registration</h1>
+        <p class="subtitle">Create your customer account.</p>
+
+        {% if error %}
+            <div class="message error" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="/register">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" maxlength="100" required autocomplete="name">
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Mobile Number</label>
+                <input type="tel" id="phone" name="phone" pattern="[0-9]{10}" maxlength="10" required autocomplete="tel">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email (optional)</label>
+                <input type="email" id="email" name="email" maxlength="255" autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" minlength="8" maxlength="128" required autocomplete="new-password">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" minlength="8" maxlength="128" required autocomplete="new-password">
+            </div>
+
+            <button type="submit" class="btn btn-primary full-btn">Register</button>
+        </form>
+
+        <p style="margin-top: 18px; text-align: center;">
+            Already have an account? <a href="/login">Customer Sign In</a>
+        </p>
+    </div>
+</main>
+</body>
+</html>

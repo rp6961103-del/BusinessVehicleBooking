@@ -14,6 +14,7 @@ load_dotenv()
 from flask import Flask, render_template, request, redirect, session, flash, jsonify, url_for
 import mysql.connector
 from mysql.connector import Error
+from mysql.connector.errors import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 from email_service import (
@@ -151,8 +152,6 @@ def prevent_auth_form_caching(response):
 
 @app.before_request
 def protect_state_changing_requests():
-    if request.path == "/register":
-        return "Not Found", 404
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         submitted_token = (
             request.form.get("csrf_token")
@@ -800,6 +799,94 @@ def account_choice():
 def home():
 
     return render_template("index.html")
+
+
+# =========================================================
+# CUSTOMER REGISTRATION
+# =========================================================
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+
+    if request.method == "POST":
+
+        name = valid_text(request.form.get("name"), 100)
+        phone = valid_phone(request.form.get("phone"))
+        email = valid_email(request.form.get("email")) if request.form.get("email") else None
+        password = valid_password(request.form.get("password"))
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not name or not phone or not password or password != confirm_password:
+            return render_template(
+                "register.html",
+                error="Enter valid registration details and matching passwords.",
+            ), 400
+        if request.form.get("email") and not email:
+            return render_template(
+                "register.html",
+                error="Enter a valid email address.",
+            ), 400
+
+        if email:
+            cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+            if cursor.fetchone():
+                return render_template(
+                    "register.html",
+                    error=(
+                        "This email address is already registered. "
+                        "Please use a different email or sign in."
+                    ),
+                ), 409
+
+        cursor.execute("SELECT id FROM users WHERE phone = %s", (phone,))
+        if cursor.fetchone():
+            return render_template(
+                "register.html",
+                error=(
+                    "This mobile number is already registered. "
+                    "Please use a different number or sign in."
+                ),
+            ), 409
+
+        try:
+            cursor.execute(
+                "INSERT INTO users (name, phone, email, password_hash) "
+                "VALUES (%s, %s, %s, %s)",
+                (name, phone, email, generate_password_hash(password)),
+            )
+            db.commit()
+        except IntegrityError as error:
+            safe_db_rollback()
+            if getattr(error, "errno", None) != 1062:
+                logger.exception("Customer registration insert failed")
+                raise
+
+            cursor.execute(
+                "SELECT phone, email FROM users "
+                "WHERE phone = %s OR email = %s LIMIT 1",
+                (phone, email),
+            )
+            existing_user = cursor.fetchone()
+            if existing_user and existing_user[1] and email and existing_user[1].lower() == email.lower():
+                duplicate_message = (
+                    "This email address is already registered. "
+                    "Please use a different email or sign in."
+                )
+            elif existing_user and existing_user[0] == phone:
+                duplicate_message = (
+                    "This mobile number is already registered. "
+                    "Please use a different number or sign in."
+                )
+            else:
+                logger.error("Customer registration encountered an unknown duplicate constraint")
+                raise
+
+            return render_template("register.html", error=duplicate_message), 409
+
+        return redirect("/login")
+
+    csrf_token()
+    return render_template("register.html")
 
 
 # =========================================================

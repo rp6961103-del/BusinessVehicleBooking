@@ -299,6 +299,8 @@ LANGUAGE_NAMES = {
 }
 
 TRANSLATIONS = {   'en': {
+        'email_or_phone': 'Email or Phone Number',
+        'enter_email_or_phone_placeholder': 'Enter your registered email or phone number',
         'admin_logout': 'Admin Logout',
         'Password must be 8 to 128 characters.': 'Password must be 8 to 128 characters.',
         'Passwords do not match.': 'Passwords do not match.',
@@ -811,6 +813,8 @@ TRANSLATIONS = {   'en': {
               'error_500_title': '500 - Server Error',
               'error_500_desc': 'An unexpected error occurred. Please try again later.'},
     'te': {
+        'email_or_phone': 'ఇమెయిల్ లేదా ఫోన్ నంబర్',
+        'enter_email_or_phone_placeholder': 'మీ నమోదిత ఇమెయిల్ లేదా ఫోన్ నంబర్‌ను నమోదు చేయండి',
         'admin_logout': 'అడ్మిన్ లాగ్అవుట్',
         'Password must be 8 to 128 characters.': 'పాస్‌వర్డ్ 8 నుండి 128 అక్షరాలు ఉండాలి.',
         'Passwords do not match.': 'పాస్‌వర్డ్‌లు సరిపోలడం లేదు.',
@@ -1334,6 +1338,8 @@ TRANSLATIONS = {   'en': {
               'error_500_title': '500 - సర్వర్ లోపం',
               'error_500_desc': 'అనుకోని లోపం సంభవించింది. దయచేసి కాసేపటి తర్వాత మళ్ళీ ప్రయత్నించండి.'},
     'ta': {
+        'email_or_phone': 'மின்னஞ்சல் அல்லது தொலைபேசி எண்',
+        'enter_email_or_phone_placeholder': 'உங்கள் பதிவு செய்யப்பட்ட மின்னஞ்சல் அல்லது தொலைபேசி எண்ணை உள்ளிடவும்',
         'admin_logout': 'நிர்வாகி வெளியேறு',
         'Password must be 8 to 128 characters.': 'கடவுச்சொல் 8 முதல் 128 எழுத்துக்கள் வரை இருக்க வேண்டும்.',
         'Passwords do not match.': 'கடவுச்சொற்கள் பொருந்தவில்லை.',
@@ -1848,6 +1854,8 @@ TRANSLATIONS = {   'en': {
               'error_500_title': '500 - சேவையக பிழை',
               'error_500_desc': 'எதிர்பாராத பிழை ஏற்பட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.'},
     'hi': {
+        'email_or_phone': 'ईमेल या फोन नंबर',
+        'enter_email_or_phone_placeholder': 'अपना पंजीकृत ईमेल या फ़ोन नंबर दर्ज करें',
         'admin_logout': 'व्यवस्थापक लॉगआउट',
         'Password must be 8 to 128 characters.': 'पासवर्ड 8 से 128 वर्णों का होना चाहिए।',
         'Passwords do not match.': 'पासवर्ड मेल नहीं खाते।',
@@ -3076,22 +3084,35 @@ def ownerlogin():
 
     if request.method == "POST":
 
-        email = valid_email(request.form.get("email"))
+        identifier = (
+            request.form.get("identifier")
+            or request.form.get("email")
+            or request.form.get("phone")
+            or ""
+        ).strip()
         password = request.form.get("password", "")
 
-        if not email or not valid_password(password):
+        is_email = "@" in identifier
+        logger.info(
+            "Owner login attempt: identifier_type=%s, identifier_len=%d",
+            "email" if is_email else "phone",
+            len(identifier),
+        )
+
+        if not identifier or not password:
+            logger.warning("Owner login rejected: missing identifier or password")
             return "Invalid owner login details", 400
 
         sql = """
         SELECT id, owner_name, phone, email, password_hash
         FROM owners
-        WHERE email = %s
+        WHERE (email = %s OR phone = %s)
         AND is_active = TRUE
         """
 
         cursor.execute(
             sql,
-            (email,)
+            (identifier, identifier)
         )
 
         owner = cursor.fetchone()
@@ -3099,6 +3120,7 @@ def ownerlogin():
         valid_owner = bool(owner and owner[4] and check_password_hash(owner[4], password))
 
         if owner and valid_owner:
+            logger.info("Owner login successful for owner ID %s", owner[0])
 
             saved_lang = session.get("language", "en")
             session.clear()
@@ -3114,6 +3136,14 @@ def ownerlogin():
             return redirect("/owner_dashboard")
 
         else:
+            if not owner:
+                logger.warning(
+                    "Owner login failed: account not found for identifier_type=%s, len=%d",
+                    "email" if is_email else "phone",
+                    len(identifier),
+                )
+            else:
+                logger.warning("Owner login failed: password verification failed for owner ID %s", owner[0])
 
             return """
             <h2>Invalid Owner Login ❌</h2>

@@ -42,15 +42,18 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="form-group">
-                <label for="email">📧 {{ t.get("email_address", "Email Address") }}</label>
+                <label for="identifier">📧 {{ t.get("email_or_phone", "Email or Phone Number") }}</label>
                 <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    placeholder="{{ t.get('enter_owner_email_placeholder', 'owner@example.com (used for login & alerts)') }}"
+                    type="text"
+                    id="identifier"
+                    name="identifier"
+                    placeholder="{{ t.get('enter_email_or_phone_placeholder', 'Enter your registered email or phone number') }}"
                     maxlength="255"
                     required
-                    autocomplete="email"
+                    autocomplete="username"
+                    autocapitalize="none"
+                    autocorrect="off"
+                    spellcheck="false"
                 >
             </div>
 

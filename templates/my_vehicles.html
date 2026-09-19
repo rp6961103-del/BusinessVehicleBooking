@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_language or 'en' }}">
 
 <head>
 
@@ -8,7 +8,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0">
 
-    <title>My Vehicles | Business Vehicle Booking</title>
+    <title>{{ t.get("my_vehicles", "My Vehicles") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='style.css') }}">
@@ -362,7 +362,7 @@
 
         <form method="POST" action="/owner_logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">🚪 {{ t.get("logout", "Logout") }}</button>
+            <button type="submit" style="background:none; border:none; color:inherit; font:inherit; cursor:pointer;">🚪 {{ t.get("logout", "Logout") }}</button>
         </form>
 
     </nav>
@@ -474,7 +474,7 @@
                             </h2>
 
                             <p>
-                                {{ t.get("booking_id", "ID") }}: #{{ vehicle[0] }}
+                                {{ t.get("vehicle_id", "Vehicle ID") }}: #{{ vehicle[0] }}
                             </p>
 
                         </div>
@@ -537,18 +537,18 @@
                         <a href="/editvehicle/{{ vehicle[0] }}"
                            class="action-btn secondary"
                            style="font-size: 12px; padding: 7px 10px;">
-                            ✏️ {{ t.get("edit_vehicle", "Edit") }}
+                            ✏️ {{ t.get("edit", "Edit") }}
                         </a>
 
                         <form method="POST"
                               action="/deletevehicle/{{ vehicle[0] }}"
-                              onsubmit="return confirm('Delete this vehicle?');"
+                              onsubmit="return confirm('{{ t.get('confirm_delete_vehicle', 'Are you sure you want to delete this vehicle?') }}');"
                               style="display: inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit"
                                     class="action-btn"
                                     style="border: 0; background: #f8d7da; color: #842029; cursor: pointer; font-size: 12px; padding: 7px 10px;">
-                                🗑️ {{ t.get("delete_vehicle", "Delete") }}
+                                🗑️ {{ t.get("delete", "Delete") }}
                             </button>
                         </form>
                     </div>
@@ -568,11 +568,11 @@
         <div class="empty-box">
 
             <h2>
-                🚫 {{ t.get("no_vehicles", "No Vehicles Added") }}
+                🚫 {{ t.get("no_vehicles_added", "No Vehicles Added") }}
             </h2>
 
             <p>
-                {{ t.get("no_vehicles_message", "You have not added any vehicles yet.") }}
+                {{ t.get("no_vehicles_added_desc", "You have not added any vehicles yet.") }}
             </p>
 
 

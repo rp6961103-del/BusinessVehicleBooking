@@ -204,16 +204,16 @@ body {
         <span class="saas-brand-logo">🚚</span>
         <div class="saas-brand-text">
             <h1>{{ t.get("vehicle_booking", "Business Vehicle Booking") }}</h1>
-            <p>{{ t.get("owner_tagline", "రైతులకు • వ్యాపారులకు • మీ సేవలో") }}</p>
+            <p>{{ t.get("owner_tagline", "For Farmers • For Businesses • At Your Service") }}</p>
         </div>
     </a>
 
     <div class="saas-top-actions">
         <div class="saas-owner-pill">
             <div class="saas-owner-avatar">{{ (session.get("owner_name") or "O")[:1]|upper }}</div>
-            <span>{{ session.get("owner_name") or "Vehicle Owner" }}</span>
+            <span>{{ session.get("owner_name") or t.get("owner", "Vehicle Owner") }}</span>
         </div>
-        <button class="saas-mobile-toggle" id="mobileToggleBtn" onclick="toggleMobileMenu()">☰ Menu</button>
+        <button class="saas-mobile-toggle" id="mobileToggleBtn" onclick="toggleMobileMenu()">☰ {{ t.get("menu", "Menu") }}</button>
     </div>
 </header>
 
@@ -237,7 +237,7 @@ body {
 
             <a href="/addroute" class="saas-nav-link">
                 <span class="saas-nav-icon">🛣️</span>
-                <span>{{ t.get("add_route", "Add Route & Rent") }}</span>
+                <span>{{ t.get("add_route_rent", "Add Route & Rent") }}</span>
             </a>
 
             <a href="/addvehicle" class="saas-nav-link">
@@ -553,7 +553,7 @@ body {
                     </div>
                     <div class="saas-profile-item">
                         <span class="saas-profile-label">{{ t.get("status", "Account Status") }}</span>
-                        <span class="saas-profile-val" style="color:#198754;">🟢 Active Fleet</span>
+                        <span class="saas-profile-val" style="color:#198754;">🟢 {{ t.get("active_fleet", "Active Fleet") }}</span>
                     </div>
                 </div>
             </div>

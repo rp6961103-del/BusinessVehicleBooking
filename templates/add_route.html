@@ -302,7 +302,7 @@
                                 </option>
                             {% endfor %}
                         </select>
-                        <span class="field-tip">Choose the vehicle from your active registered fleet.</span>
+                        <span class="field-tip">{{ t.get('choose_vehicle_tip', 'Choose the vehicle from your active registered fleet.') }}</span>
                     </div>
 
                     <div class="form-field">
@@ -313,11 +313,11 @@
                             type="text"
                             id="from_location"
                             name="from_location"
-                            placeholder="Example: Tadipatri"
+                            placeholder="{{ t.get('from_example', 'Example: Tadipatri') }}"
                             maxlength="255"
                             required
                         >
-                        <span class="field-tip">Starting town, village or loading point.</span>
+                        <span class="field-tip">{{ t.get('from_location_tip', 'Starting town, village or loading point.') }}</span>
                     </div>
 
                     <div class="form-field">
@@ -328,11 +328,11 @@
                             type="text"
                             id="to_location"
                             name="to_location"
-                            placeholder="Example: Anantapur"
+                            placeholder="{{ t.get('to_example', 'Example: Anantapur') }}"
                             maxlength="255"
                             required
                         >
-                        <span class="field-tip">Delivery market, warehouse or destination town.</span>
+                        <span class="field-tip">{{ t.get('to_location_tip', 'Delivery market, warehouse or destination town.') }}</span>
                     </div>
                 </div>
             </div>
@@ -355,13 +355,13 @@
                                 type="number"
                                 id="rent"
                                 name="rent"
-                                placeholder="Example: 2500"
+                                placeholder="{{ t.get('rent_example', 'Example: 2500') }}"
                                 min="1"
                                 step="1"
                                 required
                             >
                         </div>
-                        <span class="field-tip">Total fixed rent for this one-way route trip.</span>
+                        <span class="field-tip">{{ t.get('rent_tip', 'Total fixed rent for this one-way route trip.') }}</span>
                     </div>
 
                     <div class="form-field">
@@ -371,7 +371,7 @@
                         <select id="availability" name="availability" disabled>
                             <option selected>{{ t.get("available_ready", "Available (Ready for booking)") }}</option>
                         </select>
-                        <span class="field-tip">Vehicle route will immediately be open for customer bookings.</span>
+                        <span class="field-tip">{{ t.get('availability_tip', 'Vehicle route will immediately be open for customer bookings.') }}</span>
                     </div>
                 </div>
             </div>
@@ -386,9 +386,9 @@
                 <div class="info-panel">
                     <span class="info-panel-icon">💡</span>
                     <div>
-                        <strong>Transparent Route-Based Pricing</strong>
+                        <strong>{{ t.get('transparent_pricing_title', 'Transparent Route-Based Pricing') }}</strong>
                         <p style="margin: 4px 0 0; font-size: 12.5px; opacity: 0.9;">
-                            All rents set here are displayed transparently to customers. Zero commission surge pricing ensures higher customer trust and more bookings for your vehicles.
+                            {{ t.get('transparent_pricing_desc', 'All rents set here are displayed transparently to customers. Zero commission surge pricing ensures higher customer trust and more bookings for your vehicles.') }}
                         </p>
                     </div>
                 </div>

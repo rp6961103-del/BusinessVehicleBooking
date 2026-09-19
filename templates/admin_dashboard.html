@@ -22,37 +22,37 @@
             <nav class="admin-topbar-nav" aria-label="Admin Navigation">
                 <a href="#overview" class="admin-nav-item is-active">
                     <span class="admin-nav-icon" aria-hidden="true">▦</span>
-                    <span>Overview</span>
+                    <span>{{ t.get('overview', 'Overview') }}</span>
                 </a>
                 <a href="#bookings-section" class="admin-nav-item">
                     <span class="admin-nav-icon" aria-hidden="true">📋</span>
-                    <span>Bookings</span>
+                    <span>{{ t.get('bookings', 'Bookings') }}</span>
                 </a>
                 <a href="#customers-section" class="admin-nav-item">
                     <span class="admin-nav-icon" aria-hidden="true">👥</span>
-                    <span>Customers</span>
+                    <span>{{ t.get('customers', 'Customers') }}</span>
                 </a>
                 <a href="#owners-section" class="admin-nav-item">
                     <span class="admin-nav-icon" aria-hidden="true">👨‍🌾</span>
-                    <span>Owners</span>
+                    <span>{{ t.get('owners', 'Owners') }}</span>
                 </a>
                 <a href="#vehicles-section" class="admin-nav-item">
                     <span class="admin-nav-icon" aria-hidden="true">🚚</span>
-                    <span>Vehicles</span>
+                    <span>{{ t.get('vehicles', 'Vehicles') }}</span>
                 </a>
                 <a href="#payments-section" class="admin-nav-item">
                     <span class="admin-nav-icon" aria-hidden="true">💳</span>
-                    <span>Payments</span>
+                    <span>{{ t.get('payments', 'Payments') }}</span>
                 </a>
                 <a href="#ratings-section" class="admin-nav-item">
                     <span class="admin-nav-icon" aria-hidden="true">⭐</span>
-                    <span>Ratings</span>
+                    <span>{{ t.get('ratings', 'Ratings') }}</span>
                 </a>
             </nav>
 
             <div class="admin-topbar-actions">
                 <a href="{{ url_for('home') }}" class="admin-nav-link-subtle" title="Return to public customer website">
-                    ↗ View Site
+                    ↗ {{ t.get('view_site', 'View Site') }}
                 </a>
                 <div class="admin-user-tag" title="Authenticated Administrator">
                     <span class="admin-user-avatar" aria-hidden="true">👤</span>
@@ -62,7 +62,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="admin-btn admin-btn-logout">
                         <span aria-hidden="true">⇥</span>
-                        <span>Admin Logout</span>
+                        <span>{{ t.get('admin_logout', 'Admin Logout') }}</span>
                     </button>
                 </form>
             </div>
@@ -75,13 +75,13 @@
             <!-- Hero Banner -->
             <section class="admin-page-hero" id="overview">
                 <div class="admin-hero-content">
-                    <span class="admin-eyebrow">Enterprise Operations</span>
-                    <h1>Admin Dashboard</h1>
-                    <p>Live administrative management, member directories, and operational records.</p>
+                    <span class="admin-eyebrow">{{ t.get('enterprise_operations', 'Enterprise Operations') }}</span>
+                    <h1>{{ t.get('admin_dashboard', 'Admin Dashboard') }}</h1>
+                    <p>{{ t.get('admin_hero_desc', 'Live administrative management, member directories, and operational records.') }}</p>
                 </div>
                 <div class="admin-hero-quick-meta">
                     <span class="admin-live-pulse" aria-hidden="true"></span>
-                    <span>Live Database Connected</span>
+                    <span>{{ t.get('live_db_connected', 'Live Database Connected') }}</span>
                 </div>
             </section>
 
@@ -98,8 +98,8 @@
             <section class="admin-section" aria-label="Key Platform Metrics">
                 <div class="admin-section-header">
                     <div>
-                        <h2>Platform Statistics</h2>
-                        <p>Real-time tallies calculated from active database tables</p>
+                        <h2>{{ t.get('platform_statistics', 'Platform Statistics') }}</h2>
+                        <p>{{ t.get('platform_stats_sub', 'Real-time tallies calculated from active database tables') }}</p>
                     </div>
                 </div>
 
@@ -110,7 +110,7 @@
                             <span>👥</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Total Customers</span>
+                            <span class="admin-stat-label">{{ t.get('total_customers', 'Total Customers') }}</span>
                             <strong class="admin-stat-value">{{ metrics.total_customers }}</strong>
                         </div>
                     </article>
@@ -121,7 +121,7 @@
                             <span>👨‍🌾</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Total Vehicle Owners</span>
+                            <span class="admin-stat-label">{{ t.get('total_owners', 'Total Vehicle Owners') }}</span>
                             <strong class="admin-stat-value">{{ metrics.total_owners }}</strong>
                         </div>
                     </article>
@@ -132,7 +132,7 @@
                             <span>🚚</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Total Vehicles</span>
+                            <span class="admin-stat-label">{{ t.get('total_vehicles', 'Total Vehicles') }}</span>
                             <strong class="admin-stat-value">{{ metrics.total_vehicles }}</strong>
                         </div>
                     </article>
@@ -143,7 +143,7 @@
                             <span>📋</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Total Bookings</span>
+                            <span class="admin-stat-label">{{ t.get('total_bookings', 'Total Bookings') }}</span>
                             <strong class="admin-stat-value">{{ metrics.total_bookings }}</strong>
                         </div>
                     </article>
@@ -154,7 +154,7 @@
                             <span>⏳</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Pending Bookings</span>
+                            <span class="admin-stat-label">{{ t.get('pending_bookings', 'Pending Bookings') }}</span>
                             <strong class="admin-stat-value">{{ metrics.pending_bookings }}</strong>
                         </div>
                     </article>
@@ -165,7 +165,7 @@
                             <span>✅</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Accepted Bookings</span>
+                            <span class="admin-stat-label">{{ t.get('accepted_bookings', 'Accepted Bookings') }}</span>
                             <strong class="admin-stat-value">{{ metrics.accepted_bookings }}</strong>
                         </div>
                     </article>
@@ -176,7 +176,7 @@
                             <span>❌</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Rejected Bookings</span>
+                            <span class="admin-stat-label">{{ t.get('rejected_bookings', 'Rejected Bookings') }}</span>
                             <strong class="admin-stat-value">{{ metrics.rejected_bookings }}</strong>
                         </div>
                     </article>
@@ -187,7 +187,7 @@
                             <span>⭐</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Total Ratings</span>
+                            <span class="admin-stat-label">{{ t.get('total_ratings', 'Total Ratings') }}</span>
                             <strong class="admin-stat-value">{{ metrics.total_ratings }}</strong>
                         </div>
                     </article>
@@ -198,7 +198,7 @@
                             <span>💳</span>
                         </div>
                         <div class="admin-stat-body">
-                            <span class="admin-stat-label">Total Payments</span>
+                            <span class="admin-stat-label">{{ t.get('total_payments', 'Total Payments') }}</span>
                             <strong class="admin-stat-value">{{ metrics.total_payments }}</strong>
                         </div>
                     </article>
@@ -211,11 +211,11 @@
             <section class="admin-section" id="bookings-section" aria-label="Recent Bookings">
                 <div class="admin-section-header">
                     <div>
-                        <h2>Recent Bookings</h2>
-                        <p>Latest reservations across customers, vehicles, and assigned routes</p>
+                        <h2>{{ t.get('recent_bookings', 'Recent Bookings') }}</h2>
+                        <p>{{ t.get('recent_bookings_sub', 'Latest reservations across customers, vehicles, and assigned routes') }}</p>
                     </div>
                     {% if recent_bookings %}
-                    <span class="admin-badge-neutral">Latest Records</span>
+                    <span class="admin-badge-neutral">{{ t.get('latest_records', 'Latest Records') }}</span>
                     {% endif %}
                 </div>
 
@@ -225,12 +225,12 @@
                         <table class="admin-data-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" style="width: 110px;">Booking ID</th>
-                                    <th scope="col">Customer</th>
-                                    <th scope="col">Vehicle</th>
-                                    <th scope="col">Booking Date</th>
-                                    <th scope="col">Route</th>
-                                    <th scope="col" style="width: 130px;">Status</th>
+                                    <th scope="col" style="width: 110px;">{{ t.get('booking_id_col', 'Booking ID') }}</th>
+                                    <th scope="col">{{ t.get('customer', 'Customer') }}</th>
+                                    <th scope="col">{{ t.get('vehicle', 'Vehicle') }}</th>
+                                    <th scope="col">{{ t.get('booking_date', 'Booking Date') }}</th>
+                                    <th scope="col">{{ t.get('route_col', 'Route') }}</th>
+                                    <th scope="col" style="width: 130px;">{{ t.get('status', 'Status') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -254,8 +254,8 @@
                     {% else %}
                     <div class="admin-empty-state">
                         <span class="admin-empty-icon" aria-hidden="true">📋</span>
-                        <h3>No Bookings Recorded Yet</h3>
-                        <p>When customers reserve agricultural or transport vehicles, recent bookings will display here in real time.</p>
+                        <h3>{{ t.get('no_bookings_found', 'No Bookings Recorded Yet') }}</h3>
+                        <p>{{ t.get('no_bookings_desc', 'When customers reserve agricultural or transport vehicles, recent bookings will display here in real time.') }}</p>
                     </div>
                     {% endif %}
                 </div>
@@ -267,10 +267,10 @@
             <section class="admin-section" id="customers-section" aria-label="Registered Customers">
                 <div class="admin-section-header">
                     <div>
-                        <h2>Registered Customers</h2>
-                        <p>Customer accounts registered on the platform</p>
+                        <h2>{{ t.get('registered_customers', 'Registered Customers') }}</h2>
+                        <p>{{ t.get('customer_accounts_desc', 'Customer accounts registered on the platform') }}</p>
                     </div>
-                    <span class="admin-badge-neutral">{{ customers|length }} Customers</span>
+                    <span class="admin-badge-neutral">{{ customers|length }} {{ t.get('customers', 'Customers') }}</span>
                 </div>
 
                 <div class="admin-table-panel">
@@ -279,11 +279,11 @@
                         <table class="admin-data-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" style="width: 80px;">ID</th>
-                                    <th scope="col">Customer Name</th>
-                                    <th scope="col">Phone</th>
-                                    <th scope="col">Email</th>
-                                    <th scope="col" style="width: 120px;">Status</th>
+                                    <th scope="col" style="width: 80px;">{{ t.get('id', 'ID') }}</th>
+                                    <th scope="col">{{ t.get('customer_name', 'Customer Name') }}</th>
+                                    <th scope="col">{{ t.get('phone', 'Phone') }}</th>
+                                    <th scope="col">{{ t.get('email', 'Email') }}</th>
+                                    <th scope="col" style="width: 120px;">{{ t.get('status', 'Status') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -295,7 +295,7 @@
                                     <td><span class="admin-subtext">{{ c.email }}</span></td>
                                     <td>
                                         <span class="admin-status-badge {{ 'status-accepted' if c.is_active else 'status-rejected' }}">
-                                            {{ 'Active' if c.is_active else 'Inactive' }}
+                                            {{ t.get('active', 'Active') if c.is_active else t.get('inactive', 'Inactive') }}
                                         </span>
                                     </td>
                                 </tr>
@@ -306,7 +306,7 @@
                     {% else %}
                     <div class="admin-empty-state">
                         <span class="admin-empty-icon" aria-hidden="true">👥</span>
-                        <h3>No Customers Registered Yet</h3>
+                        <h3>{{ t.get('no_customers_found', 'No Customers Registered Yet') }}</h3>
                     </div>
                     {% endif %}
                 </div>
@@ -318,10 +318,10 @@
             <section class="admin-section" id="owners-section" aria-label="Registered Vehicle Owners">
                 <div class="admin-section-header">
                     <div>
-                        <h2>Registered Vehicle Owners</h2>
-                        <p>Commercial vehicle owners offering transportation services</p>
+                        <h2>{{ t.get('registered_owners', 'Registered Vehicle Owners') }}</h2>
+                        <p>{{ t.get('owners_accounts_desc', 'Commercial vehicle owners offering transportation services') }}</p>
                     </div>
-                    <span class="admin-badge-neutral">{{ owners|length }} Owners</span>
+                    <span class="admin-badge-neutral">{{ owners|length }} {{ t.get('owners', 'Owners') }}</span>
                 </div>
 
                 <div class="admin-table-panel">
@@ -330,11 +330,11 @@
                         <table class="admin-data-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" style="width: 80px;">ID</th>
-                                    <th scope="col">Owner Name</th>
-                                    <th scope="col">Phone</th>
-                                    <th scope="col">Email</th>
-                                    <th scope="col" style="width: 120px;">Status</th>
+                                    <th scope="col" style="width: 80px;">{{ t.get('id', 'ID') }}</th>
+                                    <th scope="col">{{ t.get('owner_name', 'Owner Name') }}</th>
+                                    <th scope="col">{{ t.get('phone', 'Phone') }}</th>
+                                    <th scope="col">{{ t.get('email', 'Email') }}</th>
+                                    <th scope="col" style="width: 120px;">{{ t.get('status', 'Status') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -346,7 +346,7 @@
                                     <td><span class="admin-subtext">{{ o.email }}</span></td>
                                     <td>
                                         <span class="admin-status-badge {{ 'status-accepted' if o.is_active else 'status-rejected' }}">
-                                            {{ 'Active' if o.is_active else 'Inactive' }}
+                                            {{ t.get('active', 'Active') if o.is_active else t.get('inactive', 'Inactive') }}
                                         </span>
                                     </td>
                                 </tr>
@@ -357,7 +357,7 @@
                     {% else %}
                     <div class="admin-empty-state">
                         <span class="admin-empty-icon" aria-hidden="true">👨‍🌾</span>
-                        <h3>No Vehicle Owners Registered Yet</h3>
+                        <h3>{{ t.get('no_owners_found', 'No Vehicle Owners Registered Yet') }}</h3>
                     </div>
                     {% endif %}
                 </div>
@@ -369,10 +369,10 @@
             <section class="admin-section" id="vehicles-section" aria-label="Vehicles Fleet">
                 <div class="admin-section-header">
                     <div>
-                        <h2>Fleet Vehicles</h2>
-                        <p>Registered agricultural and commercial vehicles in the system</p>
+                        <h2>{{ t.get('fleet_vehicles', 'Fleet Vehicles') }}</h2>
+                        <p>{{ t.get('fleet_vehicles_desc', 'Registered agricultural and commercial vehicles in the system') }}</p>
                     </div>
-                    <span class="admin-badge-neutral">{{ vehicles|length }} Vehicles</span>
+                    <span class="admin-badge-neutral">{{ vehicles|length }} {{ t.get('vehicles', 'Vehicles') }}</span>
                 </div>
 
                 <div class="admin-table-panel">
@@ -381,13 +381,13 @@
                         <table class="admin-data-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" style="width: 100px;">Vehicle ID</th>
-                                    <th scope="col">Vehicle Name</th>
-                                    <th scope="col">Vehicle Type</th>
-                                    <th scope="col">Owner</th>
-                                    <th scope="col">Location</th>
-                                    <th scope="col">Contact</th>
-                                    <th scope="col" style="width: 120px;">Status</th>
+                                    <th scope="col" style="width: 100px;">{{ t.get('vehicle_id', 'Vehicle ID') }}</th>
+                                    <th scope="col">{{ t.get('vehicle_name', 'Vehicle Name') }}</th>
+                                    <th scope="col">{{ t.get('vehicle_type', 'Vehicle Type') }}</th>
+                                    <th scope="col">{{ t.get('owner', 'Owner') }}</th>
+                                    <th scope="col">{{ t.get('location', 'Location') }}</th>
+                                    <th scope="col">{{ t.get('contact', 'Contact') }}</th>
+                                    <th scope="col" style="width: 120px;">{{ t.get('status', 'Status') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -412,7 +412,7 @@
                     {% else %}
                     <div class="admin-empty-state">
                         <span class="admin-empty-icon" aria-hidden="true">🚚</span>
-                        <h3>No Vehicles Registered Yet</h3>
+                        <h3>{{ t.get('no_vehicles_added', 'No Vehicles Registered Yet') }}</h3>
                     </div>
                     {% endif %}
                 </div>
@@ -424,10 +424,10 @@
             <section class="admin-section" id="payments-section" aria-label="Payments Information">
                 <div class="admin-section-header">
                     <div>
-                        <h2>Processed Payments</h2>
-                        <p>Customer transaction records recorded in the database</p>
+                        <h2>{{ t.get('processed_payments', 'Processed Payments') }}</h2>
+                        <p>{{ t.get('payments_desc', 'Customer transaction records recorded in the database') }}</p>
                     </div>
-                    <span class="admin-badge-neutral">{{ payments|length }} Records</span>
+                    <span class="admin-badge-neutral">{{ payments|length }} {{ t.get('records', 'Records') }}</span>
                 </div>
 
                 <div class="admin-table-panel">
@@ -436,12 +436,12 @@
                         <table class="admin-data-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" style="width: 100px;">Payment ID</th>
-                                    <th scope="col" style="width: 110px;">Booking ID</th>
-                                    <th scope="col">Amount</th>
-                                    <th scope="col">Payment Method</th>
-                                    <th scope="col" style="width: 120px;">Status</th>
-                                    <th scope="col">Date</th>
+                                    <th scope="col" style="width: 100px;">{{ t.get('payment_id', 'Payment ID') }}</th>
+                                    <th scope="col" style="width: 110px;">{{ t.get('booking_id_col', 'Booking ID') }}</th>
+                                    <th scope="col">{{ t.get('amount', 'Amount') }}</th>
+                                    <th scope="col">{{ t.get('payment_method', 'Payment Method') }}</th>
+                                    <th scope="col" style="width: 120px;">{{ t.get('status', 'Status') }}</th>
+                                    <th scope="col">{{ t.get('date', 'Date') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -465,7 +465,7 @@
                     {% else %}
                     <div class="admin-empty-state">
                         <span class="admin-empty-icon" aria-hidden="true">💳</span>
-                        <h3>No Payment Records Found</h3>
+                        <h3>{{ t.get('no_payments_found', 'No Payment Records Found') }}</h3>
                     </div>
                     {% endif %}
                 </div>
@@ -477,10 +477,10 @@
             <section class="admin-section" id="ratings-section" aria-label="Customer Ratings & Reviews">
                 <div class="admin-section-header">
                     <div>
-                        <h2>Ratings &amp; Reviews</h2>
-                        <p>Verified feedback submitted by customers after completed trips</p>
+                        <h2>{{ t.get('ratings_reviews', 'Ratings & Reviews') }}</h2>
+                        <p>{{ t.get('ratings_desc', 'Verified feedback submitted by customers after completed trips') }}</p>
                     </div>
-                    <span class="admin-badge-neutral">{{ ratings|length }} Reviews</span>
+                    <span class="admin-badge-neutral">{{ ratings|length }} {{ t.get('reviews', 'Reviews') }}</span>
                 </div>
 
                 <div class="admin-table-panel">
@@ -489,11 +489,11 @@
                         <table class="admin-data-table">
                             <thead>
                                 <tr>
-                                    <th scope="col">Customer</th>
-                                    <th scope="col">Vehicle</th>
-                                    <th scope="col" style="width: 130px;">Rating</th>
-                                    <th scope="col">Review</th>
-                                    <th scope="col" style="width: 140px;">Date</th>
+                                    <th scope="col">{{ t.get('customer', 'Customer') }}</th>
+                                    <th scope="col">{{ t.get('vehicle', 'Vehicle') }}</th>
+                                    <th scope="col" style="width: 130px;">{{ t.get('rating', 'Rating') }}</th>
+                                    <th scope="col">{{ t.get('review', 'Review') }}</th>
+                                    <th scope="col" style="width: 140px;">{{ t.get('date', 'Date') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -517,8 +517,8 @@
                     {% else %}
                     <div class="admin-empty-state">
                         <span class="admin-empty-icon" aria-hidden="true">⭐</span>
-                        <h3>No Customer Ratings Submitted Yet</h3>
-                        <p>Customer ratings and feedback on completed trips will appear here.</p>
+                        <h3>{{ t.get('no_ratings_found', 'No Customer Ratings Submitted Yet') }}</h3>
+                        <p>{{ t.get('no_ratings_sub', 'Customer ratings and feedback on completed trips will appear here.') }}</p>
                     </div>
                     {% endif %}
                 </div>
@@ -528,10 +528,10 @@
 
     <footer class="admin-footer">
         <div class="admin-footer-inner">
-            <p>&copy; 2026 Business Vehicle Booking &bull; Administrative Systems</p>
-            <p class="admin-footer-secure">🔒 Secure Session Active</p>
+            <p>&copy; 2026 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }} &bull; {{ t.get('admin_systems', 'Administrative Systems') }}</p>
+            <p class="admin-footer-secure">🔒 {{ t.get('secure_session_active', 'Secure Session Active') }}</p>
         </div>
     </footer>
 </body>
 </html>
-
+

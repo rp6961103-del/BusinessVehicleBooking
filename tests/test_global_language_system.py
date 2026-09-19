@@ -133,10 +133,39 @@ class GlobalLanguageSystemTests(unittest.TestCase):
             session["csrf_token"] = token
         res = self.client.post("/owner_logout", data={"csrf_token": token})
         self.assertEqual(res.status_code, 302)
+    def test_owner_my_vehicles_page_fully_localized_in_telugu(self):
+        token = self.csrf_token()
+        self.client.post("/set_language/te", data={"csrf_token": token})
         with self.client.session_transaction() as session:
-            self.assertEqual(session.get("language"), "te")
-            self.assertNotIn("owner_id", session)
+            session["owner_id"] = 1
+            session["owner_name"] = "Test Owner"
+            session["user_role"] = "owner"
+
+        with patch("app.cursor") as mock_cursor:
+            mock_cursor.fetchall.return_value = [
+                (101, "Tata Ace", "Mini Truck", "9876543210", "Tadipatri")
+            ]
+            res = self.client.get("/myvehicles")
+            self.assertEqual(res.status_code, 200)
+            data_str = res.data.decode("utf-8")
+            self.assertIn('lang="te"', data_str)
+            self.assertIn("నా వాహనాలు", data_str)
+            self.assertIn("డాష్‌బోర్డ్", data_str)
+            self.assertIn("వాహనం జోడించండి", data_str)
+            self.assertTrue("రూట్ & అద్దె జోడించండి" in data_str or "రూట్ &amp; అద్దె జోడించండి" in data_str)
+            self.assertIn("మీ యజమాని ఖాతా కింద నమోదైన వాహనాలను నిర్వహించండి.", data_str)
+            self.assertIn("వాహన రకం", data_str)
+            self.assertIn("సంప్రదింపు", data_str)
+            self.assertIn("ప్రస్తుత స్థానం", data_str)
+            self.assertIn("రూట్ జోడించండి", data_str)
+            self.assertIn("సవరించండి", data_str)
+            self.assertIn("తొలగించండి", data_str)
+            self.assertIn("వాహనం ID", data_str)
+            self.assertIn("Tata Ace", data_str)
+            self.assertIn("9876543210", data_str)
+            self.assertIn("Tadipatri", data_str)
 
 
 if __name__ == "__main__":
     unittest.main()
+

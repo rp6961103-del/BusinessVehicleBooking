@@ -1,145 +1,91 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="{{ current_language or 'en' }}">
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
-    <title>Edit Vehicle</title>
-
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.get('edit_vehicle', 'Edit Vehicle') }} | {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
-
 <header>
-
     <div class="logo">
-        🚚 Vehicle Owner
+        🚚 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}
     </div>
-
     <nav>
-
-        <a href="/owner_dashboard">
-            Dashboard
-        </a>
-
-        <a href="/myvehicles">
-            My Vehicles
-        </a>
-
+        <a href="/owner_dashboard">{{ t.get('dashboard', 'Dashboard') }}</a>
+        <a href="/myvehicles">{{ t.get('my_vehicles', 'My Vehicles') }}</a>
+        <a href="/addvehicle">{{ t.get('add_vehicle', 'Add Vehicle') }}</a>
         <form method="POST" action="/owner_logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">Logout</button>
+            <button type="submit">🚪 {{ t.get('logout', 'Logout') }}</button>
         </form>
-
     </nav>
-
 </header>
-
-
+{% include "_language_selector.html" %}
 <div class="container">
-
     <div class="form-card">
-
-        <h1>
-            ✏️ Edit Vehicle
-        </h1>
-
-
+        <h1>✏️ {{ t.get('edit_vehicle_title', 'Edit Vehicle') }}</h1>
         <form method="POST">
-
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-
-            <label>
-                Vehicle Name
-            </label>
-
-            <input
-                type="text"
-                name="vehicle_name"
-                value="{{ vehicle[1] }}"
-                required
-            >
-
-
-            <label>
-                Vehicle Type
-            </label>
-
-            <input
-                type="text"
-                name="vehicle_type"
-                value="{{ vehicle[2] }}"
-                required
-            >
-
-
-            <label>
-                📞 Contact Number
-            </label>
-
-            <input
-                type="tel"
-                name="contact_number"
-                value="{{ vehicle[3] }}"
-                pattern="[0-9]{10}"
-                maxlength="10"
-                required
-            >
-
-
-            <label>
-                📍 Location
-            </label>
-
-            <input
-                type="text"
-                name="location"
-                value="{{ vehicle[4] }}"
-                required
-            >
-
-
+            <div class="form-group">
+                <label>{{ t.get('vehicle_name', 'Vehicle Name') }}</label>
+                <input
+                    type="text"
+                    name="vehicle_name"
+                    value="{{ vehicle[1] }}"
+                    placeholder="{{ t.get('vehicle_name_example', 'Example: Tata Ace') }}"
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label>{{ t.get('vehicle_type', 'Vehicle Type') }}</label>
+                <input
+                    type="text"
+                    name="vehicle_type"
+                    value="{{ vehicle[2] }}"
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label>📞 {{ t.get('contact_number', 'Contact Number') }}</label>
+                <input
+                    type="tel"
+                    name="contact_number"
+                    value="{{ vehicle[3] }}"
+                    pattern="[0-9]{10}"
+                    maxlength="10"
+                    placeholder="{{ t.get('enter_phone_placeholder', 'Enter 10-digit mobile number') }}"
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label>📍 {{ t.get('location', 'Location') }}</label>
+                <input
+                    type="text"
+                    name="location"
+                    value="{{ vehicle[4] }}"
+                    placeholder="{{ t.get('location_example', 'Example: Kanchipuram') }}"
+                    required
+                >
+            </div>
             <button
                 type="submit"
                 class="btn btn-primary full-btn"
             >
-                💾 SAVE CHANGES
+                💾 {{ t.get('save_changes', 'Save Changes') }}
             </button>
-
         </form>
-
-
         <br>
-
-
         <a
             href="/myvehicles"
             class="btn btn-secondary full-btn"
         >
-            ← BACK TO MY VEHICLES
+            ← {{ t.get('my_vehicles', 'Back to My Vehicles') }}
         </a>
-
     </div>
-
 </div>
-
-
 <div class="footer">
-
-    <p>
-        Business Vehicle Booking System
-    </p>
-
+    <p>© 2026 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }} • {{ t.get('footer_message', 'Simple transportation service for everyone.') }}</p>
 </div>
-
 </body>
-
 </html>

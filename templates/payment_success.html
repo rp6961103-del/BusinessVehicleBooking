@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Successful | Business Vehicle Booking</title>
+    <title>{{ t.get('payment_successful', 'Payment Successful') }} | {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         .success-page { min-height: 80vh; display: grid; place-items: center; padding: 32px 16px; }
@@ -26,34 +26,35 @@
 </head>
 <body>
 <header>
-    <a class="logo" href="/vehicles">🚚 Business Vehicle Booking</a>
+    <a class="logo" href="/vehicles">🚚 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</a>
     <nav>
-        <a href="/mybookings">📋 My Bookings</a>
-        <a href="/farmer-ai">🌿 Farmer AI</a>
+        <a href="/mybookings">📋 {{ t.get('my_bookings', 'My Bookings') }}</a>
+        <a href="/farmer-ai">🌿 {{ t.get('farmer_ai', 'Farmer AI') }}</a>
         <form method="POST" action="/logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">🚪 Logout</button>
+            <button type="submit">🚪 {{ t.get('logout', 'Logout') }}</button>
         </form>
     </nav>
 </header>
+{% include "_language_selector.html" %}
 <main class="success-page">
     <section class="success-card">
         <div class="success-icon">✓</div>
-        <div class="demo-tag">Demo Payment</div>
-        <h1>✓ Payment Successful</h1>
-        <p class="subtitle">This demo payment was completed successfully and has been recorded in the system.</p>
+        <div class="demo-tag">{{ t.get('demo_payment', 'Demo Payment') }}</div>
+        <h1>✓ {{ t.get('payment_successful', 'Payment Successful') }}</h1>
+        <p class="subtitle">{{ t.get('payment_success_desc', 'This demo payment was completed successfully and has been recorded in the system.') }}</p>
         <div class="receipt">
-            <div class="receipt-row"><span class="receipt-label">Booking ID</span><span class="receipt-value">#{{ booking[0] }}</span></div>
-            <div class="receipt-row"><span class="receipt-label">Vehicle</span><span class="receipt-value">{{ booking[5] }}</span></div>
-            <div class="receipt-row"><span class="receipt-label">Amount Paid</span><span class="receipt-value">₹{{ booking[10] }}</span></div>
-            <div class="receipt-row"><span class="receipt-label">Payment Method</span><span class="receipt-value">{{ booking[11] }}</span></div>
-            <div class="receipt-row"><span class="receipt-label">Transaction Reference</span><span class="receipt-value">{{ booking[12] }}</span></div>
-            <div class="receipt-row"><span class="receipt-label">Payment Status</span><span class="receipt-value">{{ booking[13] }}</span></div>
-            <div class="receipt-row"><span class="receipt-label">Date</span><span class="receipt-value">{{ booking[14] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">{{ t.get('booking_id', 'Booking ID') }}</span><span class="receipt-value">#{{ booking[0] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">{{ t.get('vehicles', 'Vehicle') }}</span><span class="receipt-value">{{ booking[5] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">{{ t.get('amount_paid', 'Amount Paid') }}</span><span class="receipt-value">₹{{ booking[10] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">{{ t.get('payment_method', 'Payment Method') }}</span><span class="receipt-value">{{ booking[11] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">{{ t.get('transaction_reference', 'Transaction Reference') }}</span><span class="receipt-value">{{ booking[12] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">{{ t.get('status', 'Payment Status') }}</span><span class="receipt-value">{{ t.get('paid', 'Paid') if (booking[13]|lower == 'paid') else booking[13] }}</span></div>
+            <div class="receipt-row"><span class="receipt-label">{{ t.get('date', 'Date') }}</span><span class="receipt-value">{{ booking[14] }}</span></div>
         </div>
         <div class="actions">
-            <a class="btn btn-primary" href="/mybookings">View Booking</a>
-            <a class="btn btn-secondary" href="/booking/{{ booking[0] }}/receipt?download=1">Download Receipt</a>
+            <a class="btn btn-primary" href="/mybookings">{{ t.get('view_booking', 'View Booking') }}</a>
+            <a class="btn btn-secondary" href="/booking/{{ booking[0] }}/receipt?download=1">{{ t.get('download_receipt', 'Download Receipt') }}</a>
         </div>
     </section>
 </main>

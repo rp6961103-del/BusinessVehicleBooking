@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Bookings | Business Vehicle Booking</title>
+    <title>{{ t.get("my_bookings", "My Bookings") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <header>
-    <a href="/" class="logo">🚚 Business Vehicle Booking</a>
+    <a href="/" class="logo">🚚 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</a>
     <nav>
-        <a href="/vehicles">🚚 Vehicles</a>
-        <a href="/mybookings" class="active">📋 My Bookings</a>
-        <a href="/farmer-ai" class="nav-highlight">🌿 Farmer AI</a>
+        <a href="/vehicles">🚚 {{ t.get("available_vehicles", "Vehicles") }}</a>
+        <a href="/mybookings" class="active">📋 {{ t.get("my_bookings", "My Bookings") }}</a>
+        <a href="/farmer-ai" class="nav-highlight">🌿 {{ t.get("farmer_ai", "Farmer AI") }}</a>
         <form method="POST" action="/logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">🚪 Logout</button>
+            <button type="submit">🚪 {{ t.get("logout", "Logout") }}</button>
         </form>
     </nav>
 </header>
@@ -24,14 +24,14 @@
 
 <main class="container">
     <div class="page-header">
-        <h1>📋 My Bookings</h1>
-        <p>Track every route booking and rate accepted services.</p>
+        <h1>📋 {{ t.get("my_bookings", "My Bookings") }}</h1>
+        <p>{{ t.get("track_bookings_desc", "Track every route booking and rate accepted services.") }}</p>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="message {{ category }}" role="alert">{{ message }}</div>
+                <div class="message {{ category }}" role="alert">{{ t.get(message, message) }}</div>
             {% endfor %}
         {% endif %}
     {% endwith %}
@@ -41,13 +41,13 @@
         <table>
             <thead>
                 <tr>
-                    <th>Booking ID</th>
-                    <th>Vehicle</th>
-                    <th>Route</th>
-                    <th>Booking Date</th>
-                    <th>Rent</th>
-                    <th>Status</th>
-                    <th>Rating</th>
+                    <th>{{ t.get("booking_id", "Booking ID") }}</th>
+                    <th>{{ t.get("vehicles", "Vehicle") }}</th>
+                    <th>{{ t.get("route_label", "Route") }}</th>
+                    <th>{{ t.get("booking_date", "Booking Date") }}</th>
+                    <th>{{ t.get("rent", "Rent") }}</th>
+                    <th>{{ t.get("status", "Status") }}</th>
+                    <th>{{ t.get("rating", "Rating") }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,24 +58,24 @@
                         <strong>{{ booking[5] }}</strong><br>
                         <small>{{ booking[6] }}</small>
                     </td>
-                    <td>{{ booking[7] }} → {{ booking[8] }}</td>
+                    <td>{{ booking[7] or '—' }} → {{ booking[8] or '—' }}</td>
                     <td>{{ booking[3] }}</td>
                     <td>₹{{ booking[9] }}</td>
                     <td>
                         {% if booking[4]|lower == 'accepted' %}
-                            <span class="status status-accepted">✅ Booking Confirmed</span>
+                            <span class="status status-accepted">✅ {{ t.get("booking_confirmed_badge", "Booking Confirmed") }}</span>
                         {% elif booking[4]|lower == 'rejected' %}
-                            <span class="status status-rejected">❌ Booking Rejected</span>
+                            <span class="status status-rejected">❌ {{ t.get("rejected", "Booking Rejected") }}</span>
                         {% else %}
-                            <span class="status status-pending">⏳ Waiting for Owner Confirmation</span>
+                            <span class="status status-pending">⏳ {{ t.get("waiting_owner_confirm", "Waiting for Owner Confirmation") }}</span>
                         {% endif %}
                         {% if booking[4]|lower == 'accepted' %}
                             <div style="margin-top:8px;">
                                 {% set payment_status = (booking[12] or 'Pending')|lower %}
                                 {% if payment_status == 'paid' %}
-                                    <span class="status status-accepted">✓ Payment Completed</span>
+                                    <span class="status status-accepted">✓ {{ t.get("paid", "Payment Completed") }}</span>
                                 {% else %}
-                                    <span class="status status-pending">Payment Status: Pending</span>
+                                    <span class="status status-pending">{{ t.get("status", "Payment Status") }}: {{ t.get("pending", "Pending") }}</span>
                                 {% endif %}
                             </div>
                         {% endif %}
@@ -85,27 +85,23 @@
                             {% set payment_status = (booking[12] or 'Pending')|lower %}
                             {% if payment_status == 'paid' %}
                                 <div style="display:grid; gap:8px;">
-                                    <div>✓ Paid: ₹{{ booking[13] or booking[9] }}</div>
+                                    <div>✓ {{ t.get("paid", "Paid") }}: ₹{{ booking[13] or booking[9] }}</div>
                                     {% if booking[15] %}<small>Ref: {{ booking[15] }}</small>{% endif %}
-                                    <a href="/booking/{{ booking[0] }}/payment-success" class="btn btn-primary btn-sm">View Receipt</a>
+                                    <a href="/booking/{{ booking[0] }}/payment-success" class="btn btn-primary btn-sm">{{ t.get("view_receipt", "View Receipt") }}</a>
                                 </div>
                             {% else %}
-                                <a href="/booking/{{ booking[0] }}/pay" class="btn btn-primary btn-sm">Pay Now</a>
+                                <a href="/booking/{{ booking[0] }}/pay" class="btn btn-primary btn-sm">{{ t.get("pay_now", "Pay Now") }}</a>
                             {% endif %}
-                        {% elif booking[4]|lower == 'accepted' %}
-                            —
                         {% else %}
                             —
                         {% endif %}
                         {% if booking[10] %}
-                            {% if booking[4]|lower != 'accepted' %}
-                                <div>⭐ {{ booking[10] }}/5</div>
-                                {% if booking[11] %}<small>{{ booking[11] }}</small>{% endif %}
-                            {% endif %}
+                            <div>⭐ {{ booking[10] }}/5</div>
+                            {% if booking[11] %}<small>{{ booking[11] }}</small>{% endif %}
                         {% elif booking[4]|lower == 'accepted' and (booking[12] or 'Pending')|lower == 'paid' %}
-                            <div style="margin-top:8px;">Rate after service completion</div>
+                            <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm" style="margin-top:8px;">⭐ {{ t.get("rate_service", "Rate Service") }}</a>
                         {% elif booking[4]|lower == 'accepted' %}
-                            <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm">Rate Service</a>
+                            <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm">⭐ {{ t.get("rate_service", "Rate Service") }}</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -116,18 +112,18 @@
     {% else %}
     <div class="empty-box" style="text-align:center;">
         <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
-        <h2>No Bookings</h2>
-        <p>You have not made any vehicle bookings yet.</p>
+        <h2>{{ t.get("no_bookings", "No Bookings") }}</h2>
+        <p>{{ t.get("no_bookings_message", "You have not made any vehicle bookings yet.") }}</p>
         <div style="margin-top:18px;">
-            <a href="/vehicles" class="btn btn-primary">Browse Vehicles</a>
+            <a href="/vehicles" class="btn btn-primary">{{ t.get("browse_vehicles", "Browse Vehicles") }}</a>
         </div>
     </div>
     {% endif %}
 </main>
 
 <footer>
-    <p>© 2026 Business Vehicle Booking</p>
-    <p>Simple transportation service for everyone.</p>
+    <p>© 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</p>
+    <p>{{ t.get("footer_message", "Simple transportation service for everyone.") }}</p>
 </footer>
 </body>
 </html>

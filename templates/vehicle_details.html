@@ -3,22 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vehicle Details | Business Vehicle Booking</title>
+    <title>{{ vehicle[1] }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <header>
-    <a class="logo" href="/">🚚 Business Vehicle Booking</a>
+    <a class="logo" href="/">🚚 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</a>
     <nav>
-        <a href="/vehicles">Vehicles</a>
-        <a href="/mybookings">My Bookings</a>
-        <a href="/farmer-ai">Farmer AI</a>
+        <a href="/vehicles">{{ t.get("vehicles", "Vehicles") }}</a>
+        <a href="/mybookings">{{ t.get("my_bookings", "My Bookings") }}</a>
+        <a href="/farmer-ai">🌿 {{ t.get("farmer_ai", "Farmer AI") }}</a>
         <form method="POST" action="/logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">Logout</button>
+            <button type="submit">🚪 {{ t.get("logout", "Logout") }}</button>
         </form>
     </nav>
 </header>
+
+{% include "_language_selector.html" %}
+
 <main class="container">
     <div class="details-showcase">
         <div class="page-header">
@@ -27,33 +30,33 @@
         </div>
 
         <div class="detail-row">
-            <span class="detail-label">Vehicle Type</span>
+            <span class="detail-label">{{ t.get("vehicle_type", "Vehicle Type") }}</span>
             <span class="detail-value">{{ vehicle[2] }}</span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Current/Base Location</span>
+            <span class="detail-label">{{ t.get("current_location_label", "Current/Base Location") }}</span>
             <span class="detail-value">{{ vehicle[5] }}</span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Contact</span>
+            <span class="detail-label">{{ t.get("contact", "Contact") }}</span>
             <span class="detail-value">{{ vehicle[4] }}</span>
         </div>
 
-        <h3 style="margin-top: 24px; margin-bottom: 16px;">Available Routes & Fixed Rent</h3>
+        <h3 style="margin-top: 24px; margin-bottom: 16px;">{{ t.get("available_routes_rent", "Available Routes & Fixed Rent") }}</h3>
         <div class="routes-list">
             {% for route in routes %}
             <div class="route-card">
                 <div>
-                    <div class="route-path">🛣️ {{ route[6] }} → {{ route[7] }}</div>
+                    <div class="route-path">🛣️ {{ route[6] or '—' }} → {{ route[7] or '—' }}</div>
                     <div class="route-rent">₹{{ route[8] }}</div>
                 </div>
-                <a class="btn btn-primary" href="/book/{{ route[0] }}?route_id={{ route[9] }}">Book This Vehicle</a>
+                <a class="btn btn-primary" href="/book/{{ route[0] }}?route_id={{ route[9] }}">{{ t.get("book_this_vehicle", "Book This Vehicle") }}</a>
             </div>
             {% endfor %}
         </div>
 
         <div style="margin-top: 20px;">
-            <a class="btn btn-secondary" href="/vehicles">Back to Vehicles</a>
+            <a class="btn btn-secondary" href="/vehicles">← {{ t.get("back_to_vehicles", "Back to Vehicles") }}</a>
         </div>
     </div>
 </main>

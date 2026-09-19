@@ -166,6 +166,14 @@ def prevent_auth_form_caching(response):
 
 @app.before_request
 def protect_state_changing_requests():
+    # Maintain global language in session with cookie fallback
+    if "language" not in session:
+        cookie_lang = request.cookies.get("language", "").strip().lower()
+        if cookie_lang in SUPPORTED_LANGUAGES:
+            session["language"] = cookie_lang
+        else:
+            session["language"] = "en"
+
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         submitted_token = (
             request.form.get("csrf_token")
@@ -196,13 +204,19 @@ def protect_state_changing_requests():
 
 
 def login_required(role):
-    session_key = "user_id" if role == "customer" else "owner_id"
-
     def decorator(view):
         @wraps(view)
         def wrapped(*args, **kwargs):
-            if session_key not in session:
-                return redirect("/login" if role == "customer" else "/ownerlogin")
+            if role == "customer":
+                if "user_id" not in session:
+                    if "owner_id" in session:
+                        return redirect("/owner_dashboard")
+                    return redirect("/login")
+            elif role == "owner":
+                if "owner_id" not in session:
+                    if "user_id" in session:
+                        return redirect("/vehicles")
+                    return redirect("/ownerlogin")
             return view(*args, **kwargs)
         return wrapped
 
@@ -273,375 +287,1647 @@ def valid_rent(value):
     return amount if amount > 0 and amount <= Decimal("99999999.99") else None
 
 # =========================================================
-# LANGUAGE SUPPORT
+# LANGUAGE SUPPORT & LOCALIZATION
 # =========================================================
 
 SUPPORTED_LANGUAGES = ("en", "te", "ta", "hi")
-
-TRANSLATIONS = {
-
-    # =====================================================
-    # ENGLISH
-    # =====================================================
-
-    "en": {
-
-        "language": "Language",
-        "english": "English",
-        "telugu": "Telugu",
-        "hindi": "Hindi",
-
-        "vehicle_booking": "Business Vehicle Booking",
-        "customer": "Customer",
-        "customer_login": "Customer Login",
-
-        "book_vehicle": "Book a Vehicle",
-        "login": "Login",
-        "register": "Register",
-        "logout": "Logout",
-        "welcome": "Welcome",
-        "back_home": "Back to Home",
-
-        "mobile_number": "Mobile Number",
-        "customer_name": "Customer Name",
-
-        "how_it_works": "How It Works",
-        "choose_vehicle": "Choose Vehicle",
-        "select_date": "Select Date",
-        "confirm": "Confirm",
-
-        "login_mobile": "Login using your mobile number.",
-        "select_suitable_vehicle": "Select a suitable vehicle.",
-        "choose_booking_date": "Choose your booking date.",
-        "confirm_your_booking": "Confirm your vehicle booking.",
-
-        "vehicle_types": "Vehicle Types",
-
-        "tractor": "Tractor",
-        "mini_truck": "Mini Truck",
-        "pickup": "Pickup",
-        "lorry": "Lorry",
-
-        "tractor_desc": "Suitable for agricultural and goods transportation.",
-        "mini_truck_desc": "Suitable for small and medium loads.",
-        "pickup_desc": "Convenient for local transportation.",
-        "lorry_desc": "Suitable for transporting larger loads.",
-
-        "simple_fast_easy": "Simple • Fast • Easy",
-        "transportation_message": "Book the right vehicle for your transportation needs.",
-        "footer_message": "Simple transportation service for everyone.",
-
-        "available_vehicles": "Available Vehicles",
-        "my_bookings": "My Bookings",
-        "vehicle_type": "Vehicle Type",
-        "location": "Location",
-        "from": "From",
-        "to": "To",
-        "rent": "Rent",
-        "contact": "Contact",
-        "book_now": "Book Now",
-
-        "no_vehicles": "No Vehicles Available",
-        "no_vehicles_message": "There are currently no vehicles available for booking.",
-
-        "booking_date": "Booking Date",
-        "confirm_booking": "Confirm Booking",
-
-        # BOOKING STATUS
-        "status": "Status",
-        "accepted": "Accepted",
-        "rejected": "Rejected",
-        "pending": "Pending",
-        "no_bookings": "No Bookings",
-        "no_bookings_message": "You have not made any vehicle bookings yet.",
-
-        # FARMER AI ASSISTANT
-        "farmer_ai": "Farmer AI",
-        "farmer_ai_assistant": "Farmer AI Crop Disease Assistant",
-        "upload_leaf_image": "Upload Leaf Image",
-        "analyze_leaf": "Analyze Leaf",
-        "possible_disease": "Possible Disease",
-        "crop": "Crop",
-        "confidence": "Confidence",
-        "symptoms": "Symptoms",
-        "possible_causes": "Possible Causes",
-        "treatment_management": "Treatment / Management",
-        "prevention": "Prevention",
-        "ask_ai_assistant": "Ask AI Assistant",
-        "upload_another_image": "Upload another image",
-        "image_unclear": "Image unclear",
-        "consult_expert": "Please consult an agricultural expert",
-        "analysis_failed": "Analysis failed",
-        "ai_service_unavailable": "AI service unavailable"
-    },
-
-
-    # =====================================================
-    # TELUGU
-    # =====================================================
-
-    "te": {
-
-        "language": "భాష",
-        "english": "English",
-        "telugu": "తెలుగు",
-        "hindi": "హిందీ",
-
-        "vehicle_booking": "వాహన బుకింగ్",
-        "customer": "కస్టమర్",
-        "customer_login": "కస్టమర్ లాగిన్",
-
-        "book_vehicle": "వాహనం బుక్ చేయండి",
-        "login": "లాగిన్",
-        "register": "నమోదు",
-        "logout": "లాగ్ అవుట్",
-        "welcome": "స్వాగతం",
-        "back_home": "హోమ్‌కు తిరిగి వెళ్లండి",
-
-        "mobile_number": "మొబైల్ నంబర్",
-        "customer_name": "కస్టమర్ పేరు",
-
-        "how_it_works": "ఇది ఎలా పనిచేస్తుంది",
-        "choose_vehicle": "వాహనాన్ని ఎంచుకోండి",
-        "select_date": "తేదీని ఎంచుకోండి",
-        "confirm": "నిర్ధారించండి",
-
-        "login_mobile": "మీ మొబైల్ నంబర్‌తో లాగిన్ అవ్వండి.",
-        "select_suitable_vehicle": "అనువైన వాహనాన్ని ఎంచుకోండి.",
-        "choose_booking_date": "మీ బుకింగ్ తేదీని ఎంచుకోండి.",
-        "confirm_your_booking": "మీ వాహన బుకింగ్‌ను నిర్ధారించండి.",
-
-        "vehicle_types": "వాహనాల రకాలు",
-
-        "tractor": "ట్రాక్టర్",
-        "mini_truck": "మినీ ట్రక్",
-        "pickup": "పికప్",
-        "lorry": "లారీ",
-
-        "tractor_desc": "వ్యవసాయం మరియు సరుకు రవాణాకు అనుకూలమైనది.",
-        "mini_truck_desc": "చిన్న మరియు మధ్యస్థ సరుకులకు అనుకూలమైనది.",
-        "pickup_desc": "స్థానిక రవాణాకు అనుకూలమైనది.",
-        "lorry_desc": "పెద్ద సరుకుల రవాణాకు అనుకూలమైనది.",
-
-        "simple_fast_easy": "సులభం • వేగవంతం • సౌకర్యవంతం",
-        "transportation_message": "మీ రవాణా అవసరాలకు సరైన వాహనాన్ని బుక్ చేసుకోండి.",
-        "footer_message": "అందరికీ సులభమైన రవాణా సేవ.",
-
-        "available_vehicles": "అందుబాటులో ఉన్న వాహనాలు",
-        "my_bookings": "నా బుకింగ్స్",
-        "vehicle_type": "వాహనం రకం",
-        "location": "ప్రాంతం",
-        "from": "ఎక్కడి నుండి",
-        "to": "ఎక్కడికి",
-        "rent": "అద్దె",
-        "contact": "సంప్రదించండి",
-        "book_now": "ఇప్పుడే బుక్ చేయండి",
-
-        "no_vehicles": "వాహనాలు అందుబాటులో లేవు",
-        "no_vehicles_message": "ప్రస్తుతం బుకింగ్ కోసం వాహనాలు అందుబాటులో లేవు.",
-
-        "booking_date": "బుకింగ్ తేదీ",
-        "confirm_booking": "బుకింగ్ నిర్ధారించండి",
-
-        # BOOKING STATUS
-        "status": "స్థితి",
-        "accepted": "ఆమోదించబడింది",
-        "rejected": "తిరస్కరించబడింది",
-        "pending": "పెండింగ్‌లో ఉంది",
-        "no_bookings": "బుకింగ్స్ లేవు",
-        "no_bookings_message": "మీరు ఇంకా ఏ వాహనాన్ని బుక్ చేయలేదు.",
-
-        # FARMER AI ASSISTANT
-        "farmer_ai": "రైతు ఏఐ",
-        "farmer_ai_assistant": "రైతు ఏఐ పంట వ్యాధి సహాయకుడు",
-        "upload_leaf_image": "ఆకు చిత్రాన్ని అప్‌లోడ్ చేయండి",
-        "analyze_leaf": "ఆకును విశ్లేషించండి",
-        "possible_disease": "సాధ్యమయ్యే వ్యాధి",
-        "crop": "పంట",
-        "confidence": "విశ్వసనీయత",
-        "symptoms": "లక్షణాలు",
-        "possible_causes": "సాధ్యమైన కారణాలు",
-        "treatment_management": "చికిత్స / యాజమాన్యం",
-        "prevention": "నివారణ చిట్కాలు",
-        "ask_ai_assistant": "ఏఐ సహాయకుడిని అడగండి",
-        "upload_another_image": "మరొక చిత్రాన్ని అప్‌లోడ్ చేయండి",
-        "image_unclear": "చిత్రం స్పష్టంగా లేదు",
-        "consult_expert": "దయచేసి వ్యవసాయ నిపుణుడిని సంప్రదించండి",
-        "analysis_failed": "విశ్లేషణ విఫలమైంది",
-        "ai_service_unavailable": "ఏఐ సేవ అందుబాటులో లేదు"
-    },
-
-
-    # =====================================================
-    # HINDI
-    # =====================================================
-
-    "hi": {
-
-        "language": "भाषा",
-        "english": "English",
-        "telugu": "तेलुगु",
-        "tamil": "तमिल",
-        "hindi": "हिन्दी",
-
-        "vehicle_booking": "वाहन बुकिंग",
-        "customer": "ग्राहक",
-        "customer_login": "ग्राहक लॉगिन",
-
-        "book_vehicle": "वाहन बुक करें",
-        "login": "लॉगिन",
-        "register": "पंजीकरण",
-        "logout": "लॉग आउट",
-        "welcome": "स्वागत है",
-        "back_home": "होम पर वापस जाएँ",
-
-        "mobile_number": "मोबाइल नंबर",
-        "customer_name": "ग्राहक का नाम",
-
-        "how_it_works": "यह कैसे काम करता है",
-        "choose_vehicle": "वाहन चुनें",
-        "select_date": "तारीख चुनें",
-        "confirm": "पुष्टि करें",
-
-        "login_mobile": "अपने मोबाइल नंबर से लॉगिन करें।",
-        "select_suitable_vehicle": "उपयुक्त वाहन चुनें।",
-        "choose_booking_date": "अपनी बुकिंग की तारीख चुनें।",
-        "confirm_your_booking": "अपने वाहन की बुकिंग की पुष्टि करें।",
-
-        "vehicle_types": "वाहनों के प्रकार",
-
-        "tractor": "ट्रैक्टर",
-        "mini_truck": "मिनी ट्रक",
-        "pickup": "पिकअप",
-        "lorry": "लॉरी",
-
-        "tractor_desc": "कृषि और सामान के परिवहन के लिए उपयुक्त।",
-        "mini_truck_desc": "छोटे और मध्यम सामान के लिए उपयुक्त।",
-        "pickup_desc": "स्थानीय परिवहन के लिए सुविधाजनक।",
-        "lorry_desc": "बड़े सामान के परिवहन के लिए उपयुक्त।",
-
-        "simple_fast_easy": "सरल • तेज़ • आसान",
-        "transportation_message": "अपनी परिवहन आवश्यकताओं के लिए सही वाहन बुक करें।",
-        "footer_message": "सभी के लिए सरल परिवहन सेवा।",
-
-        "available_vehicles": "उपलब्ध वाहन",
-        "my_bookings": "मेरी बुकिंग",
-        "vehicle_type": "वाहन का प्रकार",
-        "location": "स्थान",
-        "from": "कहाँ से",
-        "to": "कहाँ तक",
-        "rent": "किराया",
-        "contact": "संपर्क",
-        "book_now": "अभी बुक करें",
-
-        "no_vehicles": "कोई वाहन उपलब्ध नहीं है",
-        "no_vehicles_message": "फिलहाल बुकिंग के लिए कोई वाहन उपलब्ध नहीं है।",
-
-        "booking_date": "बुकिंग की तारीख",
-        "confirm_booking": "बुकिंग की पुष्टि करें",
-
-        # BOOKING STATUS
-        "status": "स्थिति",
-        "accepted": "स्वीकृत",
-        "rejected": "अस्वीकृत",
-        "pending": "लंबित",
-        "no_bookings": "कोई बुकिंग नहीं",
-        "no_bookings_message": "आपने अभी तक कोई वाहन बुक नहीं किया है।",
-
-        # FARMER AI ASSISTANT
-        "farmer_ai": "किसान एआई",
-        "farmer_ai_assistant": "किसान एआई फसल रोग सहायक",
-        "upload_leaf_image": "पत्ती की तस्वीर अपलोड करें",
-        "analyze_leaf": "पत्ती का विश्लेषण करें",
-        "possible_disease": "संभावित रोग",
-        "crop": "फसल",
-        "confidence": "विश्वसनीयता",
-        "symptoms": "लक्षण",
-        "possible_causes": "संभावित कारण",
-        "treatment_management": "उपचार / प्रबंधन",
-        "prevention": "रोकथाम के उपाय",
-        "ask_ai_assistant": "एआई सहायक से पूछें",
-        "upload_another_image": "दूसरी तस्वीर अपलोड करें",
-        "image_unclear": "तस्वीर स्पष्ट नहीं है",
-        "consult_expert": "कृपया किसी कृषि विशेषज्ञ से सलाह लें",
-        "analysis_failed": "विश्लेषण विफल रहा",
-        "ai_service_unavailable": "एआई सेवा उपलब्ध नहीं है"
-    },
-
-    # =====================================================
-    # TAMIL
-    # =====================================================
-
-    "ta": {
-        "language": "மொழி",
-        "english": "English",
-        "telugu": "తెలుగు",
-        "tamil": "தமிழ்",
-        "hindi": "हिन्दी",
-        "vehicle_booking": "வணிக வாகன முன்பதிவு",
-        "customer": "வாடிக்கையாளர்",
-        "customer_login": "வாடிக்கையாளர் உள்நுழைவு",
-        "book_vehicle": "வாகனத்தை முன்பதிவு செய்க",
-        "login": "உள்நுழைவு",
-        "register": "பதிவு",
-        "logout": "வெளியேறு",
-        "welcome": "வரவேற்கிறோம்",
-        "back_home": "முகப்புக்குத் திரும்பு",
-        "mobile_number": "கைபேசி எண்",
-        "customer_name": "வாடிக்கையாளர் பெயர்",
-        "available_vehicles": "கிடைக்கும் வாகனங்கள்",
-        "my_bookings": "எனது முன்பதிவுகள்",
-        "vehicle_type": "வாகன வகை",
-        "location": "இடம்",
-        "from": "இருந்து",
-        "to": "வரை",
-        "rent": "வாடகை",
-        "contact": "தொடர்பு",
-        "book_now": "இப்போது முன்பதிவு செய்க",
-        "no_vehicles": "வாகனங்கள் கிடைக்கவில்லை",
-        "no_vehicles_message": "தற்போது முன்பதிவுக்கு வாகனங்கள் இல்லை.",
-        "booking_date": "முன்பதிவு தேதி",
-        "confirm_booking": "முன்பதிவை உறுதிப்படுத்து",
-        "status": "நிலை",
-        "accepted": "ஏற்கப்பட்டது",
-        "rejected": "நிராகரிக்கப்பட்டது",
-        "pending": "நிலுவையில்",
-        "no_bookings": "முன்பதிவுகள் இல்லை",
-        "no_bookings_message": "நீங்கள் இன்னும் எந்த வாகனத்தையும் முன்பதிவு செய்யவில்லை.",
-        "farmer_ai": "விவசாயி AI",
-        "farmer_ai_assistant": "விவசாய பயிர் நோய் உதவியாளர்",
-        "upload_leaf_image": "இலை படத்தை பதிவேற்றவும்",
-        "analyze_leaf": "இலையை பகுப்பாய்வு செய்க",
-        "possible_disease": "சாத்தியமான நோய்",
-        "crop": "பயிர்",
-        "confidence": "நம்பகத்தன்மை",
-        "symptoms": "அறிகுறிகள்",
-        "possible_causes": "சாத்தியமான காரணங்கள்",
-        "treatment_management": "சிகிச்சை / மேலாண்மை",
-        "prevention": "தடுப்பு",
-        "ask_ai_assistant": "AI உதவியாளரிடம் கேளுங்கள்",
-        "analysis_failed": "பகுப்பாய்வு தோல்வியடைந்தது",
-        "ai_service_unavailable": "AI சேவை கிடைக்கவில்லை",
-        "footer_message": "அனைவருக்கும் எளிய போக்குவரத்து சேவை."
-    }
-
+LANGUAGE_NAMES = {
+    "en": "English",
+    "te": "తెలుగు",
+    "ta": "தமிழ்",
+    "hi": "हिन्दी",
 }
+
+TRANSLATIONS = {   'en': {
+        'admin_login_badge': 'ADMIN LOGIN',
+        'username': 'Username',
+        'accepted_bookings_desc': 'Confirmed rides',
+        'action': 'Action',
+        'action_col': 'Action',
+        'active_vehicles_desc': 'Ready with active routes',
+        'ai_assisted_result_sub': 'AI-assisted result based on the uploaded image.',
+        'ai_chat_welcome': 'Hello! Upload a leaf image above, then ask me questions about the result.',
+        'ai_disclaimer_note': 'Your image is analyzed only to provide the requested AI assistance. Do not use the result as a guaranteed diagnosis.',
+        'ai_disclaimer_short': 'AI results are informational and should be verified with agricultural professionals.',
+        'ai_service_not_configured': 'AI service is not configured yet. Add AI_API_KEY and provider settings to your .env file, then restart Flask.',
+        'amount': 'Amount',
+        'ask_ai_sub': 'Ask about the analyzed leaf, symptoms, prevention or general crop care. The current analysis is kept in this session for follow-up questions.',
+        'ask_followup_questions': 'Ask follow-up questions',
+        'booking_id_col': 'Booking ID',
+        'chip_disease_label': 'What disease is this?',
+        'chip_disease_query': 'What disease could this leaf have?',
+        'chip_lang_label': 'Explain in my language',
+        'chip_lang_query': 'Explain this clearly in simple terms.',
+        'chip_prevent_label': 'How can I prevent it?',
+        'chip_prevent_query': 'How can I prevent this problem from spreading?',
+        'chip_steps_label': 'What should I do now?',
+        'chip_steps_query': 'What should I do now to manage this crop issue?',
+        'choose_or_drag_photo': 'Choose or drag a leaf photo here',
+        'contact_expert': 'When to Contact an Expert',
+        'demo_card': 'Demo Card',
+        'demo_simulation_notice': 'Simulation only: this demo payment does not process any real card, bank, or UPI data.',
+        'demo_upi': 'Demo UPI',
+        'demo_upi_id': 'Demo UPI ID',
+        'enter_cardholder_name': 'Enter demo cardholder name',
+        'enter_demo_upi_id': 'demo@upi',
+        'farmer_ai_desc': 'Upload a clear crop-leaf photo and get an AI-assisted explanation of possible disease, visible symptoms, safe management steps and prevention guidance.',
+        'file_format_limit': 'JPG, JPEG, PNG or WEBP • Maximum 10 MB',
+        'fleet_management': 'Fleet Management',
+        'fleet_overview': 'Fleet Overview',
+        'id': 'ID',
+        'image_based_analysis': 'Image-based analysis',
+        'not_specified': 'Not specified',
+        'owner_hero_subtitle': 'Manage your vehicles, routes, and respond to customer booking requests.',
+        'owner_tagline': 'For Farmers • For Businesses • At Your Service',
+        'pay': 'Pay',
+        'payment_col': 'Payment',
+        'payment_summary': 'Payment Summary',
+        'pending_actions_desc': 'Requires confirmation',
+        'pending_review_banner': 'booking request(s) need your immediate review and action.',
+        'pending_review_hint': 'Review the customer, route, date, and fixed rent below, then click Accept or Reject.',
+        'processing': 'Processing...',
+        'processing_demo_payment': 'Processing demo payment...',
+        'profile': 'Owner Profile',
+        'ready_when_you_are': 'Ready when you are',
+        'route_col': 'Route',
+        'route_pricing': 'Route Based Pricing',
+        'route_pricing_desc': 'Transparent and fair rates',
+        'secure_desc': 'Your trust is our priority',
+        'secure_reliable': 'Secure & Reliable',
+        'sidebar_dashboard': 'Dashboard',
+        'start_moving': 'Start moving your next load.',
+        'support_247': '24/7 Support',
+        'support_desc': 'We\'re always here to help',
+        'symptoms_explanation': 'Symptoms & Visual Explanation',
+        'total_bookings_desc': 'All-time bookings',
+        'total_due': 'Total Due',
+        'total_vehicles_desc': 'Registered fleet',
+        'type_question_placeholder': 'Type your farming question here...',
+        'upload_another_image': 'Upload another image',
+        'upload_leaf_tip': 'For best results, photograph one leaf in good daylight with the affected area clearly visible.',
+        'vehicle': 'Vehicle',
+        'vehicle_col': 'Vehicle',
+        'view_all_bookings': 'View Fleet',
+        'wide_range': 'Wide Vehicle Range',
+        'wide_range_desc': 'From small to heavy vehicles',   'language': 'Language',
+              'english': 'English',
+              'telugu': 'Telugu',
+              'tamil': 'Tamil',
+              'hindi': 'Hindi',
+              'vehicle_booking': 'Business Vehicle Booking',
+              'tagline': 'For Farmers • For Businesses • At Your Service',
+              'home': 'Home',
+              'vehicles': 'Vehicles',
+              'available_vehicles': 'Available Vehicles',
+              'my_bookings': 'My Bookings',
+              'dashboard': 'Dashboard',
+              'owner_dashboard': 'Owner Dashboard',
+              'admin_dashboard': 'Admin Dashboard',
+              'control_center': 'Control Center',
+              'security_clearance': 'Security Clearance',
+              'farmer_ai': 'Farmer AI',
+              'farmer_ai_assistant': 'Farmer AI Crop Disease Assistant',
+              'customer': 'Customer',
+              'customer_login': 'Customer Login',
+              'owner_login': 'Vehicle Owner Login',
+              'admin_login': 'Admin Login',
+              'book_vehicle': 'Book a Vehicle',
+              'login': 'Login',
+              'register': 'Register',
+              'customer_registration': 'Customer Registration',
+              'owner_registration': 'Vehicle Owner Registration',
+              'logout': 'Logout',
+              'welcome': 'Welcome',
+              'back_home': 'Back to Home',
+              'back_to_vehicles': 'Back to Vehicles',
+              'back_to_dashboard': 'Back to Dashboard',
+              'back_to_public': 'Back to Public Site',
+              'mobile_number': 'Mobile Number',
+              'customer_name': 'Customer Name',
+              'owner_name': 'Owner Name',
+              'registered_email': 'Registered Email',
+              'email_address': 'Email Address',
+              'email': 'Email',
+              'phone': 'Phone',
+              'phone_number': 'Phone Number',
+              'password': 'Password',
+              'confirm_password': 'Confirm Password',
+              'forgot_password': 'Forgot Password?',
+              'reset_password': 'Reset Password',
+              'set_new_password': 'Set a New Password',
+              'new_password': 'New Password',
+              'send_reset_link': 'Send Reset Link',
+              'back_to_customer_login': 'Back to Customer Login',
+              'enter_registered_email': 'Enter your registered email address.',
+              'login_mobile': 'Login using your mobile number.',
+              'create_account': 'Create Your Account',
+              'choose_account_type': 'Choose how you want to use Business Vehicle Booking',
+              'for_customers': 'For Farmers & Business Customers',
+              'for_owners': 'For Commercial Vehicle Owners',
+              'customer_desc': 'Find and book reliable commercial vehicles for your transportation needs.',
+              'owner_desc': 'Register your commercial vehicles and receive booking requests from customers.',
+              'register_as_customer': 'Register as Customer',
+              'customer_sign_in': 'Customer Sign In',
+              'register_as_owner': 'Register as Vehicle Owner',
+              'owner_sign_in': 'Vehicle Owner Sign In',
+              'new_vehicle_owner': 'New vehicle owner?',
+              'already_an_owner': 'Already an owner?',
+              'already_have_account': 'Already have an account?',
+              'new_customer': 'New customer?',
+              'sign_in_here': 'Sign in here',
+              'register_here': 'Register here',
+              'enter_owner_name_placeholder': 'Enter owner or business name',
+              'enter_phone_placeholder': 'Enter 10-digit mobile number',
+              'enter_owner_email_placeholder': 'owner@example.com (used for login & alerts)',
+              'enter_password_placeholder': 'Enter your password (min 8 characters)',
+              'enter_admin_username': 'Enter admin username',
+              'enter_admin_password': 'Enter admin password',
+              'admin_login_desc': 'Sign in to access platform management and real-time operations.',
+              'admin_copyright': '© 2026 Business Vehicle Booking • Administrative Systems',
+              'heavy_vehicles_title': 'Heavy Vehicles for a Stronger Tomorrow',
+              'book_vehicles_ease': 'Book Commercial Vehicles with Ease',
+              'hero_subtitle': 'Connecting farmers and business owners with reliable commercial vehicles for a better '
+                               'tomorrow.',
+              'explore_vehicles': 'Explore Vehicles',
+              'try_farmer_ai': 'Try Farmer AI',
+              'smart_farming_support': 'Smart farming support',
+              'how_it_works': 'How It Works',
+              'choose_vehicle': 'Choose Vehicle',
+              'select_date': 'Select Date',
+              'confirm': 'Confirm',
+              'vehicle_types': 'Vehicle Types',
+              'tractor': 'Tractor',
+              'mini_truck': 'Mini Truck',
+              'pickup': 'Pickup',
+              'lorry': 'Lorry',
+              'goods_auto': 'Goods Auto',
+              'tractor_desc': 'Suitable for agricultural and goods transportation.',
+              'mini_truck_desc': 'Suitable for small and medium loads.',
+              'pickup_desc': 'Convenient for local transportation.',
+              'lorry_desc': 'Suitable for transporting larger loads.',
+              'goods_auto_desc': 'Ideal for fast local goods and produce transit.',
+              'simple_fast_easy': 'Simple • Fast • Easy',
+              'transportation_message': 'Book the right vehicle for your transportation needs.',
+              'footer_message': 'Simple transportation service for everyone.',
+              'vehicle_type': 'Vehicle Type',
+              'location': 'Location',
+              'from': 'From',
+              'to': 'To',
+              'rent': 'Rent',
+              'contact': 'Contact',
+              'book_now': 'Book Now',
+              'no_vehicles': 'No Vehicles Available',
+              'no_vehicles_message': 'There are currently no vehicles available for booking.',
+              'search_placeholder': 'Search name, route, or location',
+              'location_placeholder': 'Location or town',
+              'all_vehicle_types': 'All Vehicle Types',
+              'min_rent': 'Min Rent (₹)',
+              'max_rent': 'Max Rent (₹)',
+              'apply_filters': 'Apply Filters',
+              'reset_filters': 'Reset Filters',
+              'view_details': 'View Details',
+              'book_this_vehicle': 'Book This Vehicle',
+              'available_routes_rent': 'Available Routes & Fixed Rent',
+              'base_location': 'Base Location',
+              'current_location_label': 'Current / Base Location',
+              'capacity_weight': 'Capacity / Load Capacity',
+              'availability_status': 'Availability',
+              'available_ready': 'Available (Ready for booking)',
+              'route_label': 'Route',
+              'fixed_route_rent_label': 'Fixed Route Rent',
+              'booking_date': 'Booking Date',
+              'confirm_booking': 'Confirm Booking',
+              'status': 'Status',
+              'accepted': 'Accepted',
+              'rejected': 'Rejected',
+              'pending': 'Pending',
+              'paid': 'Paid',
+              'pay_now': 'Pay Now',
+              'no_bookings': 'No Bookings',
+              'no_bookings_message': 'You have not made any vehicle bookings yet.',
+              'booking_id': 'Booking ID',
+              'customer_booking_requests': 'Customer Booking Requests',
+              'accept': 'Accept',
+              'reject': 'Reject',
+              'no_action_needed': 'No action required',
+              'rate_service': 'Rate Service',
+              'rate_booking': 'Rate Your Booking',
+              'rate_booking_title': '⭐ Rate Your Booking',
+              'review_optional': 'Review (optional)',
+              'review_placeholder': 'How was the vehicle and owner service?',
+              'save_rating': 'Save Rating',
+              'rating': 'Rating',
+              'booking_success_title': 'Booking Request Submitted',
+              'booking_success_desc': 'Your booking is pending owner confirmation.',
+              'waiting_owner_confirm': 'Waiting for owner confirmation.',
+              'view_my_bookings': 'View My Bookings',
+              'browse_vehicles': 'Browse Vehicles',
+              'track_bookings_desc': 'Track every route booking and rate accepted services.',
+              'booking_confirmed_badge': 'Booking Confirmed',
+              'add_vehicle': 'Add Vehicle',
+              'add_vehicle_title': '🚚 Add Vehicle',
+              'add_route': 'Add Route',
+              'add_route_rent': '+ Add Route & Rent',
+              'add_route_subtitle': 'Set fixed route pricing for your commercial vehicles so customers can book '
+                                    'instantly.',
+              'route_details': 'Route Details',
+              'rent_details': 'Rent Details',
+              'additional_info': 'Additional Information',
+              'select_vehicle': 'Select Vehicle',
+              'choose_vehicle_prompt': '-- Select Your Vehicle --',
+              'from_location': 'Origin / From Location',
+              'to_location': 'Destination / To Location',
+              'fixed_route_rent': 'Route-Based Fixed Rent (₹)',
+              'save_route_rent': 'Save Route & Rent',
+              'save_vehicle': 'Save Vehicle',
+              'save_changes': 'Save Changes',
+              'cancel': 'Cancel',
+              'route_added_success': 'Route and rent added successfully! ✅',
+              'add_another_route': 'Add Another Route',
+              'my_vehicles': 'My Vehicles',
+              'edit_vehicle': 'Edit Vehicle',
+              'edit_vehicle_title': '✏️ Edit Vehicle',
+              'vehicle_name': 'Vehicle Name',
+              'contact_number': 'Contact Number',
+              'update_vehicle': 'Update Vehicle',
+              'delete_vehicle': 'Delete Vehicle',
+              'active_vehicles': 'Active Vehicles',
+              'total_bookings': 'Total Bookings',
+              'total_vehicles': 'Total Vehicles',
+              'pending_action': 'Pending Action',
+              'accepted_bookings': 'Accepted Bookings',
+              'quick_actions_title': 'Quick Management',
+              'manage_fleet': 'Manage Fleet',
+              'manage_fleet_desc': 'View, edit, or delete existing vehicles',
+              'manage_routes_desc': 'Configure fixed route pricing for customers',
+              'owner_profile_title': 'Owner Profile',
+              'account_status': 'Account Status',
+              'active_fleet': 'Active Fleet',
+              'no_bookings_title': 'No booking requests yet',
+              'no_bookings_desc': 'Customer bookings for your vehicles will appear here in real time.',
+              'choose_vehicle_fleet_hint': 'Choose the vehicle from your active registered fleet.',
+              'starting_point_hint': 'Starting town, village or loading point.',
+              'delivery_point_hint': 'Delivery market, warehouse or destination town.',
+              'total_fixed_rent_hint': 'Total fixed rent for this one-way route trip.',
+              'route_open_notice': 'Vehicle route will immediately be open for customer bookings.',
+              'transparent_pricing_title': 'Transparent Route-Based Pricing',
+              'source_placeholder': 'Example: Tadipatri',
+              'destination_placeholder': 'Example: Anantapur',
+              'rent_placeholder': 'Example: 2500',
+              'vehicle_name_example': 'Example: Tata Ace',
+              'location_example': 'Example: Kanchipuram',
+              'demo_payment': 'Demo Payment',
+              'demo_payment_banner': 'DEMO PAYMENT — NO REAL MONEY',
+              'secure_demo_payment': 'Secure Demo Payment',
+              'demo_payment_disclaimer': 'This is a project demo transaction only. No real money is charged.',
+              'amount_paid': 'Amount Paid',
+              'payment_method': 'Payment Method',
+              'cardholder_name': 'Cardholder Name',
+              'upi_id': 'UPI ID',
+              'enter_cardholder_placeholder': 'Enter demo cardholder name',
+              'enter_upi_placeholder': 'demo@upi',
+              'pay_amount_btn': 'Pay Amount',
+              'payment_successful': 'Payment Successful',
+              'payment_success_desc': 'This demo payment was completed successfully and has been recorded in the '
+                                      'system.',
+              'transaction_reference': 'Transaction Reference',
+              'date': 'Date',
+              'view_receipt': 'View Receipt',
+              'download_receipt': 'Download Receipt',
+              'view_booking': 'View Booking',
+              'upload_leaf_image': 'Upload Leaf Image',
+              'analyze_leaf': 'Analyze Leaf',
+              'drag_leaf_image': 'Choose or drag a leaf photo here',
+              'image_format_limit': 'JPG, JPEG, PNG or WEBP • Maximum 10 MB',
+              'ai_assistant_intro': 'Upload a clear crop-leaf photo and get an AI-assisted explanation of possible '
+                                    'disease, visible symptoms, safe management steps and prevention guidance.',
+              'photo_tips': 'For best results, photograph one leaf in good daylight with the affected area clearly '
+                            'visible.',
+              'analysis_result': 'Analysis Result',
+              'ai_assisted_notice': 'AI-assisted result based on the uploaded image.',
+              'possible_disease': 'Possible Disease',
+              'crop': 'Crop',
+              'confidence': 'Confidence',
+              'symptoms': 'Symptoms',
+              'possible_causes': 'Possible Causes',
+              'treatment_management': 'Treatment / Management',
+              'prevention': 'Prevention',
+              'immediate_steps': 'Immediate Steps',
+              'expert_advice': 'Expert Advice',
+              'ask_ai_assistant': 'Ask AI Assistant',
+              'followup_prompt_desc': 'Ask about the analyzed leaf, symptoms, prevention or general crop care. The '
+                                      'current analysis is kept in this session for follow-up questions.',
+              'safety_notice': 'Safety notice',
+              'safety_notice_desc': 'This AI assistant provides educational guidance. For critical crop decisions or '
+                                    'pesticide usage, always verify with local agricultural extension officers.',
+              'chat_placeholder': 'Type your farming question here...',
+              'send': 'Send',
+              'q_disease': 'What disease is this?',
+              'q_todo': 'What should I do now?',
+              'q_prevent': 'How can I prevent it?',
+              'q_telugu': 'Explain in Telugu',
+              'q_tamil': 'Explain in Tamil',
+              'q_hindi': 'Explain in Hindi',
+              'analyzing': 'Analyzing leaf image...',
+              'ai_thinking': 'AI is generating guidance...',
+              'no_leaf_analyzed_yet': 'Upload a leaf photo above to see AI diagnosis.',
+              'admin': 'Admin',
+              'customers': 'Customers',
+              'owners': 'Owners',
+              'payments': 'Payments',
+              'ratings_reviews': 'Ratings & Reviews',
+              'overview': 'Overview',
+              'enterprise_operations': 'Enterprise Operations',
+              'live_db_connected': 'Live Database Connected',
+              'admin_management_desc': 'Live administrative management, member directories, and operational records.',
+              'recent_bookings': 'Recent Bookings',
+              'no_bookings_found': 'No bookings found.',
+              'no_records_found': 'No records found.',
+              'search': 'Search',
+              'filter': 'Filter',
+              'all_statuses': 'All statuses',
+              'active': 'Active',
+              'inactive': 'Inactive',
+              'activate': 'Activate',
+              'deactivate': 'Deactivate',
+              'update_status': 'Update Status',
+              'read_only_view': 'Read-only administrative view.',
+              'registration_success': 'Registration successful! You can now log in.',
+              'login_successful': 'Login successful.',
+              'logout_successful': 'You have been logged out.',
+              'invalid_credentials': 'Email or password is incorrect.',
+              'invalid_customer_login': 'Mobile number or password is incorrect.',
+              'invalid_owner_login': 'Email or password is incorrect.',
+              'invalid_admin_login': 'Invalid admin username or password.',
+              'email_already_registered': 'This email address is already registered. Please use a different email or '
+                                          'sign in.',
+              'mobile_already_registered': 'This mobile number is already registered. Please use a different number or '
+                                           'sign in.',
+              'valid_email_err': 'Enter a valid email address.',
+              'valid_phone_err': 'Enter a valid 10-digit mobile number.',
+              'password_length_err': 'Password must be 8 to 128 characters.',
+              'passwords_dont_match': 'Passwords do not match.',
+              'booking_date_past_err': 'Booking date cannot be in the past.',
+              'select_valid_date_err': 'Please select a valid booking date.',
+              'select_valid_route_err': 'Please select a valid route before booking.',
+              'duplicate_booking_err': 'You already have a booking request for this vehicle on this date.',
+              'booking_created_success': 'Booking request submitted successfully! Pending owner approval.',
+              'booking_status_updated': 'Booking status updated.',
+              'booking_status_update_err': 'Booking status could not be updated. Please try again.',
+              'only_pending_can_change': 'Only pending bookings can change status.',
+              'select_rating_err': 'Please select a rating from 1 to 5 stars.',
+              'rating_saved': 'Thank you! Your rating and review have been saved.',
+              'demo_payment_success': 'Demo payment completed successfully. A confirmation email has been sent.',
+              'demo_payment_success_no_mail': 'Demo payment completed successfully. The confirmation email could not '
+                                              'be sent, but payment is recorded.',
+              'demo_payment_failed': 'Demo payment processing failed. Please try again.',
+              'valid_payment_method_err': 'Please choose a valid demo payment method.',
+              'cardholder_name_err': 'Please enter the cardholder name for the demo card.',
+              'upi_id_err': 'Please enter the demo UPI ID for payment.',
+              'vehicle_added_success': 'Vehicle added successfully! You can now configure routes & rent.',
+              'vehicle_updated_success': 'Vehicle details updated successfully.',
+              'vehicle_deleted_success': 'Vehicle removed successfully.',
+              'access_denied': 'Access Denied: You can only manage your own vehicles and routes.',
+              'invalid_csrf_token': 'Invalid CSRF token. Please refresh and try again.',
+              'error_404_title': '404 - Page Not Found',
+              'error_404_desc': 'The page you are looking for does not exist or has been moved.',
+              'error_500_title': '500 - Server Error',
+              'error_500_desc': 'An unexpected error occurred. Please try again later.'},
+    'te': {
+        'admin_login_badge': 'అడ్మిన్ లాగిన్',
+        'username': 'వినియోగదారు పేరు',
+        'accepted_bookings_desc': 'ధృవీకరించబడిన బుకింగ్‌లు',
+        'action': 'చర్య',
+        'action_col': 'చర్య',
+        'active_vehicles_desc': 'చురుకైన మార్గాలతో సిద్ధంగా ఉంది',
+        'ai_assisted_result_sub': 'అప్‌లోడ్ చేసిన చిత్రం ఆధారంగా AI సహాయక ఫలితం.',
+        'ai_chat_welcome': 'నమస్కారం! పైన ఆకు చిత్రాన్ని అప్‌లోడ్ చేసి, ఫలితం గురించి నన్ను ప్రశ్నలు అడగండి.',
+        'ai_disclaimer_note': 'అభ్యర్థించిన AI సహాయాన్ని అందించడానికి మాత్రమే మీ చిత్రం విశ్లేషించబడుతుంది. ఫలితాన్ని హామీ ఇవ్వబడిన రోగనిర్ధారణగా ఉపయోగించవద్దు.',
+        'ai_disclaimer_short': 'AI ఫలితాలు సమాచార ప్రయోజనాల కోసం మాత్రమే మరియు వ్యవసాయ నిపుణులతో ధృవీకరించబడాలి.',
+        'ai_service_not_configured': 'AI సేవ ఇంకా కాన్ఫిగర్ చేయబడలేదు. మీ .env ఫైల్‌కు AI_API_KEYని జోడించి, ఫ్లాస్క్‌ను పునఃప్రారంభించండి.',
+        'amount': 'మొత్తం',
+        'ask_ai_sub': 'విశ్లేషించబడిన ఆకు, లక్షణాలు, నివారణ లేదా సాధారణ పంట సంరక్షణ గురించి అడగండి.',
+        'ask_followup_questions': 'తదుపరి ప్రశ్నలు అడగండి',
+        'booking_id_col': 'బుకింగ్ ID',
+        'chip_disease_label': 'ఇది ఏ వ్యాధి?',
+        'chip_disease_query': 'ఈ ఆకుకు ఏ వ్యాధి ఉండవచ్చు?',
+        'chip_lang_label': 'తెలుగులో వివరించండి',
+        'chip_lang_query': 'దీనిని తెలుగులో వివరంగా మరియు సరళంగా వివరించండి.',
+        'chip_prevent_label': 'దీన్ని ఎలా నివారించగలను?',
+        'chip_prevent_query': 'ఈ సమస్య వ్యాపించకుండా ఎలా నివారించగలను?',
+        'chip_steps_label': 'ఇప్పుడు నేను ఏమి చేయాలి?',
+        'chip_steps_query': 'ఈ పంట సమస్యను పరిష్కరించడానికి ఇప్పుడు నేను ఏమి చేయాలి?',
+        'choose_or_drag_photo': 'ఇక్కడ ఆకు ఫోటోను ఎంచుకోండి లేదా లాగండి',
+        'contact_expert': 'నిపుణుడిని ఎప్పుడు సంప్రదించాలి',
+        'demo_card': 'డెమో కార్డు',
+        'demo_simulation_notice': 'సిమ్యులేషన్ మాత్రమే: ఈ డెమో చెల్లింపు ఎటువంటి నిజమైన కార్డ్, బ్యాంక్ లేదా UPI డేటాను ప్రాసెస్ చేయదు.',
+        'demo_upi': 'డెమో UPI',
+        'demo_upi_id': 'డెమో UPI ID',
+        'enter_cardholder_name': 'డెమో కార్డ్ హోల్డర్ పేరును నమోదు చేయండి',
+        'enter_demo_upi_id': 'demo@upi',
+        'farmer_ai_desc': 'స్పష్టమైన పంట ఆకు ఫోటోను అప్‌లోడ్ చేయండి మరియు వ్యాధి, కనిపించే లక్షణాలు, సురక్షితమైన యాజమాన్య పద్ధతులు మరియు నివారణ మార్గదర్శకాలను పొందండి.',
+        'file_format_limit': 'JPG, JPEG, PNG లేదా WEBP • గరిష్టంగా 10 MB',
+        'fleet_management': 'వాహనాల నిర్వహణ',
+        'fleet_overview': 'వాహనాల సారాంశం',
+        'id': 'ID',
+        'image_based_analysis': 'చిత్ర ఆధారిత విశ్లేషణ',
+        'not_specified': 'పేర్కొనబడలేదు',
+        'owner_hero_subtitle': 'మీ వాహనాలు, మార్గాలను నిర్వహించండి మరియు కస్టమర్ బుకింగ్ అభ్యర్థనలకు ప్రతిస్పందించండి.',
+        'owner_tagline': 'రైతులకు • వ్యాపారులకు • మీ సేవలో',
+        'pay': 'చెల్లించండి',
+        'payment_col': 'చెల్లింపు',
+        'payment_summary': 'చెల్లింపు సారాంశం',
+        'pending_actions_desc': 'నిర్ధారణ అవసరం',
+        'pending_review_banner': 'బుకింగ్ అభ్యర్థన(లు) మీ తక్షణ పరిశీలన మరియు చర్య కోసం వేచి ఉన్నాయి.',
+        'pending_review_hint': 'క్రింద కస్టమర్, మార్గం, తేదీ మరియు అద్దెను పరిశీలించి, అంగీకరించు లేదా తిరస్కరించు క్లిక్ చేయండి.',
+        'processing': 'ప్రాసెస్ అవుతోంది...',
+        'processing_demo_payment': 'డెమో చెల్లింపు ప్రాసెస్ అవుతోంది...',
+        'profile': 'యజమాని ప్రొఫైల్',
+        'ready_when_you_are': 'మీరు సిద్ధంగా ఉన్నప్పుడే మేము సిద్ధం',
+        'route_col': 'మార్గం',
+        'route_pricing': 'మార్గం ఆధారిత ధర',
+        'route_pricing_desc': 'పారదర్శక మరియు న్యాయమైన ధరలు',
+        'secure_desc': 'మీ నమ్మకమే మా ప్రాధాన్యత',
+        'secure_reliable': 'సురక్షితమైన & విశ్వసనీయమైన',
+        'sidebar_dashboard': 'డ్యాష్‌బోర్డ్',
+        'start_moving': 'మీ తదుపరి రవాణాను ప్రారంభించండి.',
+        'support_247': '24/7 మద్దతు',
+        'support_desc': 'సహాయం చేయడానికి మేము ఎల్లప్పుడూ సిద్ధంగా ఉన్నాము',
+        'symptoms_explanation': 'లక్షణాలు & దృశ్య వివరణ',
+        'total_bookings_desc': 'మొత్తం బుకింగ్‌లు',
+        'total_due': 'మొత్తం బకాయి',
+        'total_vehicles_desc': 'నమోదిత వాహనాలు',
+        'type_question_placeholder': 'మీ వ్యవసాయ సంబంధిత ప్రశ్నను ఇక్కడ టైప్ చేయండి...',
+        'upload_another_image': 'మరొక చిత్రాన్ని అప్‌లోడ్ చేయండి',
+        'upload_leaf_tip': 'ఉత్తమ ఫలితాల కోసం, ప్రభావిత ప్రాంతం స్పష్టంగా కనిపించేలా మంచి వెలుతురులో ఒక ఆకును ఫోటో తీయండి.',
+        'vehicle': 'వాహనం',
+        'vehicle_col': 'వాహనం',
+        'view_all_bookings': 'వాహనాల జాబితా',
+        'wide_range': 'విస్తృత వాహన శ్రేణి',
+        'wide_range_desc': 'చిన్న నుండి భారీ వాహనాల వరకు',   'language': 'భాష',
+              'english': 'English',
+              'telugu': 'తెలుగు',
+              'tamil': 'தமிழ்',
+              'hindi': 'हिन्दी',
+              'vehicle_booking': 'వాహన బుకింగ్',
+              'tagline': 'రైతులకు • వ్యాపారులకు • మీ సేవలో',
+              'home': 'హోమ్',
+              'vehicles': 'వాహనాలు',
+              'available_vehicles': 'అందుబాటులో ఉన్న వాహనాలు',
+              'my_bookings': 'నా బుకింగ్స్',
+              'dashboard': 'డాష్\u200cబోర్డ్',
+              'owner_dashboard': 'యజమాని డాష్\u200cబోర్డ్',
+              'admin_dashboard': 'అడ్మిన్ డాష్\u200cబోర్డ్',
+              'control_center': 'నియంత్రణ కేంద్రం',
+              'security_clearance': 'భద్రతా అనుమతి',
+              'farmer_ai': 'రైతు AI',
+              'farmer_ai_assistant': 'రైతు AI పంట వ్యాధి సహాయకుడు',
+              'customer': 'కస్టమర్',
+              'customer_login': 'కస్టమర్ లాగిన్',
+              'owner_login': 'వాహన యజమాని లాగిన్',
+              'admin_login': 'అడ్మిన్ లాగిన్',
+              'book_vehicle': 'వాహనం బుక్ చేసుకోండి',
+              'login': 'లాగిన్',
+              'register': 'రిజిస్టర్',
+              'customer_registration': 'కస్టమర్ రిజిస్ట్రేషన్',
+              'owner_registration': 'వాహన యజమాని రిజిస్ట్రేషన్',
+              'logout': 'లాగ్అవుట్',
+              'welcome': 'స్వాగతం',
+              'back_home': 'హోమ్\u200cకి తిరిగి వెళ్ళండి',
+              'back_to_vehicles': 'వాహనాల జాబితాకు తిరిగి వెళ్ళండి',
+              'back_to_dashboard': 'డాష్\u200cబోర్డ్\u200cకు తిరిగి వెళ్ళండి',
+              'back_to_public': 'ప్రజా వెబ్\u200cసైట్\u200cకు తిరిగి వెళ్ళండి',
+              'mobile_number': 'మొబైల్ నంబర్',
+              'customer_name': 'కస్టమర్ పేరు',
+              'owner_name': 'యజమాని పేరు',
+              'registered_email': 'నమోదిత ఇమెయిల్',
+              'email_address': 'ఇమెయిల్ చిరునామా',
+              'email': 'ఇమెయిల్',
+              'phone': 'ఫోన్',
+              'phone_number': 'ఫోన్ నంబర్',
+              'password': 'పాస్\u200cవర్డ్',
+              'confirm_password': 'పాస్\u200cవర్డ్ నిర్ధారించండి',
+              'forgot_password': 'పాస్\u200cవర్డ్ మర్చిపోయారా?',
+              'reset_password': 'పాస్\u200cవర్డ్ రీసెట్ చేయండి',
+              'set_new_password': 'కొత్త పాస్\u200cవర్డ్\u200cను సెట్ చేయండి',
+              'new_password': 'కొత్త పాస్\u200cవర్డ్',
+              'send_reset_link': 'రీసెట్ లింక్ పంపండి',
+              'back_to_customer_login': 'కస్టమర్ లాగిన్\u200cకి తిరిగి వెళ్ళండి',
+              'enter_registered_email': 'మీ నమోదిత ఇమెయిల్ చిరునామాను నమోదు చేయండి.',
+              'login_mobile': 'మీ మొబైల్ నంబర్\u200cతో లాగిన్ అవ్వండి.',
+              'create_account': 'మీ ఖాతాను సృష్టించండి',
+              'choose_account_type': 'మీరు వాహన బుకింగ్\u200cను ఎలా ఉపయోగించాలనుకుంటున్నారో ఎంచుకోండి',
+              'for_customers': 'రైతులు & వ్యాపార కస్టమర్ల కోసం',
+              'for_owners': 'వాణిజ్య వాహనాల యజమానుల కోసం',
+              'customer_desc': 'మీ రవాణా అవసరాల కోసం నమ్మకమైన వాణిజ్య వాహనాలను కనుగొని బుక్ చేసుకోండి.',
+              'owner_desc': 'మీ వాణిజ్య వాహనాలను నమోదు చేసుకోండి మరియు కస్టమర్ల నుండి బుకింగ్ అభ్యర్థనలను పొందండి.',
+              'register_as_customer': 'కస్టమర్\u200cగా నమోదు చేసుకోండి',
+              'customer_sign_in': 'కస్టమర్ సైన్ ఇన్',
+              'register_as_owner': 'వాహన యజమానిగా నమోదు చేసుకోండి',
+              'owner_sign_in': 'వాహన యజమాని సైన్ ఇన్',
+              'new_vehicle_owner': 'కొత్త వాహన యజమానియా?',
+              'already_an_owner': 'ఇప్పటికే యజమానిగా ఖాతా ఉందా?',
+              'already_have_account': 'ఇప్పటికే ఖాతా ఉందా?',
+              'new_customer': 'కొత్త కస్టమరా?',
+              'sign_in_here': 'ఇక్కడ సైన్ ఇన్ చేయండి',
+              'register_here': 'ఇక్కడ నమోదు చేసుకోండి',
+              'enter_owner_name_placeholder': 'యజమాని లేదా వ్యాపార పేరు నమోదు చేయండి',
+              'enter_phone_placeholder': '10 అంకెల మొబైల్ నంబర్ నమోదు చేయండి',
+              'enter_owner_email_placeholder': 'owner@example.com (లాగిన్ & నోటిఫికేషన్ల కోసం)',
+              'enter_password_placeholder': 'పాస్\u200cవర్డ్ నమోదు చేయండి (కనీసం 8 అక్షరాలు)',
+              'enter_admin_username': 'అడ్మిన్ యూజర్\u200cనేమ్ నమోదు చేయండి',
+              'enter_admin_password': 'అడ్మిన్ పాస్\u200cవర్డ్ నమోదు చేయండి',
+              'admin_login_desc': 'నిర్వహణ మరియు ప్రత్యక్ష కార్యకలాపాల కోసం సైన్ ఇన్ చేయండి.',
+              'admin_copyright': '© 2026 వాహన బుకింగ్ • అడ్మినిస్ట్రేటివ్ సిస్టమ్స్',
+              'heavy_vehicles_title': 'ఉజ్వల భవిష్యత్తు కోసం భారీ వాహనాలు',
+              'book_vehicles_ease': 'సులభంగా వాణిజ్య వాహనాలను బుక్ చేసుకోండి',
+              'hero_subtitle': 'మెరుగైన రేపటి కోసం రైతులు మరియు వ్యాపారవేత్తలను నమ్మకమైన వాణిజ్య వాహనాలతో కలుపుతోంది.',
+              'explore_vehicles': 'వాహనాలను అన్వేషించండి',
+              'try_farmer_ai': 'రైతు AI ప్రయత్నించండి',
+              'smart_farming_support': 'స్మార్ట్ వ్యవసాయ సహాయం',
+              'how_it_works': 'ఇది ఎలా పనిచేస్తుంది',
+              'choose_vehicle': 'వాహనాన్ని ఎంచుకోండి',
+              'select_date': 'తేదీని ఎంచుకోండి',
+              'confirm': 'నిర్ధారించండి',
+              'vehicle_types': 'వాహన రకాలు',
+              'tractor': 'ట్రాక్టర్',
+              'mini_truck': 'మినీ ట్రక్',
+              'pickup': 'పికప్',
+              'lorry': 'లారీ',
+              'goods_auto': 'గూడ్స్ ఆటో',
+              'tractor_desc': 'వ్యవసాయ మరియు సరుకుల రవాణాకు అనుకూలమైనది.',
+              'mini_truck_desc': 'చిన్న మరియు మధ్య తరహా లోడ్లకు అనుకూలమైనది.',
+              'pickup_desc': 'స్థానిక రవాణాకు అత్యంత సౌకర్యవంతమైనది.',
+              'lorry_desc': 'భారీ సరుకులను రవాణా చేయడానికి అనువైనది.',
+              'goods_auto_desc': 'స్థానిక మార్కెట్ సరుకులకు వేగవంతమైన రవాణా.',
+              'simple_fast_easy': 'సులభం • వేగవంతం • సురక్షితం',
+              'transportation_message': 'మీ రవాణా అవసరాలకు తగిన వాహనాన్ని తక్షణమే బుక్ చేసుకోండి.',
+              'footer_message': 'అందరికీ అందుబాటులో ఉండే సులభమైన రవాణా సేవ.',
+              'vehicle_type': 'వాహనం రకం',
+              'location': 'స్థానం',
+              'from': 'ప్రారంభ స్థలం',
+              'to': 'గమ్యస్థానం',
+              'rent': 'అద్దె',
+              'contact': 'సంప్రదించండి',
+              'book_now': 'ఇప్పుడే బుక్ చేయండి',
+              'no_vehicles': 'వాహనాలు అందుబాటులో లేవు',
+              'no_vehicles_message': 'ప్రస్తుతం బుకింగ్ కోసం వాహనాలు ఏవీ అందుబాటులో లేవు.',
+              'search_placeholder': 'పేరు, రూట్ లేదా స్థానం శోధించండి',
+              'location_placeholder': 'స్థానం లేదా పట్టణం',
+              'all_vehicle_types': 'అన్ని వాహన రకాలు',
+              'min_rent': 'కనిష్ట అద్దె (₹)',
+              'max_rent': 'గరిష్ట అద్దె (₹)',
+              'apply_filters': 'ఫిల్టర్లను వర్తింపజేయండి',
+              'reset_filters': 'ఫిల్టర్లను రీసెట్ చేయండి',
+              'view_details': 'వివరాలు చూడండి',
+              'book_this_vehicle': 'ఈ వాహనాన్ని బుక్ చేయండి',
+              'available_routes_rent': 'అందుబాటులో ఉన్న రూట్లు & నిర్ణీత అద్దె',
+              'base_location': 'ప్రధాన స్థావరం',
+              'current_location_label': 'ప్రస్తుత / బేస్ స్థానం',
+              'capacity_weight': 'లోడ్ సామర్థ్యం',
+              'availability_status': 'లభ్యత',
+              'available_ready': 'అందుబాటులో ఉంది (బుకింగ్\u200cకు సిద్ధం)',
+              'route_label': 'రూట్',
+              'fixed_route_rent_label': 'నిర్ణీత రూట్ అద్దె',
+              'booking_date': 'బుకింగ్ తేదీ',
+              'confirm_booking': 'బుకింగ్\u200cను నిర్ధారించండి',
+              'status': 'స్థితి',
+              'accepted': 'ఆమోదించబడింది',
+              'rejected': 'తిరస్కరించబడింది',
+              'pending': 'వేచి ఉంది',
+              'paid': 'చెల్లించబడింది',
+              'pay_now': 'ఇప్పుడే చెల్లించండి',
+              'no_bookings': 'బుకింగ్స్ లేవు',
+              'no_bookings_message': 'మీరు ఇంకా ఎలాంటి వాహన బుకింగ్\u200cలు చేయలేదు.',
+              'booking_id': 'బుకింగ్ ID',
+              'customer_booking_requests': 'కస్టమర్ బుకింగ్ అభ్యర్థనలు',
+              'accept': 'ఆమోదించండి',
+              'reject': 'తిరస్కరించండి',
+              'no_action_needed': 'ఎలాంటి చర్య అవసరం లేదు',
+              'rate_service': 'సేవకు రేటింగ్ ఇవ్వండి',
+              'rate_booking': 'మీ బుకింగ్\u200cను రేట్ చేయండి',
+              'rate_booking_title': '⭐ మీ బుకింగ్\u200cను రేట్ చేయండి',
+              'review_optional': 'సమీక్ష (ఐచ్ఛికం)',
+              'review_placeholder': 'వాహనం మరియు యజమాని సేవ ఎలా ఉంది?',
+              'save_rating': 'రేటింగ్ సేవ్ చేయండి',
+              'rating': 'రేటింగ్',
+              'booking_success_title': 'బుకింగ్ అభ్యర్థన సమర్పించబడింది',
+              'booking_success_desc': 'మీ బుకింగ్ యజమాని ఆమోదం కోసం వేచి ఉంది.',
+              'waiting_owner_confirm': 'యజమాని నిర్ధారణ కోసం వేచి చూస్తోంది.',
+              'view_my_bookings': 'నా బుకింగ్స్ చూడండి',
+              'browse_vehicles': 'వాహనాలను బ్రౌజ్ చేయండి',
+              'track_bookings_desc': 'ప్రతి రూట్ బుకింగ్\u200cను ట్రాక్ చేయండి మరియు సేవలను రేట్ చేయండి.',
+              'booking_confirmed_badge': 'బుకింగ్ నిర్ధారించబడింది',
+              'add_vehicle': 'వాహనం జోడించండి',
+              'add_vehicle_title': '🚚 వాహనం జోడించండి',
+              'add_route': 'రూట్ జోడించండి',
+              'add_route_rent': '+ రూట్ & అద్దె జోడించండి',
+              'add_route_subtitle': 'కస్టమర్లు సులభంగా బుక్ చేసుకునేలా మీ వాహనాలకు నిర్ణీత రూట్ అద్దెను సెట్ చేయండి.',
+              'route_details': 'రూట్ వివరాలు',
+              'rent_details': 'అద్దె వివరాలు',
+              'additional_info': 'అదనపు సమాచారం',
+              'select_vehicle': 'వాహనాన్ని ఎంచుకోండి',
+              'choose_vehicle_prompt': '-- మీ వాహనాన్ని ఎంచుకోండి --',
+              'from_location': 'ప్రారంభ స్థలం / Origin',
+              'to_location': 'గమ్యస్థానం / Destination',
+              'fixed_route_rent': 'రూట్ ఆధారిత నిర్ణీత అద్దె (₹)',
+              'save_route_rent': 'రూట్ & అద్దెను సేవ్ చేయండి',
+              'save_vehicle': 'వాహనాన్ని సేవ్ చేయండి',
+              'save_changes': 'మార్పులను సేవ్ చేయండి',
+              'cancel': 'రద్దు చేయండి',
+              'route_added_success': 'రూట్ మరియు అద్దె విజయవంతంగా జోడించబడింది! ✅',
+              'add_another_route': 'మరొక రూట్ జోడించండి',
+              'my_vehicles': 'నా వాహనాలు',
+              'edit_vehicle': 'వాహనాన్ని సవరించండి',
+              'edit_vehicle_title': '✏️ వాహనాన్ని సవరించండి',
+              'vehicle_name': 'వాహనం పేరు',
+              'contact_number': 'సంప్రదింపు నంబర్',
+              'update_vehicle': 'వాహనాన్ని నవీకరించండి',
+              'delete_vehicle': 'వాహనాన్ని తొలగించండి',
+              'active_vehicles': 'యాక్టివ్ వాహనాలు',
+              'total_bookings': 'మొత్తం బుకింగ్స్',
+              'total_vehicles': 'మొత్తం వాహనాలు',
+              'pending_action': 'చర్య కోసం వేచి ఉన్నవి',
+              'accepted_bookings': 'ఆమోదించిన బుకింగ్స్',
+              'quick_actions_title': 'త్వరిత నిర్వహణ',
+              'manage_fleet': 'ఫ్లీట్ నిర్వహించండి',
+              'manage_fleet_desc': 'ఉన్న వాహనాలను వీక్షించండి, సవరించండి లేదా తొలగించండి',
+              'manage_routes_desc': 'కస్టమర్ల కోసం నిర్ణీత రూట్ ధరలను సెట్ చేయండి',
+              'owner_profile_title': 'యజమాని ప్రొఫైల్',
+              'account_status': 'ఖాతా స్థితి',
+              'active_fleet': 'యాక్టివ్ ఫ్లీట్',
+              'no_bookings_title': 'ఇంకా ఎలాంటి బుకింగ్ అభ్యర్థనలు లేవు',
+              'no_bookings_desc': 'మీ వాహనాలకు సంబంధించిన కస్టమర్ బుకింగ్\u200cలు ఇక్కడ కనిపిస్తాయి.',
+              'choose_vehicle_fleet_hint': 'మీ నమోదిత ఫ్లీట్ నుండి వాహనాన్ని ఎంచుకోండి.',
+              'starting_point_hint': 'ప్రారంభ పట్టణం, గ్రామం లేదా లోడింగ్ పాయింట్.',
+              'delivery_point_hint': 'డెలివరీ మార్కెట్, గిడ్డంగి లేదా గమ్యస్థాన పట్టణం.',
+              'total_fixed_rent_hint': 'ఈ వన్-వే రూట్ ట్రిప్ కోసం మొత్తం నిర్ణీత అద్దె.',
+              'route_open_notice': 'ఈ వాహన రూట్ తక్షణమే కస్టమర్ బుకింగ్\u200cల కోసం అందుబాటులోకి వస్తుంది.',
+              'transparent_pricing_title': 'పారదర్శక రూట్ ఆధారిత ధరలు',
+              'source_placeholder': 'ఉదాహరణ: తాడిపత్రి',
+              'destination_placeholder': 'ఉదాహరణ: అనంతపురం',
+              'rent_placeholder': 'ఉదాహరణ: 2500',
+              'vehicle_name_example': 'ఉదాహరణ: టాటా ఏస్',
+              'location_example': 'ఉదాహరణ: కాంచీపురం',
+              'demo_payment': 'డెమో చెల్లింపు',
+              'demo_payment_banner': 'డెమో చెల్లింపు — అసలు డబ్బు తీసుకోబడదు',
+              'secure_demo_payment': 'సురక్షిత డెమో చెల్లింపు',
+              'demo_payment_disclaimer': 'ఇది ప్రాజెక్ట్ డెమో లావాదేవీ మాత్రమే. అసలు డబ్బు వసూలు చేయబడదు.',
+              'amount_paid': 'చెల్లించిన మొత్తం',
+              'payment_method': 'చెల్లింపు విధానం',
+              'cardholder_name': 'కార్డ్ హోల్డర్ పేరు',
+              'upi_id': 'UPI ID',
+              'enter_cardholder_placeholder': 'డెమో కార్డ్ హోల్డర్ పేరు నమోదు చేయండి',
+              'enter_upi_placeholder': 'demo@upi',
+              'pay_amount_btn': 'మొత్తాన్ని చెల్లించండి',
+              'payment_successful': 'చెల్లింపు విజయవంతమైంది',
+              'payment_success_desc': 'ఈ డెమో చెల్లింపు విజయవంతంగా పూర్తయింది మరియు సిస్టమ్\u200cలో నమోదు చేయబడింది.',
+              'transaction_reference': 'లావాదేవీ రిఫరెన్స్',
+              'date': 'తేదీ',
+              'view_receipt': 'రసీదు చూడండి',
+              'download_receipt': 'రసీదు డౌన్\u200cలోడ్ చేయండి',
+              'view_booking': 'బుకింగ్ చూడండి',
+              'upload_leaf_image': 'ఆకు చిత్రాన్ని అప్\u200cలోడ్ చేయండి',
+              'analyze_leaf': 'ఆకును విశ్లేషించండి',
+              'drag_leaf_image': 'ఆకు ఫోటోను ఇక్కడ ఎంచుకోండి లేదా డ్రాగ్ చేయండి',
+              'image_format_limit': 'JPG, JPEG, PNG లేదా WEBP • గరిష్టంగా 10 MB',
+              'ai_assistant_intro': 'స్పష్టమైన పంట ఆకు ఫోటోను అప్\u200cలోడ్ చేయండి మరియు సాధ్యమయ్యే వ్యాధి, లక్షణాలు '
+                                    'మరియు నివారణ మార్గదర్శకాలను AI ద్వారా తెలుసుకోండి.',
+              'photo_tips': 'మంచి ఫలితాల కోసం, మంచి వెలుతురులో వ్యాధి సోకిన భాగాన్ని స్పష్టంగా ఫోటో తీయండి.',
+              'analysis_result': 'విశ్లేషణ ఫలితం',
+              'ai_assisted_notice': 'అప్\u200cలోడ్ చేసిన చిత్రం ఆధారంగా AI అందించిన ఫలితం.',
+              'possible_disease': 'సాధ్యమయ్యే వ్యాధి',
+              'crop': 'పంట',
+              'confidence': 'ఖచ్చితత్వం',
+              'symptoms': 'లక్షణాలు',
+              'possible_causes': 'సాధ్యమయ్యే కారణాలు',
+              'treatment_management': 'చికిత్స / నిర్వహణ',
+              'prevention': 'నివారణ',
+              'immediate_steps': 'తక్షణ చర్యలు',
+              'expert_advice': 'నిపుణుల సలహా',
+              'ask_ai_assistant': 'AI సహాయకుడిని అడగండి',
+              'followup_prompt_desc': 'విశ్లేషించిన ఆకు, లక్షణాలు లేదా పంట సంరక్షణ గురించి ప్రశ్నలు అడగండి.',
+              'safety_notice': 'భద్రతా సూచన',
+              'safety_notice_desc': 'ఈ AI విద్యాపరమైన మార్గదర్శకత్వాన్ని మాత్రమే అందిస్తుంది. క్రిమిసంహారక మందుల '
+                                    'వినియోగానికి స్థానిక వ్యవసాయ అధికారులను సంప్రదించండి.',
+              'chat_placeholder': 'మీ వ్యవసాయ ప్రశ్నను ఇక్కడ టైప్ చేయండి...',
+              'send': 'పంపండి',
+              'q_disease': 'ఇది ఏ వ్యాధి?',
+              'q_todo': 'నేను ఇప్పుడు ఏమి చేయాలి?',
+              'q_prevent': 'దీనిని ఎలా నివారించాలి?',
+              'q_telugu': 'తెలుగులో వివరించండి',
+              'q_tamil': 'తమిళంలో వివరించండి',
+              'q_hindi': 'హిందీలో వివరించండి',
+              'analyzing': 'ఆకు చిత్రాన్ని విశ్లేషిస్తోంది...',
+              'ai_thinking': 'AI సలహాను రూపొందిస్తోంది...',
+              'no_leaf_analyzed_yet': 'AI నిర్ధారణ చూడటానికి పైన ఆకు ఫోటోను అప్\u200cలోడ్ చేయండి.',
+              'admin': 'అడ్మిన్',
+              'customers': 'కస్టమర్లు',
+              'owners': 'యజమానులు',
+              'payments': 'చెల్లింపులు',
+              'ratings_reviews': 'రేటింగ్\u200cలు & సమీక్షలు',
+              'overview': 'అవలోకనం',
+              'enterprise_operations': 'నిర్వహణ కార్యకలాపాలు',
+              'live_db_connected': 'లైవ్ డేటాబేస్ కనెక్ట్ చేయబడింది',
+              'admin_management_desc': 'ప్రత్యక్ష పరిపాలనా నిర్వహణ మరియు రికార్డులు.',
+              'recent_bookings': 'ఇటీవలి బుకింగ్స్',
+              'no_bookings_found': 'బుకింగ్స్ కనుగొనబడలేదు.',
+              'no_records_found': 'రికార్డులు కనుగొనబడలేదు.',
+              'search': 'శోధించండి',
+              'filter': 'ఫిల్టర్',
+              'all_statuses': 'అన్ని స్థితులు',
+              'active': 'యాక్టివ్',
+              'inactive': 'ఇన్\u200cయాక్టివ్',
+              'activate': 'యాక్టివేట్ చేయండి',
+              'deactivate': 'డీయాక్టివేట్ చేయండి',
+              'update_status': 'స్థితిని నవీకరించండి',
+              'read_only_view': 'పరిపాలనా వీక్షణ మాత్రమే.',
+              'registration_success': 'నమోదు విజయవంతమైంది! మీరు ఇప్పుడు లాగిన్ అవ్వవచ్చు.',
+              'login_successful': 'లాగిన్ విజయవంతమైంది.',
+              'logout_successful': 'మీరు లాగ్అవుట్ అయ్యారు.',
+              'invalid_credentials': 'ఇమెయిల్ లేదా పాస్\u200cవర్డ్ తప్పు.',
+              'invalid_customer_login': 'మొబైల్ నంబర్ లేదా పాస్\u200cవర్డ్ తప్పు.',
+              'invalid_owner_login': 'ఇమెయిల్ లేదా పాస్\u200cవర్డ్ తప్పు.',
+              'invalid_admin_login': 'అడ్మిన్ యూజర్\u200cనేమ్ లేదా పాస్\u200cవర్డ్ తప్పు.',
+              'email_already_registered': 'ఈ ఇమెయిల్ చిరునామా ఇప్పటికే నమోదు చేయబడింది. దయచేసి వేరే ఇమెయిల్\u200cను '
+                                          'ఉపయోగించండి లేదా సైన్ ఇన్ చేయండి.',
+              'mobile_already_registered': 'ఈ మొబైల్ నంబర్ ఇప్పటికే నమోదు చేయబడింది. దయచేసి వేరే నంబర్\u200cను '
+                                           'ఉపయోగించండి లేదా సైన్ ఇన్ చేయండి.',
+              'valid_email_err': 'సరైన ఇమెయిల్ చిరునామాను నమోదు చేయండి.',
+              'valid_phone_err': 'సరైన 10 అంకెల మొబైల్ నంబర్\u200cను నమోదు చేయండి.',
+              'password_length_err': 'పాస్\u200cవర్డ్ 8 నుండి 128 అక్షరాల వరకు ఉండాలి.',
+              'passwords_dont_match': 'పాస్\u200cవర్డ్\u200cలు సరిపోలడం లేదు.',
+              'booking_date_past_err': 'గత తేదీలలో బుకింగ్ చేయలేరు.',
+              'select_valid_date_err': 'దయచేసి సరైన బుకింగ్ తేదీని ఎంచుకోండి.',
+              'select_valid_route_err': 'దయచేసి బుకింగ్ చేయడానికి ముందు సరైన రూట్\u200cను ఎంచుకోండి.',
+              'duplicate_booking_err': 'ఈ తేదీన ఈ వాహనానికి మీ వద్ద ఇప్పటికే బుకింగ్ అభ్యర్థన ఉంది.',
+              'booking_created_success': 'బుకింగ్ అభ్యర్థన విజయవంతంగా సమర్పించబడింది! యజమాని ఆమోదం కోసం వేచి ఉంది.',
+              'booking_status_updated': 'బుకింగ్ స్థితి నవీకరించబడింది.',
+              'booking_status_update_err': 'బుకింగ్ స్థితిని నవీకరించడం సాధ్యం కాలేదు. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+              'only_pending_can_change': 'పెండింగ్\u200cలో ఉన్న బుకింగ్\u200cల స్థితిని మాత్రమే మార్చగలరు.',
+              'select_rating_err': 'దయచేసి 1 నుండి 5 నక్షత్రాల మధ్య రేటింగ్\u200cను ఎంచుకోండి.',
+              'rating_saved': 'ధన్యవాదాలు! మీ రేటింగ్ మరియు సమీక్ష సేవ్ చేయబడ్డాయి.',
+              'demo_payment_success': 'డెమో చెల్లింపు విజయవంతంగా పూర్తయింది. నిర్ధారణ ఇమెయిల్ పంపబడింది.',
+              'demo_payment_success_no_mail': 'డెమో చెల్లింపు విజయవంతంగా పూర్తయింది. చెల్లింపు రికార్డ్ చేయబడింది.',
+              'demo_payment_failed': 'డెమో చెల్లింపు ప్రాసెసింగ్ విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+              'valid_payment_method_err': 'దయచేసి సరైన చెల్లింపు పద్ధతిని ఎంచుకోండి.',
+              'cardholder_name_err': 'దయచేసి డెమో కార్డు కోసం కార్డుదారుని పేరు నమోదు చేయండి.',
+              'upi_id_err': 'దయచేసి చెల్లింపు కోసం డెమో UPI IDని నమోదు చేయండి.',
+              'vehicle_added_success': 'వాహనం విజయవంతంగా జోడించబడింది! ఇప్పుడు మీరు రూట్లు మరియు అద్దెను సెట్ '
+                                       'చేయవచ్చు.',
+              'vehicle_updated_success': 'వాహనం వివరాలు విజయవంతంగా నవీకరించబడ్డాయి.',
+              'vehicle_deleted_success': 'వాహనం విజయవంతంగా తొలగించబడింది.',
+              'access_denied': 'అనుమతి నిరాకరించబడింది: మీరు మీ స్వంత వాహనాలు మరియు రూట్లను మాత్రమే నిర్వహించగలరు.',
+              'invalid_csrf_token': 'చెల్లని CSRF టోకెన్. దయచేసి పేజీని రీఫ్రెష్ చేసి మళ్ళీ ప్రయత్నించండి.',
+              'error_404_title': '404 - పేజీ కనుగొనబడలేదు',
+              'error_404_desc': 'మీరు వెతుకుతున్న పేజీ ఉనికిలో లేదు లేదా తరలించబడింది.',
+              'error_500_title': '500 - సర్వర్ లోపం',
+              'error_500_desc': 'అనుకోని లోపం సంభవించింది. దయచేసి కాసేపటి తర్వాత మళ్ళీ ప్రయత్నించండి.'},
+    'ta': {
+        'admin_login_badge': 'நிர்வாக உள்நுழைவு',
+        'username': 'பயனர்பெயர்',
+        'accepted_bookings_desc': 'உறுதிப்படுத்தப்பட்ட முன்பதிவுகள்',
+        'action': 'நடவடிக்கை',
+        'action_col': 'நடவடிக்கை',
+        'active_vehicles_desc': 'செயலில் உள்ள வழிகளுடன் தயாராக உள்ளது',
+        'ai_assisted_result_sub': 'பதிவேற்றிய படத்தின் அடிப்படையில் AI உதவி முடிவு.',
+        'ai_chat_welcome': 'வணக்கம்! மேலே உள்ள இலை படத்தை பதிவேற்றி, முடிவு பற்றி என்னிடம் கேள்விகள் கேளுங்கள்.',
+        'ai_disclaimer_note': 'கோரப்பட்ட AI உதவியை வழங்க மட்டுமே உங்கள் படம் பகுப்பாய்வு செய்யப்படுகிறது. முடிவை உத்தரவாதமான நோயறிதலாகப் பயன்படுத்த வேண்டாம்.',
+        'ai_disclaimer_short': 'AI முடிவுகள் தகவல் நோக்கங்களுக்காக மட்டுமே மற்றும் விவசாய நிபுணர்களுடன் சரிபார்க்கப்பட வேண்டும்.',
+        'ai_service_not_configured': 'AI சேவை இன்னும் கட்டமைக்கப்படவில்லை. உங்கள் .env கோப்பில் AI_API_KEY ஐச் சேர்த்து, பிளாஸ்க்கை மறுதொடக்கம் செய்யவும்.',
+        'amount': 'தொகை',
+        'ask_ai_sub': 'பகுப்பாய்வு செய்யப்பட்ட இலை, அறிகுறிகள், தடுப்பு அல்லது பொதுவான பயிர் பராமரிப்பு பற்றி கேளுங்கள்.',
+        'ask_followup_questions': 'பின்தொடர்தல் கேள்விகளைக் கேளுங்கள்',
+        'booking_id_col': 'முன்பதிவு ID',
+        'chip_disease_label': 'இது என்ன நோய்?',
+        'chip_disease_query': 'இந்த இலையில் என்ன நோய் இருக்கக்கூடும்?',
+        'chip_lang_label': 'தமிழில் விளக்குங்கள்',
+        'chip_lang_query': 'இதை தமிழில் விரிவாகவும் தெளிவாகவும் விளக்குங்கள்.',
+        'chip_prevent_label': 'இதை எவ்வாறு தடுப்பது?',
+        'chip_prevent_query': 'இந்த பிரச்சினை பரவாமல் எவ்வாறு தடுப்பது?',
+        'chip_steps_label': 'இப்போது நான் என்ன செய்ய வேண்டும்?',
+        'chip_steps_query': 'இந்த பயிர் சிக்கலை நிர்வகிக்க இப்போது நான் என்ன செய்ய வேண்டும்?',
+        'choose_or_drag_photo': 'இங்கே இலை புகைப்படத்தைத் தேர்ந்தெடுக்கவும் அல்லது இழுக்கவும்',
+        'contact_expert': 'நிபுணரை எப்போது தொடர்பு கொள்ள வேண்டும்',
+        'demo_card': 'டெமோ அட்டை',
+        'demo_simulation_notice': 'உருவகப்படுத்துதல் மட்டுமே: இந்த டெமோ கட்டணம் எந்த உண்மையான அட்டை, வங்கி அல்லது UPI தரவையும் செயலாக்காது.',
+        'demo_upi': 'டெமோ UPI',
+        'demo_upi_id': 'டெமோ UPI ID',
+        'enter_cardholder_name': 'டெமோ அட்டைதாரர் பெயரை உள்ளிடவும்',
+        'enter_demo_upi_id': 'demo@upi',
+        'farmer_ai_desc': 'தெளிவான பயிர் இலை புகைப்படத்தைப் பதிவேற்றி சாத்தியமான நோய், அறிகுறிகள், பாதுகாப்பான மேலாண்மை படிகள் மற்றும் தடுப்பு வழிகாட்டுதலைப் பெறுங்கள்.',
+        'file_format_limit': 'JPG, JPEG, PNG அல்லது WEBP • அதிகபட்சம் 10 MB',
+        'fleet_management': 'வாகனக் குழு மேலாண்மை',
+        'fleet_overview': 'வாகனக் குழு கண்ணோட்டம்',
+        'id': 'ID',
+        'image_based_analysis': 'பட அடிப்படையிலான பகுப்பாய்வு',
+        'not_specified': 'குறிப்பிடப்படவில்லை',
+        'owner_hero_subtitle': 'உங்கள் வாகனங்கள், வழிகளை நிர்வகிக்கவும் வாடிக்கையாளர் முன்பதிவு கோரிக்கைகளுக்கு பதிலளிக்கவும்.',
+        'owner_tagline': 'விவசாயிகளுக்கு • வணிகர்களுக்கு • உங்கள் சேவையில்',
+        'pay': 'செலுத்துங்கள்',
+        'payment_col': 'கட்டணம்',
+        'payment_summary': 'கட்டண சுருக்கம்',
+        'pending_actions_desc': 'உறுதிப்படுத்தல் தேவை',
+        'pending_review_banner': 'முன்பதிவு கோரிக்கை(கள்) உங்கள் உடனடி மதிப்பாய்வு மற்றும் நடவடிக்கை தேவை.',
+        'pending_review_hint': 'வாடிக்கையாளர், வழி, தேதி மற்றும் வாடகையை கீழே மதிப்பாய்வு செய்து, ஏற்றுக்கொள் அல்லது நிராகரி என்பதைக் கிளிக் செய்யவும்.',
+        'processing': 'செயலாக்குகிறது...',
+        'processing_demo_payment': 'டெமோ கட்டணம் செயலாக்கப்படுகிறது...',
+        'profile': 'உரிமையாளர் சுயவிவரம்',
+        'ready_when_you_are': 'நீங்கள் தயாராக இருக்கும்போது',
+        'route_col': 'வழி',
+        'route_pricing': 'வழி அடிப்படையிலான விலை',
+        'route_pricing_desc': 'வெளிப்படையான மற்றும் நியாயமான கட்டணங்கள்',
+        'secure_desc': 'உங்கள் நம்பிக்கையே எங்கள் முன்னுரிமை',
+        'secure_reliable': 'பாதுகாப்பானது & நம்பகமானது',
+        'sidebar_dashboard': 'டாஷ்போர்டு',
+        'start_moving': 'உங்கள் அடுத்த சரக்கு போக்குவரத்தைத் தொடங்குங்கள்.',
+        'support_247': '24/7 ஆதரவு',
+        'support_desc': 'உதவ நாங்கள் எப்போதும் தயாராக இருக்கிறோம்',
+        'symptoms_explanation': 'அறிகுறிகள் & காட்சி விளக்கம்',
+        'total_bookings_desc': 'அனைத்து நேர முன்பதிவுகள்',
+        'total_due': 'மொத்த நிலுவை',
+        'total_vehicles_desc': 'பதிவுசெய்யப்பட்ட வாகனங்கள்',
+        'type_question_placeholder': 'உங்கள் விவசாய கேள்வியை இங்கே தட்டச்சு செய்யவும்...',
+        'upload_another_image': 'மற்றொரு படத்தைப் பதிவேற்றவும்',
+        'upload_leaf_tip': 'சிறந்த முடிவுகளுக்கு, பாதிக்கப்பட்ட பகுதி தெளிவாகத் தெரியும் வகையில் நல்ல பகல் வெளிச்சத்தில் ஒரு இலையைப் புகைப்படம் எடுக்கவும்.',
+        'vehicle': 'வாகனம்',
+        'vehicle_col': 'வாகனம்',
+        'view_all_bookings': 'வாகன பட்டியல்',
+        'wide_range': 'பரந்த வாகன வரம்பு',
+        'wide_range_desc': 'சிறிய வாகனங்கள் முதல் கனரக வாகனங்கள் வரை',   'language': 'மொழி',
+              'english': 'English',
+              'telugu': 'తెలుగు',
+              'tamil': 'தமிழ்',
+              'hindi': 'हिन्दी',
+              'vehicle_booking': 'வணிக வாகன முன்பதிவு',
+              'tagline': 'விவசாயிகளுக்கு • வணிகர்களுக்கு • உங்கள் சேவையில்',
+              'home': 'முகப்பு',
+              'vehicles': 'வாகனங்கள்',
+              'available_vehicles': 'கிடைக்கும் வாகனங்கள்',
+              'my_bookings': 'எனது முன்பதிவுகள்',
+              'dashboard': 'டாஷ்போர்டு',
+              'owner_dashboard': 'உரிமையாளர் டாஷ்போர்டு',
+              'admin_dashboard': 'நிர்வாக டாஷ்போர்டு',
+              'control_center': 'கட்டுப்பாட்டு மையம்',
+              'security_clearance': 'பாதுகாப்பு அனுமதி',
+              'farmer_ai': 'விவசாயி AI',
+              'farmer_ai_assistant': 'விவசாயி AI பயிர் நோய் உதவியாளர்',
+              'customer': 'வாடிக்கையாளர்',
+              'customer_login': 'வாடிக்கையாளர் உள்நுழைவு',
+              'owner_login': 'வாகன உரிமையாளர் உள்நுழைவு',
+              'admin_login': 'நிர்வாக உள்நுழைவு',
+              'book_vehicle': 'வாகனம் முன்பதிவு செய்',
+              'login': 'உள்நுழை',
+              'register': 'பதிவு செய்',
+              'customer_registration': 'வாடிக்கையாளர் பதிவு',
+              'owner_registration': 'வாகன உரிமையாளர் பதிவு',
+              'logout': 'வெளியேறு',
+              'welcome': 'வரவேற்கிறோம்',
+              'back_home': 'முகப்பிற்கு திரும்பு',
+              'back_to_vehicles': 'வாகனங்கள் பட்டியலுக்கு திரும்பு',
+              'back_to_dashboard': 'டாஷ்போர்டிற்கு திரும்பு',
+              'back_to_public': 'பொது தளத்திற்கு திரும்பு',
+              'mobile_number': 'கைபேசி எண்',
+              'customer_name': 'வாடிக்கையாளர் பெயர்',
+              'owner_name': 'உரிமையாளர் பெயர்',
+              'registered_email': 'பதிவுசெய்த மின்னஞ்சல்',
+              'email_address': 'மின்னஞ்சல் முகவரி',
+              'email': 'மின்னஞ்சல்',
+              'phone': 'தொலைபேசி',
+              'phone_number': 'தொலைபேசி எண்',
+              'password': 'கடவுச்சொல்',
+              'confirm_password': 'கடவுச்சொல்லை உறுதிப்படுத்துக',
+              'forgot_password': 'கடவுச்சொல் மறந்துவிட்டதா?',
+              'reset_password': 'கடவுச்சொல்லை மீட்டமை',
+              'set_new_password': 'புதிய கடவுச்சொல்லை அமைக்கவும்',
+              'new_password': 'புதிய கடவுச்சொல்',
+              'send_reset_link': 'மீட்டமைப்பு இணைப்பை அனுப்புக',
+              'back_to_customer_login': 'வாடிக்கையாளர் உள்நுழைவுக்கு திரும்பு',
+              'enter_registered_email': 'உங்கள் பதிவுசெய்த மின்னஞ்சலை உள்ளிடவும்.',
+              'login_mobile': 'உங்கள் கைபேசி எண்ணைப் பயன்படுத்தி உள்நுழையவும்.',
+              'create_account': 'உங்கள் கணக்கை உருவாக்கவும்',
+              'choose_account_type': 'வணிக வாகன முன்பதிவை எவ்வாறு பயன்படுத்த விரும்புகிறீர்கள் என்பதைத் '
+                                     'தேர்ந்தெடுக்கவும்',
+              'for_customers': 'விவசாயிகள் மற்றும் வணிக வாடிக்கையாளர்களுக்கு',
+              'for_owners': 'வணிக வாகன உரிமையாளர்களுக்கு',
+              'customer_desc': 'உங்கள் போக்குவரத்து தேவைகளுக்கு நம்பகமான வணிக வாகனங்களை கண்டறிந்து முன்பதிவு '
+                               'செய்யுங்கள்.',
+              'owner_desc': 'உங்கள் வணிக வாகனங்களை பதிவுசெய்து வாடிக்கையாளர்களிடமிருந்து முன்பதிவு கோரிக்கைகளைப் '
+                            'பெறுங்கள்.',
+              'register_as_customer': 'வாடிக்கையாளராக பதிவு செய்க',
+              'customer_sign_in': 'வாடிக்கையாளர் உள்நுழைவு',
+              'register_as_owner': 'வாகன உரிமையாளராக பதிவு செய்க',
+              'owner_sign_in': 'வாகன உரிமையாளர் உள்நுழைவு',
+              'new_vehicle_owner': 'புதிய வாகன உரிமையாளரா?',
+              'already_an_owner': 'ஏற்கனவே உரிமையாளர் கணக்கு உள்ளதா?',
+              'already_have_account': 'ஏற்கனவே கணக்கு உள்ளதா?',
+              'new_customer': 'புதிய வாடிக்கையாளரா?',
+              'sign_in_here': 'இங்கே உள்நுழையவும்',
+              'register_here': 'இங்கே பதிவு செய்யவும்',
+              'enter_owner_name_placeholder': 'உரிமையாளர் அல்லது வணிகப் பெயரை உள்ளிடவும்',
+              'enter_phone_placeholder': '10 இலக்க கைபேசி எண்ணை உள்ளிடவும்',
+              'enter_owner_email_placeholder': 'owner@example.com (உள்நுழைவு மற்றும் அறிவிப்புகளுக்கு)',
+              'enter_password_placeholder': 'கடவுச்சொல்லை உள்ளிடவும் (குறைந்தது 8 எழுத்துக்கள்)',
+              'enter_admin_username': 'நிர்வாக பயனர் பெயரை உள்ளிடவும்',
+              'enter_admin_password': 'நிர்வாக கடவுச்சொல்லை உள்ளிடவும்',
+              'admin_login_desc': 'தள மேலாண்மை மற்றும் செயல்பாடுகளை அணுக உள்நுழையவும்.',
+              'admin_copyright': '© 2026 வணிக வாகன முன்பதிவு • நிர்வாக அமைப்புகள்',
+              'heavy_vehicles_title': 'வளமான எதிர்காலத்திற்கான கனரக வாகனங்கள்',
+              'book_vehicles_ease': 'எளிதாக வணிக வாகனங்களை முன்பதிவு செய்யுங்கள்',
+              'hero_subtitle': 'விவசாயிகளையும் வணிகர்களையும் நம்பகமான வாகனங்களுடன் இணைக்கிறோம்.',
+              'explore_vehicles': 'வாகனங்களை ஆராயுங்கள்',
+              'try_farmer_ai': 'விவசாயி AI-யை முயற்சிக்கவும்',
+              'smart_farming_support': 'ஸ்மார்ட் விவசாய உதவி',
+              'how_it_works': 'எவ்வாறு செயல்படுகிறது',
+              'choose_vehicle': 'வாகனத்தை தேர்வு செய்க',
+              'select_date': 'தேதியை தேர்வு செய்க',
+              'confirm': 'உறுதிப்படுத்துக',
+              'vehicle_types': 'வாகன வகைகள்',
+              'tractor': 'டிராக்டர்',
+              'mini_truck': 'மினி டிரக்',
+              'pickup': 'பிக்கப்',
+              'lorry': 'லாரி',
+              'goods_auto': 'சரக்கு ஆட்டோ',
+              'tractor_desc': 'விவசாய மற்றும் சரக்கு போக்குவரத்திற்கு ஏற்றது.',
+              'mini_truck_desc': 'சிறிய மற்றும் நடுத்தர சுமைகளுக்கு ஏற்றது.',
+              'pickup_desc': 'உள்ளூர் போக்குவரத்திற்கு வசதியானது.',
+              'lorry_desc': 'பெரிய சுமைகளை ஏற்றிச் செல்ல சிறந்தது.',
+              'goods_auto_desc': 'விரைவான உள்ளூர் சரக்கு போக்குவரத்திற்கு சிறந்தது.',
+              'simple_fast_easy': 'எளிமை • வேகம் • பாதுகாப்பு',
+              'transportation_message': 'உங்கள் தேவைக்கேற்ப சரியான வாகனத்தை உடனே முன்பதிவு செய்யுங்கள்.',
+              'footer_message': 'அனைவருக்கும் எளிதான போக்குவரத்து சேவை.',
+              'vehicle_type': 'வாகன வகை',
+              'location': 'இடம்',
+              'from': 'புறப்படும் இடம்',
+              'to': 'சேருமிடம்',
+              'rent': 'வாடகை',
+              'contact': 'தொடர்பு',
+              'book_now': 'இப்போதே முன்பதிவு செய்க',
+              'no_vehicles': 'வாகனங்கள் எதுவும் கிடைக்கவில்லை',
+              'no_vehicles_message': 'தற்போது முன்பதிவு செய்ய வாகனங்கள் எதுவும் இல்லை.',
+              'search_placeholder': 'பெயர், வழி அல்லது இடத்தை தேடுங்கள்',
+              'location_placeholder': 'இடம் அல்லது நகரம்',
+              'all_vehicle_types': 'அனைத்து வாகன வகைகள்',
+              'min_rent': 'குறைந்தபட்ச வாடகை (₹)',
+              'max_rent': 'அதிகபட்ச வாடகை (₹)',
+              'apply_filters': 'வடிகட்டிகளைப் பயன்படுத்து',
+              'reset_filters': 'வடிகட்டிகளை மீட்டமை',
+              'view_details': 'விவரங்களைக் காண்க',
+              'book_this_vehicle': 'இந்த வாகனத்தை முன்பதிவு செய்க',
+              'available_routes_rent': 'கிடைக்கும் வழிகள் & நிலையான வாடகை',
+              'base_location': 'முதன்மை இருப்பிடம்',
+              'current_location_label': 'தற்போதைய / முதன்மை இடம்',
+              'capacity_weight': 'சுமை திறன்',
+              'availability_status': 'கிடைக்கும் நிலை',
+              'available_ready': 'கிடைக்கிறது (முன்பதிவுக்கு தயார்)',
+              'route_label': 'பயண வழி',
+              'fixed_route_rent_label': 'நிலையான வழி வாடகை',
+              'booking_date': 'முன்பதிவு தேதி',
+              'confirm_booking': 'முன்பதிவை உறுதிப்படுத்துக',
+              'status': 'நிலை',
+              'accepted': 'ஏற்றுக்கொள்ளப்பட்டது',
+              'rejected': 'நிராகரிக்கப்பட்டது',
+              'pending': 'நிலுவையில் உள்ளது',
+              'paid': 'செலுத்தப்பட்டது',
+              'pay_now': 'இப்போது செலுத்தவும்',
+              'no_bookings': 'முன்பதிவுகள் இல்லை',
+              'no_bookings_message': 'நீங்கள் இன்னும் எந்த வாகனத்தையும் முன்பதிவு செய்யவில்லை.',
+              'booking_id': 'முன்பதிவு எண்',
+              'customer_booking_requests': 'வாடிக்கையாளர் முன்பதிவு கோரிக்கைகள்',
+              'accept': 'ஏற்றுக்கொள்',
+              'reject': 'நிராகரி',
+              'no_action_needed': 'எந்த நடவடிக்கையும் தேவையில்லை',
+              'rate_service': 'மதிப்பீடு செய்க',
+              'rate_booking': 'உங்கள் முன்பதிவை மதிப்பிடுங்கள்',
+              'rate_booking_title': '⭐ உங்கள் முன்பதிவை மதிப்பிடுங்கள்',
+              'review_optional': 'கருத்து (விருப்பத்தேர்வு)',
+              'review_placeholder': 'வாகனம் மற்றும் உரிமையாளர் சேவை எவ்வாறு இருந்தது?',
+              'save_rating': 'மதிப்பீட்டை சேமி',
+              'rating': 'மதிப்பீடு',
+              'booking_success_title': 'முன்பதிவு கோரிக்கை சமர்ப்பிக்கப்பட்டது',
+              'booking_success_desc': 'உங்கள் முன்பதிவு உரிமையாளர் உறுதிப்படுத்தலுக்கு காத்திருக்கிறது.',
+              'waiting_owner_confirm': 'உரிமையாளர் ஒப்புதலுக்காக காத்திருக்கிறது.',
+              'view_my_bookings': 'எனது முன்பதிவுகளைக் காண்க',
+              'browse_vehicles': 'வாகனங்களை உலாவுங்கள்',
+              'track_bookings_desc': 'ஒவ்வொரு முன்பதிவையும் கண்காணித்து சேவையை மதிப்பிடுங்கள்.',
+              'booking_confirmed_badge': 'முன்பதிவு உறுதி செய்யப்பட்டது',
+              'add_vehicle': 'வாகனம் சேர்க்க',
+              'add_vehicle_title': '🚚 வாகனம் சேர்க்க',
+              'add_route': 'வழித்தடத்தை சேர்க்க',
+              'add_route_rent': '+ வழித்தடம் & வாடகையை சேர்க்க',
+              'add_route_subtitle': 'வாடிக்கையாளர்கள் எளிதில் முன்பதிவு செய்ய உங்கள் வாகனங்களுக்கு நிலையான வாடகையை '
+                                    'அமைக்கவும்.',
+              'route_details': 'வழித்தட விவரங்கள்',
+              'rent_details': 'வாடகை விவரங்கள்',
+              'additional_info': 'கூடுதல் தகவல்கள்',
+              'select_vehicle': 'வாகனத்தை தேர்வு செய்க',
+              'choose_vehicle_prompt': '-- உங்கள் வாகனத்தை தேர்வு செய்க --',
+              'from_location': 'புறப்படும் இடம் / Origin',
+              'to_location': 'சேருமிடம் / Destination',
+              'fixed_route_rent': 'வழித்தட நிலையான வாடகை (₹)',
+              'save_route_rent': 'வழித்தடம் & வாடகையை சேமிக்க',
+              'save_vehicle': 'வாகனத்தை சேமிக்க',
+              'save_changes': 'மாற்றங்களைச் சேமிக்கவும்',
+              'cancel': 'ரத்து செய்',
+              'route_added_success': 'வழித்தடம் மற்றும் வாடகை வெற்றிகரமாக சேர்க்கப்பட்டது! ✅',
+              'add_another_route': 'மற்றொரு வழியைச் சேர்க்கவும்',
+              'my_vehicles': 'எனது வாகனங்கள்',
+              'edit_vehicle': 'வாகனத்தை திருத்து',
+              'edit_vehicle_title': '✏️ வாகனத்தை திருத்து',
+              'vehicle_name': 'வாகனத்தின் பெயர்',
+              'contact_number': 'தொடர்பு எண்',
+              'update_vehicle': 'வாகனத்தை புதுப்பிக்கவும்',
+              'delete_vehicle': 'வாகனத்தை நீக்கு',
+              'active_vehicles': 'செயலில் உள்ள வாகனங்கள்',
+              'total_bookings': 'மொத்த முன்பதிவுகள்',
+              'total_vehicles': 'மொத்த வாகனங்கள்',
+              'pending_action': 'நிலுவை நடவடிக்கைகள்',
+              'accepted_bookings': 'ஏற்றுக்கொள்ளப்பட்ட முன்பதிவுகள்',
+              'quick_actions_title': 'விரைவு மேலாண்மை',
+              'manage_fleet': 'வாகனங்களை நிர்வகிக்க',
+              'manage_fleet_desc': 'இருக்கும் வாகனங்களை பார்க்க, திருத்த அல்லது நீக்க',
+              'manage_routes_desc': 'வாடிக்கையாளர்களுக்கான நிலையான வழி விலைகளை அமைக்கவும்',
+              'owner_profile_title': 'உரிமையாளர் சுயவிவரம்',
+              'account_status': 'கணக்கு நிலை',
+              'active_fleet': 'செயலில் உள்ள வாகனங்கள்',
+              'no_bookings_title': 'முன்பதிவு கோரிக்கைகள் எதுவும் இல்லை',
+              'no_bookings_desc': 'உங்கள் வாகனங்களுக்கான வாடிக்கையாளர் முன்பதிவுகள் இங்கே தோன்றும்.',
+              'choose_vehicle_fleet_hint': 'உங்கள் பதிவுசெய்யப்பட்ட வாகனங்களில் ஒன்றைத் தேர்ந்தெடுக்கவும்.',
+              'starting_point_hint': 'புறப்படும் நகரம், கிராமம் அல்லது ஏற்றும் இடம்.',
+              'delivery_point_hint': 'இறக்கும் சந்தை, கிடங்கு அல்லது இலக்கு நகரம்.',
+              'total_fixed_rent_hint': 'இந்த ஒருவழி பயணத்திற்கான மொத்த நிலையான வாடகை.',
+              'route_open_notice': 'இந்த வழித்தடம் உடனடியாக வாடிக்கையாளர் முன்பதிவுக்கு திறக்கப்படும்.',
+              'transparent_pricing_title': 'வெளிப்படையான வழித்தட விலை நிர்ணயம்',
+              'source_placeholder': 'உதாரணம்: தாடிபத்ரி',
+              'destination_placeholder': 'உதாரணம்: அனந்தபூர்',
+              'rent_placeholder': 'உதாரணம்: 2500',
+              'vehicle_name_example': 'உதாரணம்: டாடா ஏஸ்',
+              'location_example': 'உதாரணம்: காஞ்சிபுரம்',
+              'demo_payment': 'டெமோ கட்டணம்',
+              'demo_payment_banner': 'டெமோ கட்டணம் — உண்மையான பணம் கழிக்கப்படாது',
+              'secure_demo_payment': 'பாதுகாப்பான டெமோ கட்டணம்',
+              'demo_payment_disclaimer': 'இது திட்ட டெமோ பரிவர்த்தனை மட்டுமே. உண்மையான பணம் வசூலிக்கப்படாது.',
+              'amount_paid': 'செலுத்தப்பட்ட தொகை',
+              'payment_method': 'கட்டண முறை',
+              'cardholder_name': 'கார்டு வைத்திருப்பவர் பெயர்',
+              'upi_id': 'UPI ID',
+              'enter_cardholder_placeholder': 'டெமோ கார்டு வைத்திருப்பவர் பெயரை உள்ளிடவும்',
+              'enter_upi_placeholder': 'demo@upi',
+              'pay_amount_btn': 'தொகையை செலுத்தவும்',
+              'payment_successful': 'கட்டணம் வெற்றிகரமாக செலுத்தப்பட்டது',
+              'payment_success_desc': 'இந்த டெமோ கட்டணம் வெற்றிகரமாக நிறைவடைந்து கணினியில் பதிவு செய்யப்பட்டுள்ளது.',
+              'transaction_reference': 'பரிவர்த்தனை குறிப்பு எண்',
+              'date': 'தேதி',
+              'view_receipt': 'ரசீதை பார்க்க',
+              'download_receipt': 'ரசீதை பதிவிறக்கம் செய்ய',
+              'view_booking': 'முன்பதிவை பார்க்க',
+              'upload_leaf_image': 'இலை படத்தை பதிவேற்றவும்',
+              'analyze_leaf': 'இலையை பகுப்பாய்வு செய்க',
+              'drag_leaf_image': 'இலை புகைப்படத்தை இங்கே தேர்வு செய்யவும் அல்லது இழுத்து விடவும்',
+              'image_format_limit': 'JPG, JPEG, PNG அல்லது WEBP • அதிகபட்சம் 10 MB',
+              'ai_assistant_intro': 'பயிர் இலையின் தெளிவான புகைப்படத்தை பதிவேற்றி, சாத்தியமான நோய், அறிகுறிகள் மற்றும் '
+                                    'தடுப்பு வழிகாட்டுதலை AI மூலம் பெறுங்கள்.',
+              'photo_tips': 'சிறந்த முடிவுகளுக்கு, பாதிக்கப்பட்ட பகுதியை நல்ல வெளிச்சத்தில் தெளிவாக புகைப்படம் '
+                            'எடுக்கவும்.',
+              'analysis_result': 'பகுப்பாய்வு முடிவு',
+              'ai_assisted_notice': 'பதிவேற்றப்பட்ட படத்தின் அடிப்படையில் AI உதவியுடன் பெறப்பட்ட முடிவு.',
+              'possible_disease': 'சாத்தியமான நோய்',
+              'crop': 'பயிர்',
+              'confidence': 'நம்பகத்தன்மை',
+              'symptoms': 'அறிகுறிகள்',
+              'possible_causes': 'சாத்தியமான காரணங்கள்',
+              'treatment_management': 'சிகிச்சை / மேலாண்மை',
+              'prevention': 'தடுப்பு முறைகள்',
+              'immediate_steps': 'உடனடி நடவடிக்கைகள்',
+              'expert_advice': 'நிபுணர் ஆலோசனை',
+              'ask_ai_assistant': 'AI உதவியாளரிடம் கேளுங்கள்',
+              'followup_prompt_desc': 'பகுப்பாய்வு செய்யப்பட்ட இலை, அறிகுறிகள் அல்லது பயிர் பராமரிப்பு பற்றி கேள்விகள் '
+                                      'கேட்கவும்.',
+              'safety_notice': 'பாதுகாப்பு அறிவிப்பு',
+              'safety_notice_desc': 'இந்த AI கல்வி வழிகாட்டுதலை மட்டுமே வழங்குகிறது. பூச்சிக்கொல்லி பயன்பாட்டிற்கு '
+                                    'உள்ளூர் விவசாய அதிகாரிகளை அணுகவும்.',
+              'chat_placeholder': 'உங்கள் விவசாய கேள்வியை இங்கே தட்டச்சு செய்க...',
+              'send': 'அனுப்பு',
+              'q_disease': 'இது என்ன நோய்?',
+              'q_todo': 'நான் இப்போது என்ன செய்ய வேண்டும்?',
+              'q_prevent': 'இதை எவ்வாறு தடுப்பது?',
+              'q_telugu': 'தெலுங்கில் விளக்குங்கள்',
+              'q_tamil': 'தமிழில் விளக்குங்கள்',
+              'q_hindi': 'இந்தியில் விளக்குங்கள்',
+              'analyzing': 'இலை படத்தை பகுப்பாய்வு செய்கிறது...',
+              'ai_thinking': 'AI வழிகாட்டுதலை உருவாக்குகிறது...',
+              'no_leaf_analyzed_yet': 'AI நோயறிதலைக் காண மேலே ஒரு இலை புகைப்படத்தை பதிவேற்றவும்.',
+              'admin': 'நிர்வாகம்',
+              'customers': 'வாடிக்கையாளர்கள்',
+              'owners': 'உரிமையாளர்கள்',
+              'payments': 'கட்டணங்கள்',
+              'ratings_reviews': 'மதிப்பீடுகள் & மதிப்புரைகள்',
+              'overview': 'மேலோட்டம்',
+              'enterprise_operations': 'நிறுவன செயல்பாடுகள்',
+              'live_db_connected': 'நேரலை தரவுத்தளம் இணைக்கப்பட்டுள்ளது',
+              'admin_management_desc': 'நேரலை நிர்வாக மேலாண்மை மற்றும் செயல்பாட்டு பதிவுகள்.',
+              'recent_bookings': 'சமீபத்திய முன்பதிவுகள்',
+              'no_bookings_found': 'முன்பதிவுகள் எதுவும் இல்லை.',
+              'no_records_found': 'பதிவுகள் எதுவும் இல்லை.',
+              'search': 'தேடு',
+              'filter': 'வடிகட்டு',
+              'all_statuses': 'அனைத்து நிலைகளும்',
+              'active': 'செயலில்',
+              'inactive': 'செயலற்றது',
+              'activate': 'செயல்படுத்து',
+              'deactivate': 'செயலிழக்கச் செய்',
+              'update_status': 'நிலையை புதுப்பிக்கவும்',
+              'read_only_view': 'பார்வைக்கான நிர்வாகப் பக்கம் மட்டும்.',
+              'registration_success': 'பதிவு வெற்றிகரமாக முடிந்தது! இப்போது உள்நுழையலாம்.',
+              'login_successful': 'உள்நுழைவு வெற்றிகரமானது.',
+              'logout_successful': 'நீங்கள் வெளியேறிவிட்டீர்கள்.',
+              'invalid_credentials': 'மின்னஞ்சல் அல்லது கடவுச்சொல் தவறானது.',
+              'invalid_customer_login': 'கைபேசி எண் அல்லது கடவுச்சொல் தவறானது.',
+              'invalid_owner_login': 'மின்னஞ்சல் அல்லது கடவுச்சொல் தவறானது.',
+              'invalid_admin_login': 'நிர்வாக பயனர் பெயர் அல்லது கடவுச்சொல் தவறானது.',
+              'email_already_registered': 'இந்த மின்னஞ்சல் ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது. வேறு மின்னஞ்சலை '
+                                          'பயன்படுத்தவும் அல்லது உள்நுழையவும்.',
+              'mobile_already_registered': 'இந்த கைபேசி எண் ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது. வேறு எண்ணை பயன்படுத்தவும் '
+                                           'அல்லது உள்நுழையவும்.',
+              'valid_email_err': 'சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.',
+              'valid_phone_err': 'சரியான 10 இலக்க கைபேசி எண்ணை உள்ளிடவும்.',
+              'password_length_err': 'கடவுச்சொல் 8 முதல் 128 எழுத்துக்கள் வரை இருக்க வேண்டும்.',
+              'passwords_dont_match': 'கடவுச்சொற்கள் பொருந்தவில்லை.',
+              'booking_date_past_err': 'கடந்த தேதிகளில் முன்பதிவு செய்ய முடியாது.',
+              'select_valid_date_err': 'சரியான முன்பதிவு தேதியைத் தேர்ந்தெடுக்கவும்.',
+              'select_valid_route_err': 'முன்பதிவு செய்வதற்கு முன் சரியான வழியைத் தேர்ந்தெடுக்கவும்.',
+              'duplicate_booking_err': 'இந்த தேதியில் இந்த வாகனத்திற்கு ஏற்கனவே உங்களிடம் முன்பதிவு கோரிக்கை உள்ளது.',
+              'booking_created_success': 'முன்பதிவு கோரிக்கை வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது! உரிமையாளர் ஒப்புதலுக்கு '
+                                         'காத்திருக்கிறது.',
+              'booking_status_updated': 'முன்பதிவு நிலை புதுப்பிக்கப்பட்டது.',
+              'booking_status_update_err': 'முன்பதிவு நிலையை புதுப்பிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
+              'only_pending_can_change': 'நிலுவையில் உள்ள முன்பதிவுகளின் நிலையை மட்டுமே மாற்ற முடியும்.',
+              'select_rating_err': '1 முதல் 5 நட்சத்திரங்கள் வரை மதிப்பீட்டைத் தேர்ந்தெடுக்கவும்.',
+              'rating_saved': 'நன்றி! உங்கள் மதிப்பீடு மற்றும் கருத்து சேமிக்கப்பட்டது.',
+              'demo_payment_success': 'டெமோ கட்டணம் வெற்றிகரமாக முடிந்தது. உறுதிப்படுத்தல் மின்னஞ்சல் அனுப்பப்பட்டது.',
+              'demo_payment_success_no_mail': 'டெமோ கட்டணம் வெற்றிகரமாக முடிந்தது. கட்டணம் பதிவு செய்யப்பட்டது.',
+              'demo_payment_failed': 'டெமோ கட்டண செயல்முறை தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.',
+              'valid_payment_method_err': 'சரியான கட்டண முறையைத் தேர்ந்தெடுக்கவும்.',
+              'cardholder_name_err': 'டெமோ கார்டு வைத்திருப்பவர் பெயரை உள்ளிடவும்.',
+              'upi_id_err': 'கட்டணத்திற்கு டெமோ UPI ID-ஐ உள்ளிடவும்.',
+              'vehicle_added_success': 'வாகனம் வெற்றிகரமாக சேர்க்கப்பட்டது! இப்போது வழிகளையும் வாடகையையும் அமைக்கலாம்.',
+              'vehicle_updated_success': 'வாகன விவரங்கள் வெற்றிகரமாக புதுப்பிக்கப்பட்டன.',
+              'vehicle_deleted_success': 'வாகனம் வெற்றிகரமாக நீக்கப்பட்டது.',
+              'access_denied': 'அனுமதி மறுக்கப்பட்டது: உங்கள் சொந்த வாகனங்களையும் வழிகளையும் மட்டுமே நிர்வகிக்க '
+                               'முடியும்.',
+              'invalid_csrf_token': 'தவறான CSRF டோக்கன். பக்கத்தை புதுப்பித்து மீண்டும் முயற்சிக்கவும்.',
+              'error_404_title': '404 - பக்கம் கிடைக்கவில்லை',
+              'error_404_desc': 'நீங்கள் தேடும் பக்கம் இல்லை அல்லது நகர்த்தப்பட்டுள்ளது.',
+              'error_500_title': '500 - சேவையக பிழை',
+              'error_500_desc': 'எதிர்பாராத பிழை ஏற்பட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.'},
+    'hi': {
+        'admin_login_badge': 'व्यवस्थापक लॉगिन',
+        'username': 'उपयोगकर्ता नाम',
+        'accepted_bookings_desc': 'पुष्टीकृत बुकिंग',
+        'action': 'कार्रवाई',
+        'action_col': 'कार्रवाई',
+        'active_vehicles_desc': 'सक्रिय मार्गों के साथ तैयार',
+        'ai_assisted_result_sub': 'अपलोड की गई छवि के आधार पर AI-सहायता प्राप्त परिणाम।',
+        'ai_chat_welcome': 'नमस्ते! ऊपर एक पत्ती की छवि अपलोड करें, फिर परिणाम के बारे में मुझसे प्रश्न पूछें।',
+        'ai_disclaimer_note': 'आपकी छवि का विश्लेषण केवल अनुरोधित AI सहायता प्रदान करने के लिए किया जाता है। परिणाम को गारंटीकृत निदान के रूप में उपयोग न करें।',
+        'ai_disclaimer_short': 'AI परिणाम केवल सूचनात्मक हैं और कृषि पेशेवरों के साथ सत्यापित किए जाने चाहिए।',
+        'ai_service_not_configured': 'AI सेवा अभी कॉन्फ़िगर नहीं की गई है। अपनी .env फ़ाइल में AI_API_KEY जोड़ें, फिर फ्लास्क को पुनरारंभ करें।',
+        'amount': 'राशि',
+        'ask_ai_sub': 'विश्लेषण की गई पत्ती, लक्षण, रोकथाम या सामान्य फसल देखभाल के बारे में पूछें।',
+        'ask_followup_questions': 'अनुवर्ती प्रश्न पूछें',
+        'booking_id_col': 'बुकिंग ID',
+        'chip_disease_label': 'यह कौन सी बीमारी है?',
+        'chip_disease_query': 'इस पत्ती में कौन सी बीमारी हो सकती है?',
+        'chip_lang_label': 'हिंदी में समझाइए',
+        'chip_lang_query': 'इसे हिंदी में विस्तार से और सरल शब्दों में समझाइए।',
+        'chip_prevent_label': 'मैं इसे कैसे रोक सकता हूँ?',
+        'chip_prevent_query': 'मैं इस समस्या को फैलने से कैसे रोक सकता हूँ?',
+        'chip_steps_label': 'अब मुझे क्या करना चाहिए?',
+        'chip_steps_query': 'इस फसल समस्या के प्रबंधन के लिए अब मुझे क्या करना चाहिए?',
+        'choose_or_drag_photo': 'यहाँ एक पत्ती की तस्वीर चुनें या खींचें',
+        'contact_expert': 'विशेषज्ञ से कब संपर्क करें',
+        'demo_card': 'डेमो कार्ड',
+        'demo_simulation_notice': 'केवल सिमुलेशन: यह डेमो भुगतान किसी वास्तविक कार्ड, बैंक या UPI डेटा को संसाधित नहीं करता है।',
+        'demo_upi': 'डेमो UPI',
+        'demo_upi_id': 'डेमो UPI ID',
+        'enter_cardholder_name': 'डेमो कार्डधारक का नाम दर्ज करें',
+        'enter_demo_upi_id': 'demo@upi',
+        'farmer_ai_desc': 'एक स्पष्ट फसल-पत्ती की तस्वीर अपलोड करें और संभावित बीमारी, दिखाई देने वाले लक्षण, सुरक्षित प्रबंधन कदम और रोकथाम मार्गदर्शन प्राप्त करें।',
+        'file_format_limit': 'JPG, JPEG, PNG या WEBP • अधिकतम 10 MB',
+        'fleet_management': 'फ्लीट प्रबंधन',
+        'fleet_overview': 'फ्लीट अवलोकन',
+        'id': 'ID',
+        'image_based_analysis': 'छवि आधारित विश्लेषण',
+        'not_specified': 'निर्दिष्ट नहीं',
+        'owner_hero_subtitle': 'अपने वाहनों, मार्गों का प्रबंधन करें और ग्राहक बुकिंग अनुरोधों का जवाब दें।',
+        'owner_tagline': 'किसानों के लिए • व्यापारियों के लिए • आपकी सेवा में',
+        'pay': 'भुगतान करें',
+        'payment_col': 'भुगतान',
+        'payment_summary': 'भुगतान सारांश',
+        'pending_actions_desc': 'पुष्टि की आवश्यकता है',
+        'pending_review_banner': 'बुकिंग अनुरोध(ओं) पर आपकी तत्काल समीक्षा और कार्रवाई की आवश्यकता है।',
+        'pending_review_hint': 'नीचे ग्राहक, मार्ग, तिथि और किराए की समीक्षा करें, फिर स्वीकार या अस्वीकार करें पर क्लिक करें।',
+        'processing': 'प्रसंस्करण हो रहा है...',
+        'processing_demo_payment': 'डेमो भुगतान संसाधित हो रहा है...',
+        'profile': 'मालिक प्रोफाइल',
+        'ready_when_you_are': 'जब आप तैयार हों',
+        'route_col': 'मार्ग',
+        'route_pricing': 'मार्ग आधारित मूल्य निर्धारण',
+        'route_pricing_desc': 'पारदर्शी और उचित दरें',
+        'secure_desc': 'आपका विश्वास हमारी प्राथमिकता है',
+        'secure_reliable': 'सुरक्षित और विश्वसनीय',
+        'sidebar_dashboard': 'डैशबोर्ड',
+        'start_moving': 'अपनी अगली ढुलाई शुरू करें।',
+        'support_247': '24/7 सहायता',
+        'support_desc': 'हम हमेशा मदद के लिए यहाँ हैं',
+        'symptoms_explanation': 'लक्षण और दृश्य व्याख्या',
+        'total_bookings_desc': 'अब तक की सभी बुकिंग',
+        'total_due': 'कुल देय राशि',
+        'total_vehicles_desc': 'पंजीकृत वाहन',
+        'type_question_placeholder': 'अपना खेती संबंधी प्रश्न यहाँ टाइप करें...',
+        'upload_another_image': 'दूसरी छवि अपलोड करें',
+        'upload_leaf_tip': 'सर्वोत्तम परिणामों के लिए, प्रभावित क्षेत्र को स्पष्ट रूप से दिखाते हुए अच्छी रोशनी में एक पत्ती की तस्वीर लें।',
+        'vehicle': 'वाहन',
+        'vehicle_col': 'वाहन',
+        'view_all_bookings': 'फ्लीट देखें',
+        'wide_range': 'वाहनों की विस्तृत श्रृंखला',
+        'wide_range_desc': 'छोटे से लेकर भारी वाहनों तक',   'language': 'भाषा',
+              'english': 'English',
+              'telugu': 'తెలుగు',
+              'tamil': 'தமிழ்',
+              'hindi': 'हिन्दी',
+              'vehicle_booking': 'व्यावसायिक वाहन बुकिंग',
+              'tagline': 'किसानों के लिए • व्यापारियों के लिए • आपकी सेवा में',
+              'home': 'होम',
+              'vehicles': 'वाहन',
+              'available_vehicles': 'उपलब्ध वाहन',
+              'my_bookings': 'मेरी बुकिंग्स',
+              'dashboard': 'डैशबोर्ड',
+              'owner_dashboard': 'मालिक डैशबोर्ड',
+              'admin_dashboard': 'व्यवस्थापक डैशबोर्ड',
+              'control_center': 'नियंत्रण केंद्र',
+              'security_clearance': 'सुरक्षा स्वीकृति',
+              'farmer_ai': 'किसान AI',
+              'farmer_ai_assistant': 'किसान AI फसल रोग सहायक',
+              'customer': 'ग्राहक',
+              'customer_login': 'ग्राहक लॉगिन',
+              'owner_login': 'वाहन मालिक लॉगिन',
+              'admin_login': 'व्यवस्थापक लॉगिन',
+              'book_vehicle': 'वाहन बुक करें',
+              'login': 'लॉगिन',
+              'register': 'पंजीकरण',
+              'customer_registration': 'ग्राहक पंजीकरण',
+              'owner_registration': 'वाहन मालिक पंजीकरण',
+              'logout': 'लॉगआउट',
+              'welcome': 'स्वागत है',
+              'back_home': 'होम पर वापस जाएं',
+              'back_to_vehicles': 'वाहन सूची पर वापस जाएं',
+              'back_to_dashboard': 'डैशबोर्ड पर वापस जाएं',
+              'back_to_public': 'सार्वजनिक साइट पर वापस जाएं',
+              'mobile_number': 'मोबाइल नंबर',
+              'customer_name': 'ग्राहक का नाम',
+              'owner_name': 'मालिक का नाम',
+              'registered_email': 'पंजीकृत ईमेल',
+              'email_address': 'ईमेल पता',
+              'email': 'ईमेल',
+              'phone': 'फ़ोन',
+              'phone_number': 'फ़ोन नंबर',
+              'password': 'पासवर्ड',
+              'confirm_password': 'पासवर्ड की पुष्टि करें',
+              'forgot_password': 'पासवर्ड भूल गए?',
+              'reset_password': 'पासवर्ड रीसेट करें',
+              'set_new_password': 'नया पासवर्ड सेट करें',
+              'new_password': 'नया पासवर्ड',
+              'send_reset_link': 'रीसेट लिंक भेजें',
+              'back_to_customer_login': 'ग्राहक लॉगिन पर वापस जाएं',
+              'enter_registered_email': 'अपना पंजीकृत ईमेल पता दर्ज करें।',
+              'login_mobile': 'अपने मोबाइल नंबर से लॉगिन करें।',
+              'create_account': 'अपना खाता बनाएं',
+              'choose_account_type': 'चुनें कि आप व्यावसायिक वाहन बुकिंग का उपयोग कैसे करना चाहते हैं',
+              'for_customers': 'किसानों और व्यापारिक ग्राहकों के लिए',
+              'for_owners': 'व्यावसायिक वाहन मालिकों के लिए',
+              'customer_desc': 'अपनी परिवहन आवश्यकताओं के लिए विश्वसनीय व्यावसायिक वाहन खोजें और बुक करें।',
+              'owner_desc': 'अपने व्यावसायिक वाहनों को पंजीकृत करें और ग्राहकों से बुकिंग अनुरोध प्राप्त करें।',
+              'register_as_customer': 'ग्राहक के रूप में पंजीकरण करें',
+              'customer_sign_in': 'ग्राहक साइन इन',
+              'register_as_owner': 'वाहन मालिक के रूप में पंजीकरण करें',
+              'owner_sign_in': 'वाहन मालिक साइन इन',
+              'new_vehicle_owner': 'नए वाहन मालिक हैं?',
+              'already_an_owner': 'पहले से मालिक खाता है?',
+              'already_have_account': 'क्या आपके पास पहले से एक खाता है?',
+              'new_customer': 'नए ग्राहक हैं?',
+              'sign_in_here': 'यहाँ साइन इन करें',
+              'register_here': 'यहाँ पंजीकरण करें',
+              'enter_owner_name_placeholder': 'मालिक या व्यवसाय का नाम दर्ज करें',
+              'enter_phone_placeholder': '10 अंकों का मोबाइल नंबर दर्ज करें',
+              'enter_owner_email_placeholder': 'owner@example.com (लॉगिन और अलर्ट के लिए)',
+              'enter_password_placeholder': 'पासवर्ड दर्ज करें (न्यूनतम 8 वर्ण)',
+              'enter_admin_username': 'व्यवस्थापक उपयोगकर्ता नाम दर्ज करें',
+              'enter_admin_password': 'व्यवस्थापक पासवर्ड दर्ज करें',
+              'admin_login_desc': 'प्रबंधन और परिचालन कार्यों के लिए साइन इन करें।',
+              'admin_copyright': '© 2026 व्यावसायिक वाहन बुकिंग • प्रशासनिक प्रणाली',
+              'heavy_vehicles_title': 'मजबूत कल के लिए भारी वाहन',
+              'book_vehicles_ease': 'आसानी से व्यावसायिक वाहन बुक करें',
+              'hero_subtitle': 'किसानों और व्यापारियों को बेहतर कल के लिए विश्वसनीय व्यावसायिक वाहनों से जोड़ना।',
+              'explore_vehicles': 'वाहन देखें',
+              'try_farmer_ai': 'किसान AI आज़माएं',
+              'smart_farming_support': 'स्मार्ट कृषि सहायता',
+              'how_it_works': 'यह कैसे काम करता है',
+              'choose_vehicle': 'वाहन चुनें',
+              'select_date': 'तारीख चुनें',
+              'confirm': 'पुष्टि करें',
+              'vehicle_types': 'वाहन के प्रकार',
+              'tractor': 'ट्रैक्टर',
+              'mini_truck': 'मिनी ट्रक',
+              'pickup': 'पिकअप',
+              'lorry': 'लॉरी',
+              'goods_auto': 'गुड्स ऑटो',
+              'tractor_desc': 'कृषि और माल परिवहन के लिए उपयुक्त।',
+              'mini_truck_desc': 'छोटे और मध्यम भार के लिए उपयुक्त।',
+              'pickup_desc': 'स्थानीय परिवहन के लिए सुविधाजनक।',
+              'lorry_desc': 'बड़े भार के परिवहन के लिए उपयुक्त।',
+              'goods_auto_desc': 'त्वरित स्थानीय उपज और माल परिवहन के लिए उपयुक्त।',
+              'simple_fast_easy': 'सरल • तेज • सुरक्षित',
+              'transportation_message': 'अपनी परिवहन आवश्यकताओं के लिए सही वाहन तुरंत बुक करें।',
+              'footer_message': 'सभी के लिए सरल परिवहन सेवा।',
+              'vehicle_type': 'वाहन का प्रकार',
+              'location': 'स्थान',
+              'from': 'प्रारंभिक स्थान',
+              'to': 'गंतव्य स्थान',
+              'rent': 'किराया',
+              'contact': 'संपर्क',
+              'book_now': 'अभी बुक करें',
+              'no_vehicles': 'कोई वाहन उपलब्ध नहीं है',
+              'no_vehicles_message': 'वर्तमान में बुकिंग के लिए कोई वाहन उपलब्ध नहीं है।',
+              'search_placeholder': 'नाम, मार्ग या स्थान खोजें',
+              'location_placeholder': 'स्थान या शहर',
+              'all_vehicle_types': 'सभी वाहन प्रकार',
+              'min_rent': 'न्यूनतम किराया (₹)',
+              'max_rent': 'अधिकतम किराया (₹)',
+              'apply_filters': 'फ़िल्टर लागू करें',
+              'reset_filters': 'फ़िल्टर रीसेट करें',
+              'view_details': 'विवरण देखें',
+              'book_this_vehicle': 'यह वाहन बुक करें',
+              'available_routes_rent': 'उपलब्ध मार्ग और निर्धारित किराया',
+              'base_location': 'मूल स्थान',
+              'current_location_label': 'वर्तमान / मूल स्थान',
+              'capacity_weight': 'भार क्षमता',
+              'availability_status': 'उपलब्धता',
+              'available_ready': 'उपलब्ध (बुकिंग के लिए तैयार)',
+              'route_label': 'मार्ग',
+              'fixed_route_rent_label': 'निर्धारित मार्ग किराया',
+              'booking_date': 'बुकिंग तिथि',
+              'confirm_booking': 'बुकिंग की पुष्टि करें',
+              'status': 'स्थिति',
+              'accepted': 'स्वीकृत',
+              'rejected': 'अस्वीकृत',
+              'pending': 'लंबित',
+              'paid': 'भुगतान किया गया',
+              'pay_now': 'अभी भुगतान करें',
+              'no_bookings': 'कोई बुकिंग नहीं',
+              'no_bookings_message': 'आपने अभी तक कोई वाहन बुक नहीं किया है।',
+              'booking_id': 'बुकिंग आईडी',
+              'customer_booking_requests': 'ग्राहक बुकिंग अनुरोध',
+              'accept': 'स्वीकार करें',
+              'reject': 'अस्वीकार करें',
+              'no_action_needed': 'किसी कार्रवाई की आवश्यकता नहीं',
+              'rate_service': 'सेवा को रेट करें',
+              'rate_booking': 'अपनी बुकिंग को रेट करें',
+              'rate_booking_title': '⭐ अपनी बुकिंग को रेट करें',
+              'review_optional': 'समीक्षा (वैकल्पिक)',
+              'review_placeholder': 'वाहन और मालिक की सेवा कैसी थी?',
+              'save_rating': 'रेटिंग सहेजें',
+              'rating': 'रेटिंग',
+              'booking_success_title': 'बुकिंग अनुरोध सबमिट किया गया',
+              'booking_success_desc': 'आपकी बुकिंग मालिक की पुष्टि के लिए लंबित है।',
+              'waiting_owner_confirm': 'मालिक की पुष्टि की प्रतीक्षा कर रहा है।',
+              'view_my_bookings': 'मेरी बुकिंग देखें',
+              'browse_vehicles': 'वाहन ब्राउज़ करें',
+              'track_bookings_desc': 'प्रत्येक बुकिंग को ट्रैक करें और सेवा को रेट करें।',
+              'booking_confirmed_badge': 'बुकिंग की पुष्टि हो गई',
+              'add_vehicle': 'वाहन जोड़ें',
+              'add_vehicle_title': '🚚 वाहन जोड़ें',
+              'add_route': 'मार्ग जोड़ें',
+              'add_route_rent': '+ मार्ग और किराया जोड़ें',
+              'add_route_subtitle': 'ग्राहकों द्वारा तुरंत बुकिंग के लिए अपने वाहनों के लिए निश्चित मार्ग मूल्य '
+                                    'निर्धारित करें।',
+              'route_details': 'मार्ग विवरण',
+              'rent_details': 'किराया विवरण',
+              'additional_info': 'अतिरिक्त जानकारी',
+              'select_vehicle': 'वाहन चुनें',
+              'choose_vehicle_prompt': '-- अपना वाहन चुनें --',
+              'from_location': 'प्रारंभिक स्थान / Origin',
+              'to_location': 'गंतव्य स्थान / Destination',
+              'fixed_route_rent': 'मार्ग आधारित निर्धारित किराया (₹)',
+              'save_route_rent': 'मार्ग और किराया सहेजें',
+              'save_vehicle': 'वाहन सहेजें',
+              'save_changes': 'परिवर्तन सहेजें',
+              'cancel': 'रद्द करें',
+              'route_added_success': 'मार्ग और किराया सफलतापूर्वक जोड़ा गया! ✅',
+              'add_another_route': 'एक और मार्ग जोड़ें',
+              'my_vehicles': 'मेरे वाहन',
+              'edit_vehicle': 'वाहन संपादित करें',
+              'edit_vehicle_title': '✏️ वाहन संपादित करें',
+              'vehicle_name': 'वाहन का नाम',
+              'contact_number': 'संपर्क नंबर',
+              'update_vehicle': 'वाहन अपडेट करें',
+              'delete_vehicle': 'वाहन हटाएं',
+              'active_vehicles': 'सक्रिय वाहन',
+              'total_bookings': 'कुल बुकिंग्स',
+              'total_vehicles': 'कुल वाहन',
+              'pending_action': 'लंबित कार्रवाई',
+              'accepted_bookings': 'स्वीकृत बुकिंग्स',
+              'quick_actions_title': 'त्वरित प्रबंधन',
+              'manage_fleet': 'फ्लीट प्रबंधित करें',
+              'manage_fleet_desc': 'मौजूदा वाहनों को देखें, संपादित करें या हटाएं',
+              'manage_routes_desc': 'ग्राहकों के लिए निश्चित मार्ग मूल्य निर्धारित करें',
+              'owner_profile_title': 'मालिक प्रोफ़ाइल',
+              'account_status': 'खाता स्थिति',
+              'active_fleet': 'सक्रिय फ्लीट',
+              'no_bookings_title': 'अभी तक कोई बुकिंग अनुरोध नहीं',
+              'no_bookings_desc': 'आपके वाहनों के लिए ग्राहक बुकिंग यहाँ दिखाई देगी।',
+              'choose_vehicle_fleet_hint': 'अपने पंजीकृत फ्लीट से वाहन चुनें।',
+              'starting_point_hint': 'प्रारंभिक शहर, गाँव या लोडिंग बिंदु।',
+              'delivery_point_hint': 'डिलीवरी बाज़ार, गोदाम या गंतव्य शहर।',
+              'total_fixed_rent_hint': 'इस एकतरफ़ा मार्ग यात्रा के लिए कुल निश्चित किराया।',
+              'route_open_notice': 'यह वाहन मार्ग तुरंत ग्राहक बुकिंग के लिए उपलब्ध होगा।',
+              'transparent_pricing_title': 'पारदर्शी मार्ग-आधारित मूल्य निर्धारण',
+              'source_placeholder': 'उदाहरण: ताड़ीपत्री',
+              'destination_placeholder': 'उदाहरण: अनंतपुर',
+              'rent_placeholder': 'उदाहरण: 2500',
+              'vehicle_name_example': 'उदाहरण: टाटा ऐस',
+              'location_example': 'उदाहरण: कांचीपुरम',
+              'demo_payment': 'डेमो भुगतान',
+              'demo_payment_banner': 'डेमो भुगतान — कोई वास्तविक पैसा नहीं लिया जाएगा',
+              'secure_demo_payment': 'सुरक्षित डेमो भुगतान',
+              'demo_payment_disclaimer': 'यह केवल एक प्रोजेक्ट डेमो लेनदेन है। कोई वास्तविक पैसा नहीं लिया जाता है।',
+              'amount_paid': 'भुगतान की गई राशि',
+              'payment_method': 'भुगतान विधि',
+              'cardholder_name': 'कार्डधारक का नाम',
+              'upi_id': 'UPI ID',
+              'enter_cardholder_placeholder': 'डेमो कार्डधारक का नाम दर्ज करें',
+              'enter_upi_placeholder': 'demo@upi',
+              'pay_amount_btn': 'राशि का भुगतान करें',
+              'payment_successful': 'भुगतान सफल रहा',
+              'payment_success_desc': 'यह डेमो भुगतान सफलतापूर्वक पूरा हुआ और सिस्टम में दर्ज किया गया है।',
+              'transaction_reference': 'लेनदेन संदर्भ संख्या',
+              'date': 'तारीख',
+              'view_receipt': 'रसीद देखें',
+              'download_receipt': 'रसीद डाउनलोड करें',
+              'view_booking': 'बुकिंग देखें',
+              'upload_leaf_image': 'पत्ती की छवि अपलोड करें',
+              'analyze_leaf': 'पत्ती का विश्लेषण करें',
+              'drag_leaf_image': 'यहाँ पत्ती की तस्वीर चुनें या खींचें',
+              'image_format_limit': 'JPG, JPEG, PNG या WEBP • अधिकतम 10 MB',
+              'ai_assistant_intro': 'फसल की पत्ती की स्पष्ट तस्वीर अपलोड करें और संभावित बीमारी, लक्षण और रोकथाम पर AI '
+                                    'सहायता प्राप्त करें।',
+              'photo_tips': 'सर्वोत्तम परिणामों के लिए, अच्छी रोशनी में प्रभावित क्षेत्र की स्पष्ट तस्वीर लें।',
+              'analysis_result': 'विश्लेषण परिणाम',
+              'ai_assisted_notice': 'अपलोड की गई छवि के आधार पर AI-सहायता प्राप्त परिणाम।',
+              'possible_disease': 'संभावित बीमारी',
+              'crop': 'फसल',
+              'confidence': 'सटीकता',
+              'symptoms': 'लक्षण',
+              'possible_causes': 'संभावित कारण',
+              'treatment_management': 'उपचार / प्रबंधन',
+              'prevention': 'रोकथाम',
+              'immediate_steps': 'तत्काल कदम',
+              'expert_advice': 'विशेषज्ञ सलाह',
+              'ask_ai_assistant': 'AI सहायक से पूछें',
+              'followup_prompt_desc': 'विश्लेषण की गई पत्ती, लक्षणों या फसल देखभाल के बारे में प्रश्न पूछें।',
+              'safety_notice': 'सुरक्षा सूचना',
+              'safety_notice_desc': 'यह AI सहायक केवल शैक्षणिक मार्गदर्शन प्रदान करता है। कीटनाशक उपयोग के लिए स्थानीय '
+                                    'कृषि अधिकारियों से परामर्श करें।',
+              'chat_placeholder': 'अपना कृषि प्रश्न यहाँ टाइप करें...',
+              'send': 'भेजें',
+              'q_disease': 'यह कौन सी बीमारी है?',
+              'q_todo': 'मुझे अब क्या करना चाहिए?',
+              'q_prevent': 'इसे कैसे रोका जाए?',
+              'q_telugu': 'तेलुगु में समझाएं',
+              'q_tamil': 'तमिल में समझाएं',
+              'q_hindi': 'हिन्दी में समझाएं',
+              'analyzing': 'पत्ती की छवि का विश्लेषण किया जा रहा है...',
+              'ai_thinking': 'AI मार्गदर्शन तैयार कर रहा है...',
+              'no_leaf_analyzed_yet': 'AI निदान देखने के लिए ऊपर एक पत्ती की तस्वीर अपलोड करें।',
+              'admin': 'व्यवस्थापक',
+              'customers': 'ग्राहक',
+              'owners': 'मालिक',
+              'payments': 'भुगतान',
+              'ratings_reviews': 'रेटिंग और समीक्षाएं',
+              'overview': 'अवलोकन',
+              'enterprise_operations': 'प्रशासनिक संचालन',
+              'live_db_connected': 'लाइव डेटाबेस जुड़ा हुआ है',
+              'admin_management_desc': 'प्रत्यक्ष प्रशासनिक प्रबंधन और परिचालन रिकॉर्ड।',
+              'recent_bookings': 'हाल की बुकिंग्स',
+              'no_bookings_found': 'कोई बुकिंग नहीं मिली।',
+              'no_records_found': 'कोई रिकॉर्ड नहीं मिला।',
+              'search': 'खोजें',
+              'filter': 'फ़िल्टर',
+              'all_statuses': 'सभी स्थितियाँ',
+              'active': 'सक्रिय',
+              'inactive': 'निष्क्रिय',
+              'activate': 'सक्रिय करें',
+              'deactivate': 'निष्क्रिय करें',
+              'update_status': 'स्थिति अपडेट करें',
+              'read_only_view': 'केवल पढ़ने योग्य प्रशासनिक दृश्य।',
+              'registration_success': 'पंजीकरण सफल रहा! अब आप लॉगिन कर सकते हैं।',
+              'login_successful': 'लॉगिन सफल रहा।',
+              'logout_successful': 'आप लॉगआउट हो चुके हैं।',
+              'invalid_credentials': 'ईमेल या पासवर्ड गलत है।',
+              'invalid_customer_login': 'मोबाइल नंबर या पासवर्ड गलत है।',
+              'invalid_owner_login': 'ईमेल या पासवर्ड गलत है।',
+              'invalid_admin_login': 'व्यवस्थापक उपयोगकर्ता नाम या पासवर्ड गलत है।',
+              'email_already_registered': 'यह ईमेल पता पहले से पंजीकृत है। कृपया दूसरा ईमेल उपयोग करें या साइन इन '
+                                          'करें।',
+              'mobile_already_registered': 'यह मोबाइल नंबर पहले से पंजीकृत है। कृपया दूसरा नंबर उपयोग करें या साइन इन '
+                                           'करें।',
+              'valid_email_err': 'एक मान्य ईमेल पता दर्ज करें।',
+              'valid_phone_err': 'एक मान्य 10 अंकों का मोबाइल नंबर दर्ज करें।',
+              'password_length_err': 'पासवर्ड 8 से 128 वर्णों का होना चाहिए।',
+              'passwords_dont_match': 'पासवर्ड मेल नहीं खाते।',
+              'booking_date_past_err': 'बुकिंग तिथि पिछली तारीख नहीं हो सकती।',
+              'select_valid_date_err': 'कृपया एक मान्य बुकिंग तिथि चुनें।',
+              'select_valid_route_err': 'कृपया बुकिंग से पहले एक मान्य मार्ग चुनें।',
+              'duplicate_booking_err': 'इस तिथि पर इस वाहन के लिए आपके पास पहले से एक बुकिंग अनुरोध है।',
+              'booking_created_success': 'बुकिंग अनुरोध सफलतापूर्वक सबमिट किया गया! मालिक की मंजूरी की प्रतीक्षा है।',
+              'booking_status_updated': 'बुकिंग स्थिति अपडेट की गई।',
+              'booking_status_update_err': 'बुकिंग स्थिति अपडेट नहीं की जा सकी। कृपया पुनः प्रयास करें।',
+              'only_pending_can_change': 'केवल लंबित बुकिंग की स्थिति बदली जा सकती है।',
+              'select_rating_err': 'कृपया 1 से 5 स्टार के बीच रेटिंग चुनें।',
+              'rating_saved': 'धन्यवाद! आपकी रेटिंग और समीक्षा सहेज ली गई है।',
+              'demo_payment_success': 'डेमो भुगतान सफलतापूर्वक पूरा हुआ। एक पुष्टिकरण ईमेल भेजा गया है।',
+              'demo_payment_success_no_mail': 'डेमो भुगतान सफलतापूर्वक पूरा हुआ। भुगतान दर्ज कर लिया गया है।',
+              'demo_payment_failed': 'डेमो भुगतान प्रसंस्करण विफल रहा। कृपया पुनः प्रयास करें।',
+              'valid_payment_method_err': 'कृपया एक मान्य भुगतान विधि चुनें।',
+              'cardholder_name_err': 'कृपया डेमो कार्ड के लिए कार्डधारक का नाम दर्ज करें।',
+              'upi_id_err': 'कृपया भुगतान के लिए डेमो UPI ID दर्ज करें।',
+              'vehicle_added_success': 'वाहन सफलतापूर्वक जोड़ा गया! अब आप मार्ग और किराया निर्धारित कर सकते हैं।',
+              'vehicle_updated_success': 'वाहन विवरण सफलतापूर्वक अपडेट किया गया।',
+              'vehicle_deleted_success': 'वाहन सफलतापूर्वक हटाया गया।',
+              'access_denied': 'पहुँच अस्वीकृत: आप केवल अपने स्वयं के वाहनों और मार्गों का प्रबंधन कर सकते हैं।',
+              'invalid_csrf_token': 'अमान्य CSRF टोकन। कृपया पृष्ठ को रीफ्रेश करें और पुनः प्रयास करें।',
+              'error_404_title': '404 - पृष्ठ नहीं मिला',
+              'error_404_desc': 'जिस पृष्ठ को आप खोज रहे हैं वह मौजूद नहीं है या स्थानांतरित कर दिया गया है।',
+              'error_500_title': '500 - सर्वर त्रुटि',
+              'error_500_desc': 'एक अप्रत्याशित त्रुटि हुई। कृपया थोड़ी देर बाद पुनः प्रयास करें।'}}
+
+class TranslationDict(dict):
+    """Fallback-aware translation dictionary that avoids KeyError and defaults safely."""
+    def __init__(self, current_dict, fallback_dict):
+        super().__init__(current_dict or {})
+        self.fallback = fallback_dict or {}
+
+    def __getitem__(self, key):
+        if key in self:
+            return super().__getitem__(key)
+        if key in self.fallback:
+            return self.fallback[key]
+        return key
+
+    def get(self, key, default=None):
+        if key in self:
+            return super().get(key)
+        if key in self.fallback:
+            return self.fallback.get(key)
+        return default if default is not None else key
+
+
+def get_text(key, default=None):
+    """Retrieve translated text according to the active session/cookie language."""
+    language = session.get("language", "en")
+    if language not in SUPPORTED_LANGUAGES:
+        language = "en"
+    current_dict = TRANSLATIONS.get(language, TRANSLATIONS["en"])
+    if key in current_dict:
+        return current_dict[key]
+    if key in TRANSLATIONS["en"]:
+        return TRANSLATIONS["en"][key]
+    return default if default is not None else key
+
+
 # =========================================================
 # MAKE TRANSLATIONS AVAILABLE TO HTML
 # =========================================================
 
 @app.context_processor
 def inject_language():
-
     language = session.get("language", "en")
+    if language not in SUPPORTED_LANGUAGES:
+        language = "en"
+
+    current_dict = TRANSLATIONS.get(language, TRANSLATIONS["en"])
+    fallback_dict = TRANSLATIONS["en"]
+    t_obj = TranslationDict(current_dict, fallback_dict)
 
     return {
-        "t": TRANSLATIONS.get(
-            language,
-            TRANSLATIONS["en"]
-        ),
-        "current_language": language
+        "t": t_obj,
+        "get_text": get_text,
+        "current_language": language,
+        "supported_languages": SUPPORTED_LANGUAGES,
+        "language_names": LANGUAGE_NAMES,
     }
+
+
 # =========================================================
 # CHANGE LANGUAGE
 # =========================================================
@@ -655,12 +1941,24 @@ def change_language(language):
 
     session["language"] = language
 
-    # Referrer is only used as a local navigation convenience.  Never redirect
-    # to an arbitrary external URL supplied by a client.
     referrer = request.referrer or "/"
+    target = "/"
     if referrer.startswith("/") and not referrer.startswith("//"):
-        return redirect(referrer)
-    return redirect("/")
+        target = referrer
+    else:
+        from urllib.parse import urlparse
+        try:
+            parsed = urlparse(referrer)
+            if not parsed.netloc or parsed.netloc == request.host:
+                target = parsed.path or "/"
+                if parsed.query:
+                    target += "?" + parsed.query
+        except Exception:
+            target = "/"
+
+    response = redirect(target if target else "/")
+    response.set_cookie("language", language, max_age=30 * 24 * 3600, samesite="Lax")
+    return response
 # =========================================================
 # MYSQL DATABASE CONNECTION
 # =========================================================
@@ -869,6 +2167,11 @@ def home():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    if request.method == "GET":
+        if session.get("user_id"):
+            return redirect("/vehicles")
+        if session.get("owner_id"):
+            return redirect("/owner_dashboard")
 
     if request.method == "POST":
 
@@ -957,6 +2260,11 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if request.method == "GET":
+        if session.get("user_id"):
+            return redirect("/vehicles")
+        if session.get("owner_id"):
+            return redirect("/owner_dashboard")
 
     if request.method == "POST":
 
@@ -999,11 +2307,15 @@ def login():
         if user and user_active and password_valid:
 
             logger.info("Customer login successful for phone ending %s", phone[-4:])
+            saved_lang = session.get("language", "en")
             session.clear()
             session.permanent = True
+            session["language"] = saved_lang
             session["user_id"] = user[0]
             session["user_name"] = user[1]
             session["user_phone"] = user[2]
+            session["user_role"] = "customer"
+            session["logged_in"] = True
             if user and len(user) > 4:
                 session["user_email"] = user[3]
             else:
@@ -1170,9 +2482,9 @@ def reset_password(token):
 
 @app.route("/logout", methods=["POST"])
 def logout():
-
+    saved_lang = session.get("language", "en")
     session.clear()
-
+    session["language"] = saved_lang
     return redirect("/")
 
 
@@ -1182,6 +2494,11 @@ def logout():
 
 @app.route("/ownerregister", methods=["GET", "POST"])
 def ownerregister():
+    if request.method == "GET":
+        if session.get("owner_id"):
+            return redirect("/owner_dashboard")
+        if session.get("user_id"):
+            return redirect("/vehicles")
 
     if request.method == "POST":
 
@@ -1267,6 +2584,11 @@ def ownerregister():
 
 @app.route("/ownerlogin", methods=["GET", "POST"])
 def ownerlogin():
+    if request.method == "GET":
+        if session.get("owner_id"):
+            return redirect("/owner_dashboard")
+        if session.get("user_id"):
+            return redirect("/vehicles")
 
     if request.method == "POST":
 
@@ -1294,12 +2616,16 @@ def ownerlogin():
 
         if owner and valid_owner:
 
+            saved_lang = session.get("language", "en")
             session.clear()
             session.permanent = True
+            session["language"] = saved_lang
             session["owner_id"] = owner[0]
             session["owner_name"] = owner[1]
             session["owner_phone"] = owner[2]
             session["owner_email"] = owner[3]
+            session["user_role"] = "owner"
+            session["logged_in"] = True
 
             return redirect("/owner_dashboard")
 
@@ -1351,8 +2677,10 @@ def adminlogin():
         admin = cursor.fetchone()
 
         if admin and check_password_hash(admin[2], password):
+            saved_lang = session.get("language", "en")
             session.clear()
             session.permanent = True
+            session["language"] = saved_lang
             session["admin_id"] = admin[0]
             session["admin_username"] = admin[1]
             return redirect("/admin_dashboard")
@@ -1369,7 +2697,9 @@ def adminlogin():
 @app.route("/admin_logout", methods=["POST"])
 @admin_required
 def admin_logout():
+    saved_lang = session.get("language", "en")
     session.clear()
+    session["language"] = saved_lang
     return redirect("/adminlogin")
 
 
@@ -2293,7 +3623,7 @@ def addroute():
             return "Invalid route or rent details", 400
 
         check_sql = """
-        SELECT id
+        SELECT id, vehicle_name, vehicle_type, location
         FROM vehicles
         WHERE id = %s
         AND owner_id = %s
@@ -2307,18 +3637,21 @@ def addroute():
         vehicle = cursor.fetchone()
 
         if vehicle is None:
-
-            return """
-            <h2>Access Denied ❌</h2>
-
-            <p>
-            You can only add routes to your own vehicles.
-            </p>
-
-            <a href="/addroute">
-            Go Back
-            </a>
-            """
+            cursor.execute(
+                """
+                SELECT id, vehicle_name, vehicle_type, location
+                FROM vehicles
+                WHERE owner_id = %s AND is_active = TRUE
+                ORDER BY id DESC
+                """,
+                (owner_id,)
+            )
+            vehicles_data = cursor.fetchall()
+            return render_template(
+                "add_route.html",
+                vehicles=vehicles_data,
+                error="Access Denied: You can only add routes to your own vehicles."
+            ), 403
 
         sql = """
         INSERT INTO vehicle_routes
@@ -2345,28 +3678,41 @@ def addroute():
 
         db.commit()
 
-        return """
-        <h2>Route and Rent Added Successfully! ✅</h2>
+        cursor.execute(
+            """
+            SELECT id, vehicle_name, vehicle_type, location
+            FROM vehicles
+            WHERE owner_id = %s AND is_active = TRUE
+            ORDER BY id DESC
+            """,
+            (owner_id,)
+        )
+        vehicles_data = cursor.fetchall()
 
-        <a href="/addroute">
-        Add Another Route
-        </a>
-
-        <br><br>
-
-        <a href="/vehicles">
-        View Vehicles
-        </a>
-        """
+        flash("Route and rent added successfully! ✅", "success")
+        return render_template(
+            "add_route.html",
+            vehicles=vehicles_data,
+            success=True,
+            added_route={
+                "vehicle_name": vehicle[1],
+                "vehicle_type": vehicle[2],
+                "from_location": from_location,
+                "to_location": to_location,
+                "rent": rent,
+            }
+        ), 200
 
     cursor.execute(
         """
         SELECT
             id,
             vehicle_name,
-            vehicle_type
+            vehicle_type,
+            location
         FROM vehicles
-        WHERE owner_id = %s
+        WHERE owner_id = %s AND is_active = TRUE
+        ORDER BY id DESC
         """,
         (owner_id,)
     )
@@ -3305,9 +4651,9 @@ def update_booking(booking_id, status):
 @app.route("/owner_logout", methods=["POST"])
 @login_required("owner")
 def owner_logout():
-
+    saved_lang = session.get("language", "en")
     session.clear()
-
+    session["language"] = saved_lang
     return redirect("/")
 
 

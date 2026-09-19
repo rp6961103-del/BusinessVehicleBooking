@@ -394,32 +394,32 @@
         <div class="details">
 
             <div class="detail-row">
-                <span class="detail-label">🚚 Vehicle</span>
+                <span class="detail-label">🚚 {{ t.get("vehicles", "Vehicle") }}</span>
                 <span class="detail-value">{{ vehicle[1] }}</span>
             </div>
 
             <div class="detail-row">
-                <span class="detail-label">🧰 Type</span>
-                <span class="detail-value">{{ vehicle[2] }}</span>
+                <span class="detail-label">🧰 {{ t.get("vehicle_type", "Type") }}</span>
+                <span class="detail-value">{{ t.get(vehicle[2]|lower|replace(' ', '_'), vehicle[2]) }}</span>
             </div>
 
             <div class="detail-row">
-                <span class="detail-label">📍 Current / Base Location</span>
+                <span class="detail-label">📍 {{ t.get("current_location_label", "Current / Base Location") }}</span>
                 <span class="detail-value">{{ vehicle[5] }}</span>
             </div>
 
             <div class="detail-row">
-                <span class="detail-label">🛣️ Route</span>
-                <span class="detail-value route">{{ vehicle[6] }} → {{ vehicle[7] }}</span>
+                <span class="detail-label">🛣️ {{ t.get("route_label", "Route") }}</span>
+                <span class="detail-value route">{{ vehicle[6] or '—' }} → {{ vehicle[7] or '—' }}</span>
             </div>
 
             <div class="detail-row">
-                <span class="detail-label">📞 Contact</span>
+                <span class="detail-label">📞 {{ t.get("contact", "Contact") }}</span>
                 <span class="detail-value">{{ vehicle[4] }}</span>
             </div>
 
             <div class="detail-row">
-                <span class="detail-label">💰 Fixed Route Rent</span>
+                <span class="detail-label">💰 {{ t.get("fixed_route_rent_label", "Fixed Route Rent") }}</span>
                 <span class="detail-value rent">₹{{ vehicle[8] }}</span>
             </div>
 
@@ -431,7 +431,7 @@
         <div class="form-section">
 
             <h2>
-                📅 {{ t["booking_date"] }}
+                📅 {{ t.get("booking_date", "Booking Date") }}
             </h2>
 
 
@@ -444,7 +444,7 @@
 
                 <label for="booking_date">
 
-                    {{ t["booking_date"] }}
+                    {{ t.get("booking_date", "Booking Date") }}
 
                 </label>
 
@@ -464,7 +464,7 @@
                     <a href="/vehicles"
                        class="back-btn">
 
-                        ← {{ t["back_home"] }}
+                        ← {{ t.get("back_to_vehicles", "Back to Vehicles") }}
 
                     </a>
 
@@ -473,7 +473,7 @@
                         type="submit"
                         class="confirm-btn">
 
-                        ✅ {{ t["confirm_booking"] }}
+                        ✅ {{ t.get("confirm_booking", "Confirm Booking") }}
 
                     </button>
 
@@ -498,11 +498,11 @@
 <footer>
 
     <p>
-        © 2026 {{ t["vehicle_booking"] }}
+        © 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}
     </p>
 
     <p>
-        {{ t["footer_message"] }}
+        {{ t.get("footer_message", "Simple transportation service for everyone.") }}
     </p>
 
 </footer>

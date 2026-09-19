@@ -3,49 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Commercial Vehicles with Ease | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
+    <title>{{ t.get("book_vehicles_ease", "Book Commercial Vehicles with Ease") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
     <meta name="description" content="Reliable route-based commercial vehicle booking for farmers and businesses.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script defer src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
 <body class="homepage">
     <header class="home-header">
-        <a href="/home" class="home-logo" aria-label="Business Vehicle Booking home">
+        <a href="/" class="home-logo" aria-label="{{ t.get('vehicle_booking', 'Business Vehicle Booking') }}">
             <span class="home-logo-mark" aria-hidden="true">▰</span>
-            <span>Business Vehicle <strong>Booking</strong></span>
+            <span>{{ t.get("vehicle_booking", "Business Vehicle Booking") }}</span>
         </a>
 
         <nav class="home-nav" aria-label="Main navigation">
-            <a href="/home" class="active">Home</a>
-            <a href="/vehicles">Vehicles</a>
-            <a href="#about">About</a>
-            <a href="#contact">Contact</a>
+            <a href="/" class="active">{{ t.get("home", "Home") }}</a>
+            <a href="/vehicles">{{ t.get("vehicles", "Vehicles") }}</a>
+            <a href="/farmer-ai">{{ t.get("farmer_ai", "Farmer AI") }}</a>
+            <a href="#contact">{{ t.get("contact", "Contact") }}</a>
         </nav>
 
         <div class="home-header-actions">
             {% include "_language_selector.html" %}
-            <a href="/admin/login" class="home-admin-button" title="Administrative Portal">Admin Dashboard</a>
+            <a href="/admin/login" class="home-admin-button" title="Administrative Portal">{{ t.get("admin_dashboard", "Admin Dashboard") }}</a>
             {% if session.get('user_id') %}
-                <a href="/mybookings" class="home-auth-link">My Bookings</a>
+                <a href="/mybookings" class="home-auth-link">{{ t.get("my_bookings", "My Bookings") }}</a>
                 <form method="POST" action="/logout" class="home-inline-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="home-auth-button">Logout</button>
+                    <button type="submit" class="home-auth-button">{{ t.get("logout", "Logout") }}</button>
                 </form>
             {% elif session.get('owner_id') %}
-                <a href="/owner_dashboard" class="home-auth-link">Dashboard</a>
+                <a href="/owner_dashboard" class="home-auth-link">{{ t.get("dashboard", "Dashboard") }}</a>
                 <form method="POST" action="/owner_logout" class="home-inline-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="home-auth-button">Logout</button>
+                    <button type="submit" class="home-auth-button">{{ t.get("logout", "Logout") }}</button>
                 </form>
             {% elif session.get('admin_id') %}
-                <a href="/admin_dashboard" class="home-auth-link">Dashboard</a>
+                <a href="/admin_dashboard" class="home-auth-link">{{ t.get("dashboard", "Dashboard") }}</a>
                 <form method="POST" action="/admin_logout" class="home-inline-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="home-auth-button">Logout</button>
+                    <button type="submit" class="home-auth-button">{{ t.get("logout", "Logout") }}</button>
                 </form>
             {% else %}
-                <a href="/login" class="home-auth-link">Login</a>
-                <a href="/ownerregister" class="home-register-link">Register</a>
+                <a href="/login" class="home-auth-link">{{ t.get("login", "Login") }}</a>
+                <a href="/ownerregister" class="home-register-link">{{ t.get("register", "Register") }}</a>
             {% endif %}
         </div>
     </header>
@@ -54,45 +54,45 @@
         <section class="home-hero" aria-labelledby="home-hero-title">
             <div class="home-hero-overlay"></div>
             <div class="home-hero-content">
-                <p class="home-eyebrow">Heavy Vehicles for a Stronger Tomorrow</p>
-                <h1 id="home-hero-title">Book Commercial Vehicles with Ease</h1>
-                <p class="home-hero-copy">Connecting farmers and business owners with reliable commercial vehicles for a better tomorrow.</p>
+                <p class="home-eyebrow">{{ t.get("heavy_vehicles_title", "Heavy Vehicles for a Stronger Tomorrow") }}</p>
+                <h1 id="home-hero-title">{{ t.get("book_vehicles_ease", "Book Commercial Vehicles with Ease") }}</h1>
+                <p class="home-hero-copy">{{ t.get("hero_subtitle", "Connecting farmers and business owners with reliable commercial vehicles for a better tomorrow.") }}</p>
                 <div class="home-hero-links">
-                    <a href="/vehicles" class="home-primary-button">Explore Vehicles <span aria-hidden="true">&#8594;</span></a>
-                    <a href="/farmer-ai" class="home-hero-text-link">Try Farmer AI <span aria-hidden="true">&#8594;</span></a>
+                    <a href="/vehicles" class="home-primary-button">{{ t.get("explore_vehicles", "Explore Vehicles") }} <span aria-hidden="true">&#8594;</span></a>
+                    <a href="/farmer-ai" class="home-hero-text-link">{{ t.get("try_farmer_ai", "Try Farmer AI") }} <span aria-hidden="true">&#8594;</span></a>
                 </div>
             </div>
 
             <div class="home-action-cards" aria-label="Vehicle actions">
                 <a href="/vehicles" class="home-action-card">
                     <span class="home-action-icon" aria-hidden="true">▣</span>
-                    <span><strong>Book a Vehicle</strong><small>Find and book the right vehicle for your needs</small></span>
+                    <span><strong>{{ t.get("book_vehicle", "Book a Vehicle") }}</strong><small>{{ t.get("customer_desc", "Find and book the right vehicle for your needs") }}</small></span>
                     <span class="home-action-arrow" aria-hidden="true">&#8594;</span>
                 </a>
                 <a href="/vehicles" class="home-action-card">
                     <span class="home-action-icon" aria-hidden="true">⌁</span>
-                    <span><strong>Vehicle Routes</strong><small>Explore available routes and vehicle options</small></span>
+                    <span><strong>{{ t.get("available_routes_rent", "Vehicle Routes") }}</strong><small>{{ t.get("transportation_message", "Explore available routes and vehicle options") }}</small></span>
                     <span class="home-action-arrow" aria-hidden="true">&#8594;</span>
                 </a>
             </div>
         </section>
 
         <section class="home-features" aria-label="Service benefits">
-            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">✓</span><div><h2>Secure &amp; Reliable</h2><p>Your trust is our priority</p></div></div>
-            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">▦</span><div><h2>Wide Vehicle Range</h2><p>From small to heavy vehicles</p></div></div>
-            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">⌁</span><div><h2>Route Based Pricing</h2><p>Transparent and fair rates</p></div></div>
-            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">24</span><div><h2>24/7 Support</h2><p>We're always here to help</p></div></div>
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">✓</span><div><h2>{{ t.get("secure_reliable", "Secure & Reliable") }}</h2><p>{{ t.get("secure_desc", "Your trust is our priority") }}</p></div></div>
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">▦</span><div><h2>{{ t.get("wide_range", "Wide Vehicle Range") }}</h2><p>{{ t.get("wide_range_desc", "From small to heavy vehicles") }}</p></div></div>
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">⌁</span><div><h2>{{ t.get("route_pricing", "Route Based Pricing") }}</h2><p>{{ t.get("route_pricing_desc", "Transparent and fair rates") }}</p></div></div>
+            <div class="home-feature-item"><span class="home-feature-icon" aria-hidden="true">24</span><div><h2>{{ t.get("support_247", "24/7 Support") }}</h2><p>{{ t.get("support_desc", "We're always here to help") }}</p></div></div>
         </section>
 
         <section class="home-ai-card" aria-labelledby="home-ai-title">
             <div class="home-ai-icon" aria-hidden="true">✦</div>
-            <div><p class="home-section-kicker">Smart farming support</p><h2 id="home-ai-title">Farmer AI Assistant</h2><p>Scan crops &amp; get expert advice</p></div>
-            <a href="/farmer-ai" class="home-ai-button">Try Now <span aria-hidden="true">&#8594;</span></a>
+            <div><p class="home-section-kicker">{{ t.get('smart_farming_support', 'Smart farming support') }}</p><h2 id="home-ai-title">{{ t.get("farmer_ai_assistant", "Farmer AI Crop Disease Assistant") }}</h2><p>{{ t.get("analyze_leaf", "Scan crops & get expert advice") }}</p></div>
+            <a href="/farmer-ai" class="home-ai-button">{{ t.get("try_farmer_ai", "Try Now") }} <span aria-hidden="true">&#8594;</span></a>
         </section>
 
         <section id="contact" class="home-contact" aria-labelledby="home-contact-title">
-            <div><p class="home-section-kicker">Ready when you are</p><h2 id="home-contact-title">Start moving your next load.</h2></div>
-            <a href="/vehicles" class="home-primary-button">Browse Vehicles <span aria-hidden="true">&#8594;</span></a>
+            <div><p class="home-section-kicker">{{ t.get("ready_when_you_are", "Ready when you are") }}</p><h2 id="home-contact-title">{{ t.get("start_moving", "Start moving your next load.") }}</h2></div>
+            <a href="/vehicles" class="home-primary-button">{{ t.get("explore_vehicles", "Browse Vehicles") }} <span aria-hidden="true">&#8594;</span></a>
         </section>
     </main>
 

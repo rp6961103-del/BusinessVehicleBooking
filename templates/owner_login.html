@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_language or 'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vehicle Owner Login | Business Vehicle Booking</title>
+    <title>{{ t.get("owner_login", "Owner Login") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script defer src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
@@ -11,26 +11,28 @@
 
 <header>
     <a href="/" class="logo">
-        <span>🚚</span> Business Vehicle Booking
+        <span>🚚</span> {{ t.get("vehicle_booking", "Business Vehicle Booking") }}
     </a>
     <nav>
-        <a href="/">Back to Home</a>
-        <a href="/login">Customer Login</a>
-        <a href="/farmer-ai">🌿 Farmer AI</a>
+        <a href="/">{{ t.get("back_home", "Back to Home") }}</a>
+        <a href="/login">{{ t.get("customer_login", "Customer Login") }}</a>
+        <a href="/farmer-ai">🌿 {{ t.get("farmer_ai", "Farmer AI") }}</a>
     </nav>
 </header>
+
+{% include "_language_selector.html" %}
 
 <main class="container container-narrow">
     <div class="form-card" style="border-top-color: var(--accent);">
         <div style="text-align: center; font-size: 40px; margin-bottom: 8px;">🚚</div>
-        <h1>Vehicle Owner Login</h1>
-        <p class="subtitle">Access your fleet dashboard to manage vehicles, routes, and bookings.</p>
+        <h1>{{ t.get("owner_login", "Owner Login") }}</h1>
+        <p class="subtitle">{{ t.get("owner_desc", "Access your fleet dashboard to manage vehicles, routes, and bookings.") }}</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="message {{ category }}" role="alert">
-                        {{ message }}
+                        {{ t.get(message, message) }}
                     </div>
                 {% endfor %}
             {% endif %}
@@ -40,12 +42,12 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="form-group">
-                <label for="email">📧 Registered Owner Email</label>
+                <label for="email">📧 {{ t.get("email_address", "Email Address") }}</label>
                 <input
                     type="email"
                     id="email"
                     name="email"
-                    placeholder="owner@example.com"
+                    placeholder="{{ t.get('enter_owner_email_placeholder', 'owner@example.com (used for login & alerts)') }}"
                     maxlength="255"
                     required
                     autocomplete="email"
@@ -53,30 +55,30 @@
             </div>
 
             <div class="form-group">
-                <label for="password">🔑 Password</label>
+                <label for="password">🔑 {{ t.get("password", "Password") }}</label>
                 <input
                     type="password"
                     id="password"
                     name="password"
-                    placeholder="Enter owner account password"
+                    placeholder="{{ t.get('enter_password_placeholder', 'Enter owner account password') }}"
                     required
                     autocomplete="current-password"
                 >
             </div>
 
             <button type="submit" class="btn btn-accent full-btn" style="margin-top: 10px;">
-                🚚 Sign In to Dashboard
+                🚚 {{ t.get("owner_sign_in", "Sign In to Dashboard") }}
             </button>
         </form>
 
         <div style="margin-top: 24px; text-align: center; border-top: 1px solid var(--line); padding-top: 18px;">
-            <p style="margin-bottom: 10px; font-size: 0.9rem; color: var(--muted);">New vehicle owner?</p>
+            <p style="margin-bottom: 10px; font-size: 0.9rem; color: var(--muted);">{{ t.get("new_vehicle_owner", "New vehicle owner?") }}</p>
             <a href="/ownerregister" class="btn btn-secondary full-btn">
-                ➕ Register as a Vehicle Owner
+                ➕ {{ t.get("register_as_owner", "Register as a Vehicle Owner") }}
             </a>
             <div style="margin-top: 14px;">
                 <a href="/login" style="font-size: 0.88rem; font-weight: 600;">
-                    ← Looking to book a vehicle? Customer Login here
+                    ← {{ t.get("for_customers", "Looking to book a vehicle?") }} {{ t.get("customer_sign_in", "Customer Login") }} →
                 </a>
             </div>
         </div>
@@ -84,8 +86,8 @@
 </main>
 
 <footer>
-    <p>© 2026 Business Vehicle Booking System</p>
-    <p>Owner Fleet Management Portal</p>
+    <p>© 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</p>
+    <p>{{ t.get("footer_message", "Owner Fleet Management Portal") }}</p>
 </footer>
 
 </body>

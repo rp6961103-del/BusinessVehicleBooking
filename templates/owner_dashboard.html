@@ -3,111 +3,581 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Owner Dashboard | Business Vehicle Booking</title>
+<title>{{ t.get("owner_dashboard", "Owner Dashboard") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script defer src="{{ url_for('static', filename='script.js') }}"></script>
 <style>
-:root{--od-brand:#176b58;--od-dark:#123c34;--od-soft:#eaf5f1;--od-line:#dfe9e5;--od-bg:#f5f8f7;--od-muted:#64736f;--od-shadow:0 12px 35px rgba(22,55,48,.08)}
-body{background:var(--od-bg);color:#20302c}
-.od-wrap{width:min(1240px,94%);margin:28px auto 50px}
-.od-hero{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;padding:28px;border-radius:22px;background:linear-gradient(135deg,#123c34,#176b58);color:#fff;box-shadow:var(--od-shadow);margin-bottom:22px}
-.od-hero h1{margin:0 0 8px;font-size:32px}.od-hero p{margin:0;opacity:.86}.od-actions{display:flex;gap:9px;flex-wrap:wrap}.od-actions a{background:#fff;color:var(--od-dark);padding:11px 15px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px}
-.od-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}.stat{background:#fff;border:1px solid var(--od-line);border-radius:16px;padding:18px;box-shadow:var(--od-shadow)}.stat-top{display:flex;justify-content:space-between;align-items:center}.stat-icon{font-size:25px}.stat-label{font-size:12px;color:var(--od-muted);font-weight:700}.stat-value{font-size:28px;font-weight:900;margin-top:7px;color:var(--od-dark)}.stat.pending .stat-value{color:#b26b00}.stat.accepted .stat-value{color:#19734f}.stat.rejected .stat-value{color:#b53a3a}
-.od-section{background:#fff;border:1px solid var(--od-line);border-radius:18px;box-shadow:var(--od-shadow);overflow:hidden;margin-bottom:22px}.od-section-head{padding:18px 20px;border-bottom:1px solid var(--od-line);display:flex;justify-content:space-between;gap:15px;align-items:center}.od-section-head h2{margin:0;color:var(--od-dark);font-size:20px}.od-section-head span{color:var(--od-muted);font-size:13px}
-.pending-panel{background:#fff9ec;border:1px solid #f1d9a5;border-radius:15px;padding:15px 17px;margin:18px 20px}.pending-panel strong{color:#8b5c0b}.pending-panel p{margin:5px 0 0;color:#6d5a35;font-size:13px}
-.table-wrap{overflow:auto}.od-table{width:100%;border-collapse:collapse;min-width:1000px}.od-table th{background:#f2f7f5;color:#46605a;padding:13px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}.od-table td{padding:14px 12px;border-top:1px solid #edf1ef;font-size:13px;vertical-align:middle}.od-table tr:hover td{background:#fbfdfc}.customer{font-weight:800;color:#20302c}.vehicle{font-weight:800;color:var(--od-brand)}.route{white-space:nowrap}.rent{font-weight:900;color:#19734f;white-space:nowrap}.status{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:900}.s-pending{background:#fff1ce;color:#8a5a00}.s-accepted{background:#dcf2e8;color:#166541}.s-rejected{background:#fbe3e3;color:#a13434}
-.action-cell{min-width:180px}.action-buttons{display:flex;gap:7px}.action-buttons form{margin:0}.action-btn{border:0;border-radius:9px;padding:9px 11px;color:#fff;font-weight:900;font-size:12px;cursor:pointer}.accept{background:#198754}.reject{background:#d94a4a}.action-btn:hover{filter:brightness(.94)}.no-action{color:#8a9692;font-size:12px}
-.empty{padding:55px 20px;text-align:center;color:var(--od-muted)}.empty .icon{font-size:42px}.empty h3{color:var(--od-dark);margin:10px 0 5px}
-@media(max-width:900px){.od-hero{flex-direction:column;align-items:flex-start}.od-stats{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){.od-wrap{width:92%}.od-hero h1{font-size:25px}.od-stats{grid-template-columns:1fr 1fr;gap:9px}.stat{padding:14px}.stat-value{font-size:23px}.od-actions{width:100%}.od-actions a{flex:1;text-align:center}.od-section-head{align-items:flex-start;flex-direction:column}}
+:root {
+    --saas-primary: #0b4d42;
+    --saas-brand: #146b5b;
+    --saas-brand-light: #1b8572;
+    --saas-accent: #e59834;
+    --saas-bg: #f4f7f5;
+    --saas-surface: #ffffff;
+    --saas-line: #dfe9e5;
+    --saas-line-light: #edf3f0;
+    --saas-text-main: #18302b;
+    --saas-text-muted: #5e726d;
+    --saas-success: #17603c;
+    --saas-success-bg: #dff3e8;
+    --saas-warning: #8b5c0b;
+    --saas-warning-bg: #fff5db;
+    --saas-danger: #a13434;
+    --saas-danger-bg: #fde8e8;
+    --saas-radius: 16px;
+    --saas-radius-sm: 10px;
+    --saas-shadow: 0 8px 24px rgba(11, 77, 66, 0.07);
+    --saas-shadow-lg: 0 16px 36px rgba(11, 77, 66, 0.12);
+}
+body {
+    background-color: var(--saas-bg);
+    color: var(--saas-text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0; padding: 0; min-height: 100vh;
+}
+.saas-topbar {
+    background: #ffffff; border-bottom: 1px solid var(--saas-line); padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+.saas-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--saas-primary); }
+.saas-brand-logo { font-size: 26px; line-height: 1; background: var(--saas-brand-light); color: #fff; padding: 6px 10px; border-radius: 10px; }
+.saas-brand-text h1 { font-size: 18px; font-weight: 800; margin: 0; color: var(--saas-primary); line-height: 1.2; }
+.saas-brand-text p { font-size: 11px; font-weight: 600; color: var(--saas-text-muted); margin: 0; }
+.saas-top-actions { display: flex; align-items: center; gap: 16px; }
+.saas-owner-pill {
+    display: flex; align-items: center; gap: 10px; background: #f0f6f4; border: 1px solid var(--saas-line);
+    padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--saas-primary);
+}
+.saas-owner-avatar {
+    width: 28px; height: 28px; background: var(--saas-brand); color: #fff; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;
+}
+.saas-mobile-toggle {
+    display: none; background: #f0f6f4; border: 1px solid var(--saas-line); border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; font-weight: 700; color: var(--saas-primary); cursor: pointer;
+}
+.saas-layout { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 65px); max-width: 1440px; margin: 0 auto; }
+.saas-sidebar {
+    background: #ffffff; border-right: 1px solid var(--saas-line); padding: 24px 16px;
+    display: flex; flex-direction: column; justify-content: space-between; position: sticky; top: 65px;
+    height: calc(100vh - 65px); overflow-y: auto;
+}
+.saas-nav-menu { display: flex; flex-direction: column; gap: 6px; }
+.saas-nav-category { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--saas-text-muted); padding: 10px 12px 4px; }
+.saas-nav-link {
+    display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--saas-radius-sm);
+    text-decoration: none; color: var(--saas-text-main); font-size: 14px; font-weight: 700; transition: all 0.15s ease-in-out;
+}
+.saas-nav-link:hover { background: #eef6f3; color: var(--saas-primary); transform: translateX(3px); }
+.saas-nav-link.active { background: var(--saas-primary); color: #ffffff; box-shadow: 0 4px 12px rgba(11, 77, 66, 0.2); }
+.saas-nav-icon { font-size: 18px; line-height: 1; width: 22px; text-align: center; }
+.saas-sidebar-widget { background: linear-gradient(135deg, #eaf5f1, #dcf0e8); border: 1px solid #c2e2d6; border-radius: var(--saas-radius-sm); padding: 14px; margin-top: 20px; }
+.saas-sidebar-widget h4 { font-size: 12px; font-weight: 800; color: var(--saas-primary); margin: 0 0 4px; text-transform: uppercase; }
+.saas-sidebar-widget p { font-size: 12px; color: var(--saas-text-muted); margin: 0 0 10px; }
+.saas-sidebar-logout-btn {
+    width: 100%; background: #fff; border: 1px solid #d4e5de; border-radius: 8px; padding: 9px 12px;
+    font-size: 13px; font-weight: 800; color: #a13434; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;
+}
+.saas-sidebar-logout-btn:hover { background: #fde8e8; border-color: #f5c2c2; }
+.saas-main { padding: 24px 28px 60px; overflow-y: auto; }
+.saas-lang-wrapper { margin-bottom: 16px; }
+.saas-hero {
+    background: linear-gradient(135deg, #0b4d42 0%, #166b5b 100%);
+    color: #ffffff; border-radius: var(--saas-radius); padding: 28px 32px;
+    box-shadow: var(--saas-shadow-lg); display: flex; justify-content: space-between;
+    align-items: center; gap: 24px; margin-bottom: 22px; position: relative; overflow: hidden;
+}
+.saas-hero-content { position: relative; z-index: 1; max-width: 680px; }
+.saas-hero-content h2 { font-size: 26px; font-weight: 900; margin: 0 0 8px; color: #ffffff; line-height: 1.2; }
+.saas-hero-content p { font-size: 14px; line-height: 1.5; margin: 0; color: rgba(255, 255, 255, 0.9); }
+.saas-hero-actions { position: relative; z-index: 1; display: flex; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+.saas-btn-hero-primary {
+    background: #ffffff; color: var(--saas-primary); padding: 11px 18px; border-radius: 11px;
+    text-decoration: none; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center;
+    gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); transition: all 0.15s ease;
+}
+.saas-btn-hero-primary:hover { background: #f0f7f4; transform: translateY(-2px); }
+.saas-btn-hero-secondary {
+    background: rgba(255, 255, 255, 0.18); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.35);
+    padding: 11px 16px; border-radius: 11px; text-decoration: none; font-size: 13px; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s ease;
+}
+.saas-btn-hero-secondary:hover { background: rgba(255, 255, 255, 0.28); transform: translateY(-2px); }
+.saas-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px; }
+.saas-stat-card {
+    background: #ffffff; border: 1px solid var(--saas-line); border-radius: var(--saas-radius);
+    padding: 18px 16px; box-shadow: var(--saas-shadow); display: flex; flex-direction: column;
+    justify-content: space-between; position: relative; overflow: hidden; transition: all 0.2s ease;
+}
+.saas-stat-card:hover { transform: translateY(-2px); box-shadow: var(--saas-shadow-lg); border-color: #c0ded4; }
+.saas-stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--saas-brand); }
+.saas-stat-card.card-pending::before { background: var(--saas-accent); }
+.saas-stat-card.card-accepted::before { background: #198754; }
+.saas-stat-card.card-active::before { background: #0b4d42; }
+.saas-stat-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.saas-stat-label { font-size: 11px; font-weight: 800; color: var(--saas-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.saas-stat-icon-wrap { width: 34px; height: 34px; border-radius: 9px; background: #f0f7f4; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.card-pending .saas-stat-icon-wrap { background: var(--saas-warning-bg); }
+.card-accepted .saas-stat-icon-wrap { background: var(--saas-success-bg); }
+.saas-stat-number { font-size: 28px; font-weight: 900; color: var(--saas-primary); line-height: 1; margin-bottom: 5px; }
+.card-pending .saas-stat-number { color: var(--saas-warning); }
+.card-accepted .saas-stat-number { color: #198754; }
+.saas-stat-hint { font-size: 11px; font-weight: 600; color: var(--saas-text-muted); }
+.saas-card-section { background: #ffffff; border: 1px solid var(--saas-line); border-radius: var(--saas-radius); box-shadow: var(--saas-shadow); margin-bottom: 24px; overflow: hidden; }
+.saas-section-header { padding: 18px 22px; border-bottom: 1px solid var(--saas-line); display: flex; justify-content: space-between; align-items: center; gap: 16px; background: #fdfefe; }
+.saas-section-title-wrap { display: flex; align-items: center; gap: 10px; }
+.saas-section-title-wrap h3 { font-size: 17px; font-weight: 800; margin: 0; color: var(--saas-primary); }
+.saas-count-badge { background: #eef6f3; color: var(--saas-brand); font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; border: 1px solid #d4ebe2; }
+.saas-view-all-link { font-size: 12px; font-weight: 800; color: var(--saas-brand); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px; border-radius: 7px; background: #f0f7f4; transition: all 0.15s ease; }
+.saas-view-all-link:hover { background: var(--saas-brand); color: #fff; }
+.saas-pending-notice { margin: 18px 22px 0; background: var(--saas-warning-bg); border: 1px solid #f2db9f; border-radius: 11px; padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px; }
+.saas-pending-icon { font-size: 20px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+.saas-pending-text strong { display: block; font-size: 13px; color: var(--saas-warning); margin-bottom: 3px; }
+.saas-pending-text p { font-size: 12px; color: #6b4d12; margin: 0; }
+.saas-table-container { overflow-x: auto; padding: 8px 0; }
+.saas-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; min-width: 920px; }
+.saas-table th { background: #f7faf9; color: var(--saas-text-muted); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 12px 18px; border-bottom: 1px solid var(--saas-line); }
+.saas-table td { padding: 14px 18px; border-bottom: 1px solid var(--saas-line-light); vertical-align: middle; color: var(--saas-text-main); }
+.saas-table tr:last-child td { border-bottom: 0; }
+.saas-table tbody tr:hover td { background-color: #fbfdfc; }
+.saas-booking-id { font-weight: 800; color: var(--saas-primary); font-family: monospace; font-size: 13px; }
+.saas-customer-cell strong { display: block; font-size: 13px; color: var(--saas-text-main); }
+.saas-customer-cell span { font-size: 11px; color: var(--saas-text-muted); }
+.saas-vehicle-cell strong { display: block; font-size: 13px; color: var(--saas-brand); }
+.saas-vehicle-cell span { font-size: 10px; background: #eef6f3; color: var(--saas-primary); padding: 2px 6px; border-radius: 4px; font-weight: 700; display: inline-block; margin-top: 2px; }
+.saas-route-tag { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: #2b453e; background: #f4f8f6; padding: 4px 8px; border-radius: 7px; border: 1px solid #e1ede8; white-space: nowrap; }
+.saas-rent-tag { font-size: 14px; font-weight: 900; color: #166541; white-space: nowrap; }
+.saas-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; }
+.status-badge-pending { background: var(--saas-warning-bg); color: var(--saas-warning); border: 1px solid #f2db9f; }
+.status-badge-accepted { background: var(--saas-success-bg); color: var(--saas-success); border: 1px solid var(--saas-line); }
+.status-badge-rejected { background: var(--saas-danger-bg); color: var(--saas-danger); border: 1px solid #f5c2c2; }
+.saas-action-group { display: flex; align-items: center; gap: 6px; }
+.saas-action-group form { margin: 0; }
+.saas-btn-accept { background: #198754; color: #ffffff; border: none; padding: 7px 12px; border-radius: 7px; font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease; }
+.saas-btn-accept:hover { background: #157347; transform: scale(1.02); }
+.saas-btn-reject { background: #dc3545; color: #ffffff; border: none; padding: 7px 12px; border-radius: 7px; font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease; }
+.saas-btn-reject:hover { background: #bb2d3b; transform: scale(1.02); }
+.saas-no-action-hint { font-size: 11px; font-weight: 600; color: var(--saas-text-muted); font-style: italic; }
+.saas-empty-state { padding: 50px 24px; text-align: center; }
+.saas-empty-icon { font-size: 48px; line-height: 1; margin-bottom: 14px; color: var(--saas-text-muted); }
+.saas-empty-state h4 { font-size: 17px; font-weight: 800; color: var(--saas-primary); margin: 0 0 5px; }
+.saas-empty-state p { font-size: 13px; color: var(--saas-text-muted); margin: 0 auto 16px; max-width: 400px; }
+.saas-management-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; }
+.saas-quick-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px; }
+.saas-quick-card {
+    background: #f8fbfa; border: 1px solid var(--saas-line); border-radius: 11px; padding: 16px;
+    text-decoration: none; color: var(--saas-text-main); transition: all 0.2s ease;
+    display: flex; flex-direction: column; justify-content: space-between;
+}
+.saas-quick-card:hover { background: #ffffff; border-color: var(--saas-brand); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(11, 77, 66, 0.08); }
+.saas-qc-icon { font-size: 26px; margin-bottom: 8px; }
+.saas-qc-title { font-size: 14px; font-weight: 800; color: var(--saas-primary); margin-bottom: 3px; }
+.saas-qc-desc { font-size: 11px; color: var(--saas-text-muted); line-height: 1.3; }
+.saas-profile-box { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.saas-profile-item { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--saas-line-light); font-size: 12px; }
+.saas-profile-item:last-child { border-bottom: 0; }
+.saas-profile-label { font-weight: 700; color: var(--saas-text-muted); }
+.saas-profile-val { font-weight: 800; color: var(--saas-text-main); text-align: right; }
+.saas-footer { text-align: center; padding: 20px; font-size: 12px; font-weight: 600; color: var(--saas-text-muted); border-top: 1px solid var(--saas-line); background: #ffffff; margin-top: 36px; }
+@media (max-width: 1100px) { .saas-stats-grid { grid-template-columns: repeat(3, 1fr); } .saas-management-grid { grid-template-columns: 1fr; } }
+@media (max-width: 850px) {
+    .saas-layout { grid-template-columns: 1fr; }
+    .saas-sidebar { display: none; position: fixed; top: 60px; left: 0; right: 0; bottom: 0; height: calc(100vh - 60px); z-index: 999; border-right: none; }
+    .saas-sidebar.is-open { display: flex; }
+    .saas-mobile-toggle { display: inline-flex; }
+    .saas-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .saas-hero { flex-direction: column; align-items: flex-start; padding: 22px; }
+    .saas-hero-actions { width: 100%; flex-direction: column; }
+    .saas-btn-hero-primary, .saas-btn-hero-secondary { justify-content: center; }
+    .saas-main { padding: 16px 14px 40px; }
+    .saas-quick-cards { grid-template-columns: 1fr; }
+}
+@media (max-width: 500px) { .saas-stats-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-<header>
-<a href="/" class="logo">🚚 {{ t.get("vehicle_booking","Business Vehicle Booking") }}</a>
-<nav>
-<a href="/owner_dashboard" class="active">📊 Dashboard</a>
-<a href="/addvehicle">🚚 Add Vehicle</a>
-<a href="/myvehicles">🚛 My Vehicles</a>
-<a href="/addroute">📍 Add Route</a>
-<form method="POST" action="/owner_logout" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">🚪 Logout</button></form>
-</nav>
+
+<!-- Top SaaS Header Bar -->
+<header class="saas-topbar">
+    <a href="/" class="saas-brand">
+        <span class="saas-brand-logo">🚚</span>
+        <div class="saas-brand-text">
+            <h1>{{ t.get("vehicle_booking", "Business Vehicle Booking") }}</h1>
+            <p>{{ t.get("owner_tagline", "రైతులకు • వ్యాపారులకు • మీ సేవలో") }}</p>
+        </div>
+    </a>
+
+    <div class="saas-top-actions">
+        <div class="saas-owner-pill">
+            <div class="saas-owner-avatar">{{ (session.get("owner_name") or "O")[:1]|upper }}</div>
+            <span>{{ session.get("owner_name") or "Vehicle Owner" }}</span>
+        </div>
+        <button class="saas-mobile-toggle" id="mobileToggleBtn" onclick="toggleMobileMenu()">☰ Menu</button>
+    </div>
 </header>
 
-<div class="od-wrap">
-{% include "_language_selector.html" %}
+<!-- Main Layout Shell -->
+<div class="saas-layout">
 
-<section class="od-hero">
-<div><h1>Owner Dashboard</h1><p>Welcome, <strong>{{ session.get("owner_name") }}</strong>. Manage your fleet and respond to customer booking requests.</p></div>
-<div class="od-actions"><a href="/addvehicle">+ Add Vehicle</a><a href="/addroute">+ Add Route & Rent</a></div>
-</section>
+    <!-- Left Sticky Sidebar -->
+    <aside class="saas-sidebar" id="saasSidebar">
+        <div class="saas-nav-menu">
+            <div class="saas-nav-category">{{ t.get("fleet_management", "Fleet Management") }}</div>
+            
+            <a href="/owner_dashboard" class="saas-nav-link active">
+                <span class="saas-nav-icon">🏠</span>
+                <span>{{ t.get("sidebar_dashboard", "Dashboard") }}</span>
+            </a>
 
-<section class="od-stats">
-<div class="stat"><div class="stat-top"><span class="stat-label">TOTAL BOOKINGS</span><span class="stat-icon">📋</span></div><div class="stat-value">{{ total_bookings }}</div></div>
-<div class="stat"><div class="stat-top"><span class="stat-label">TOTAL VEHICLES</span><span class="stat-icon">🚛</span></div><div class="stat-value">{{ vehicle_count }}</div></div>
-<div class="stat"><div class="stat-top"><span class="stat-label">Active Vehicles</span><span class="stat-icon">🟢</span></div><div class="stat-value">{{ active_vehicles }}</div></div>
-<div class="stat pending"><div class="stat-top"><span class="stat-label">PENDING ACTION</span><span class="stat-icon">⏳</span></div><div class="stat-value">{{ pending_bookings }}</div></div>
-<div class="stat accepted"><div class="stat-top"><span class="stat-label">ACCEPTED</span><span class="stat-icon">✅</span></div><div class="stat-value">{{ accepted_bookings }}</div></div>
-</section>
+            <a href="/myvehicles" class="saas-nav-link">
+                <span class="saas-nav-icon">🚚</span>
+                <span>{{ t.get("my_vehicles", "My Vehicles") }}</span>
+            </a>
 
-<section class="od-section">
-<div class="od-section-head"><h2>📋 Customer Booking Requests</h2><span>{{ total_bookings }} booking(s)</span></div>
-{% if pending_bookings %}
-<div class="pending-panel"><strong>⏳ {{ pending_bookings }} booking request(s) need your action.</strong><p>Review the customer, route, date and fixed rent below, then use <b>Accept</b> or <b>Reject</b>.</p></div>
-{% endif %}
-{% if bookings %}
-<div class="table-wrap"><table class="od-table">
-<thead><tr><th>ID</th><th>Customer</th><th>Phone</th><th>Email</th><th>Vehicle</th><th>Route</th><th>Date</th><th>Rent</th><th>Status</th><th>Payment</th><th>Action</th></tr></thead>
-<tbody>
-{% for booking in bookings %}
-<tr>
-<td>#{{ booking[0] }}</td>
-<td><span class="customer">{{ booking[1] }}</span></td>
-<td>{{ booking[2] }}</td>
-<td>{{ booking[3] or '—' }}</td>
-<td><span class="vehicle">{{ booking[6] }}</span><br><small>{{ booking[7] }}</small></td>
-<td class="route">{{ booking[8] or '—' }} → {{ booking[9] or '—' }}</td>
-<td>{{ booking[4] }}</td>
-<td><span class="rent">₹{{ booking[10] }}</span></td>
-<td>
-{% set st = booking[5]|lower|trim %}
-{% if st == 'pending' %}<span class="status s-pending">⏳ Pending</span>
-{% elif st == 'accepted' %}<span class="status s-accepted">✓ Accepted</span>
-{% elif st == 'rejected' %}<span class="status s-rejected">✕ Rejected</span>
-{% else %}<span class="status">{{ booking[4] }}</span>{% endif %}
-</td>
-<td>
-{% set payment_status = (booking[13] or 'Pending')|lower %}
-{% if payment_status == 'paid' %}
-<span class="status s-accepted">✓ Paid</span>
-{% else %}
-<span class="status s-pending">Pending</span>
-{% endif %}
-</td>
-<td class="action-cell">
-{% if st == 'pending' %}
-<div class="action-buttons">
-<form method="POST" action="{{ url_for('update_booking', booking_id=booking[0], status='Accepted') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="action-btn accept" type="submit">✓ Accept</button></form>
-<form method="POST" action="{{ url_for('update_booking', booking_id=booking[0], status='Rejected') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="action-btn reject" type="submit">✕ Reject</button></form>
+            <a href="/addroute" class="saas-nav-link">
+                <span class="saas-nav-icon">🛣️</span>
+                <span>{{ t.get("add_route", "Add Route & Rent") }}</span>
+            </a>
+
+            <a href="/addvehicle" class="saas-nav-link">
+                <span class="saas-nav-icon">➕</span>
+                <span>{{ t.get("add_vehicle", "Add Vehicle") }}</span>
+            </a>
+
+            <a href="#bookings-section" class="saas-nav-link">
+                <span class="saas-nav-icon">📋</span>
+                <span>{{ t.get("customer_booking_requests", "Booking Requests") }}</span>
+            </a>
+
+            <div class="saas-nav-category" style="margin-top: 14px;">{{ t.get("additional_info", "Services & Account") }}</div>
+
+            <a href="/farmer-ai" class="saas-nav-link">
+                <span class="saas-nav-icon">🌿</span>
+                <span>{{ t.get("farmer_ai", "Farmer AI") }}</span>
+            </a>
+
+            <a href="#profile-section" class="saas-nav-link">
+                <span class="saas-nav-icon">👤</span>
+                <span>{{ t.get("profile", "Owner Profile") }}</span>
+            </a>
+        </div>
+
+        <div>
+            <div class="saas-sidebar-widget">
+                <h4>{{ t.get("fleet_overview", "Fleet Overview") }}</h4>
+                <p>🟢 {{ active_vehicles }} / {{ vehicle_count }} {{ t.get("active_vehicles", "Active Vehicles") }}</p>
+                <a href="/addvehicle" class="saas-btn-hero-primary" style="font-size:12px; padding:7px 12px; width:100%; justify-content:center;">
+                    + {{ t.get("add_vehicle", "Add Vehicle") }}
+                </a>
+            </div>
+
+            <form method="POST" action="/owner_logout" style="margin-top: 14px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="saas-sidebar-logout-btn">
+                    <span>🚪</span>
+                    <span>{{ t.get("logout", "Logout") }}</span>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Main Dashboard Content -->
+    <main class="saas-main">
+        
+        <!-- Global Multi-Language Selector Dropdown -->
+        <div class="saas-lang-wrapper">
+            {% include "_language_selector.html" %}
+        </div>
+
+        <!-- Hero / Welcome Banner -->
+        <section class="saas-hero">
+            <div class="saas-hero-content">
+                <h2>
+                    {{ t.get("welcome", "Welcome") }}, {{ session.get("owner_name") }}{% if current_language == 'te' %} గారు{% elif current_language == 'ta' %} அவர்களே{% elif current_language == 'hi' %} जी{% endif %}! 🚜
+                </h2>
+                <p>
+                    {{ t.get("owner_hero_subtitle", "Manage your vehicles, routes, and respond to customer booking requests.") }}
+                </p>
+            </div>
+            <div class="saas-hero-actions">
+                <a href="/addvehicle" class="saas-btn-hero-primary">
+                    <span>➕</span> {{ t.get("add_vehicle", "+ Add Vehicle") }}
+                </a>
+                <a href="/addroute" class="saas-btn-hero-secondary">
+                    <span>🛣️</span> {{ t.get("add_route_rent", "+ Add Route & Rent") }}
+                </a>
+            </div>
+        </section>
+
+        <!-- 5 Dashboard Statistics Cards -->
+        <section class="saas-stats-grid">
+            <!-- Card 1: Total Bookings -->
+            <div class="saas-stat-card">
+                <div class="saas-stat-head">
+                    <span class="saas-stat-label">{{ t.get("total_bookings", "Total Bookings") }}</span>
+                    <div class="saas-stat-icon-wrap">📋</div>
+                </div>
+                <div class="saas-stat-number">{{ total_bookings }}</div>
+                <div class="saas-stat-hint">{{ t.get("total_bookings_desc", "All-time bookings") }}</div>
+            </div>
+
+            <!-- Card 2: Total Vehicles -->
+            <div class="saas-stat-card">
+                <div class="saas-stat-head">
+                    <span class="saas-stat-label">{{ t.get("total_vehicles", "Total Vehicles") }}</span>
+                    <div class="saas-stat-icon-wrap">🚛</div>
+                </div>
+                <div class="saas-stat-number">{{ vehicle_count }}</div>
+                <div class="saas-stat-hint">{{ t.get("total_vehicles_desc", "Registered fleet") }}</div>
+            </div>
+
+            <!-- Card 3: Active Vehicles -->
+            <div class="saas-stat-card card-active">
+                <div class="saas-stat-head">
+                    <span class="saas-stat-label">{{ t.get("active_vehicles", "Active Vehicles") }}</span>
+                    <div class="saas-stat-icon-wrap">🟢</div>
+                </div>
+                <div class="saas-stat-number">{{ active_vehicles }}</div>
+                <div class="saas-stat-hint">{{ t.get("active_vehicles_desc", "Ready with active routes") }}</div>
+            </div>
+
+            <!-- Card 4: Pending Actions -->
+            <div class="saas-stat-card card-pending">
+                <div class="saas-stat-head">
+                    <span class="saas-stat-label">{{ t.get("pending_action", "Pending Actions") }}</span>
+                    <div class="saas-stat-icon-wrap">⏳</div>
+                </div>
+                <div class="saas-stat-number">{{ pending_bookings }}</div>
+                <div class="saas-stat-hint">{{ t.get("pending_actions_desc", "Requires confirmation") }}</div>
+            </div>
+
+            <!-- Card 5: Accepted Bookings -->
+            <div class="saas-stat-card card-accepted">
+                <div class="saas-stat-head">
+                    <span class="saas-stat-label">{{ t.get("accepted", "Accepted Bookings") }}</span>
+                    <div class="saas-stat-icon-wrap">✅</div>
+                </div>
+                <div class="saas-stat-number">{{ accepted_bookings }}</div>
+                <div class="saas-stat-hint">{{ t.get("accepted_bookings_desc", "Confirmed rides") }}</div>
+            </div>
+        </section>
+
+        <!-- Customer Booking Requests Section -->
+        <section class="saas-card-section" id="bookings-section">
+            <div class="saas-section-header">
+                <div class="saas-section-title-wrap">
+                    <h3>📋 {{ t.get("customer_booking_requests", "Recent Booking Requests") }}</h3>
+                    <span class="saas-count-badge">{{ total_bookings }} {{ t.get("total_bookings", "Bookings") }}</span>
+                </div>
+                <a href="/myvehicles" class="saas-view-all-link">
+                    <span>{{ t.get("view_all_bookings", "View Fleet") }}</span>
+                    <span>→</span>
+                </a>
+            </div>
+
+            {% if pending_bookings > 0 %}
+            <div class="saas-pending-notice">
+                <div class="saas-pending-icon">⏳</div>
+                <div class="saas-pending-text">
+                    <strong>{{ pending_bookings }} {{ t.get("pending_review_banner", "booking request(s) need your immediate review and action.") }}</strong>
+                    <p>{{ t.get("pending_review_hint", "Review the customer, route, date, and fixed rent below, then click Accept or Reject.") }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if bookings %}
+            <div class="saas-table-container">
+                <table class="saas-table">
+                    <thead>
+                        <tr>
+                            <th>{{ t.get("booking_id_col", "Booking ID") }}</th>
+                            <th>{{ t.get("customer", "Customer") }}</th>
+                            <th>{{ t.get("vehicle_col", "Vehicle") }}</th>
+                            <th>{{ t.get("route_col", "Route") }}</th>
+                            <th>{{ t.get("booking_date", "Date") }}</th>
+                            <th>{{ t.get("rent", "Rent") }}</th>
+                            <th>{{ t.get("status", "Status") }}</th>
+                            <th>{{ t.get("payment_col", "Payment") }}</th>
+                            <th>{{ t.get("action_col", "Action") }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for booking in bookings %}
+                        {% set st = (booking[5] or '')|lower|trim %}
+                        {% set pay_st = (booking[13] or 'Pending')|lower|trim %}
+                        <tr>
+                            <td>
+                                <span class="saas-booking-id">#{{ booking[0] }}</span>
+                            </td>
+                            <td>
+                                <div class="saas-customer-cell">
+                                    <strong>{{ booking[1] }}</strong>
+                                    <span>📞 {{ booking[2] }}</span>
+                                    {% if booking[3] %}
+                                    <br><small style="color:var(--saas-text-muted); font-size:11px;">✉️ {{ booking[3] }}</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="saas-vehicle-cell">
+                                    <strong>{{ booking[6] }}</strong>
+                                    <span>{{ booking[7] }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="saas-route-tag">
+                                    <span>📍</span> {{ booking[8] or '—' }} <span>→</span> {{ booking[9] or '—' }}
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ booking[4] }}</strong>
+                            </td>
+                            <td>
+                                <span class="saas-rent-tag">₹{{ booking[10] }}</span>
+                            </td>
+                            <td>
+                                {% if st == 'pending' %}
+                                    <span class="saas-status-badge status-badge-pending">⏳ {{ t.get("pending", "Pending") }}</span>
+                                {% elif st == 'accepted' %}
+                                    <span class="saas-status-badge status-badge-accepted">✓ {{ t.get("accepted", "Accepted") }}</span>
+                                {% elif st == 'rejected' %}
+                                    <span class="saas-status-badge status-badge-rejected">✕ {{ t.get("rejected", "Rejected") }}</span>
+                                {% else %}
+                                    <span class="saas-status-badge">{{ booking[5] }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if pay_st == 'paid' %}
+                                    <span class="saas-status-badge status-badge-accepted">✓ {{ t.get("paid", "Paid") }}</span>
+                                {% else %}
+                                    <span class="saas-status-badge status-badge-pending">⏳ {{ t.get("pending", "Pending") }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if st == 'pending' %}
+                                <div class="saas-action-group">
+                                    <form method="POST" action="{{ url_for('update_booking', booking_id=booking[0], status='Accepted') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="saas-btn-accept" type="submit" title="Accept Booking Request">
+                                            ✓ {{ t.get("accept", "Accept") }}
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('update_booking', booking_id=booking[0], status='Rejected') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="saas-btn-reject" type="submit" title="Reject Booking Request">
+                                            ✕ {{ t.get("reject", "Reject") }}
+                                        </button>
+                                    </form>
+                                </div>
+                                {% else %}
+                                <span class="saas-no-action-hint">{{ t.get("no_action_needed", "No action required") }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="saas-empty-state">
+                <div class="saas-empty-icon">📭</div>
+                <h4>{{ t.get("no_bookings_title", "No booking requests yet") }}</h4>
+                <p>{{ t.get("no_bookings_desc", "Customer bookings for your vehicles will appear here in real time.") }}</p>
+                <a href="/addroute" class="saas-btn-hero-primary" style="display:inline-flex; margin-top:10px;">
+                    🛣️ {{ t.get("add_route_rent", "+ Add Route & Rent") }}
+                </a>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- Quick Management & Profile Section -->
+        <div class="saas-management-grid" id="profile-section">
+            
+            <!-- Quick Management Operations -->
+            <div class="saas-card-section" style="margin-bottom:0;">
+                <div class="saas-section-header">
+                    <div class="saas-section-title-wrap">
+                        <h3>⚡ {{ t.get("quick_actions_title", "Quick Management") }}</h3>
+                    </div>
+                </div>
+                <div class="saas-quick-cards">
+                    <a href="/addvehicle" class="saas-quick-card">
+                        <div>
+                            <div class="saas-qc-icon">🚚</div>
+                            <div class="saas-qc-title">{{ t.get("add_vehicle", "Add Vehicle") }}</div>
+                            <div class="saas-qc-desc">{{ t.get("owner_desc", "Register a new commercial vehicle in your fleet") }}</div>
+                        </div>
+                        <span style="font-size:12px; font-weight:800; color:var(--saas-brand); margin-top:14px;">+ {{ t.get("add_vehicle", "Register") }} →</span>
+                    </a>
+
+                    <a href="/myvehicles" class="saas-quick-card">
+                        <div>
+                            <div class="saas-qc-icon">🚛</div>
+                            <div class="saas-qc-title">{{ t.get("my_vehicles", "My Vehicles") }}</div>
+                            <div class="saas-qc-desc">{{ t.get("manage_fleet_desc", "View, edit, or delete existing vehicles") }}</div>
+                        </div>
+                        <span style="font-size:12px; font-weight:800; color:var(--saas-brand); margin-top:14px;">{{ t.get("manage_fleet", "Manage Fleet") }} →</span>
+                    </a>
+
+                    <a href="/addroute" class="saas-quick-card">
+                        <div>
+                            <div class="saas-qc-icon">📍</div>
+                            <div class="saas-qc-title">{{ t.get("add_route", "Route & Rent") }}</div>
+                            <div class="saas-qc-desc">{{ t.get("manage_routes_desc", "Configure fixed route pricing for customers") }}</div>
+                        </div>
+                        <span style="font-size:12px; font-weight:800; color:var(--saas-brand); margin-top:14px;">{{ t.get("add_route_rent", "Set Pricing") }} →</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Owner Profile Card -->
+            <div class="saas-card-section" style="margin-bottom:0;">
+                <div class="saas-section-header">
+                    <div class="saas-section-title-wrap">
+                        <h3>👤 {{ t.get("owner_profile_title", "Owner Profile") }}</h3>
+                    </div>
+                </div>
+                <div class="saas-profile-box">
+                    <div class="saas-profile-item">
+                        <span class="saas-profile-label">{{ t.get("customer_name", "Owner Name") }}</span>
+                        <span class="saas-profile-val">{{ session.get("owner_name") or "Commercial Operator" }}</span>
+                    </div>
+                    <div class="saas-profile-item">
+                        <span class="saas-profile-label">{{ t.get("phone_number", "Phone") }}</span>
+                        <span class="saas-profile-val">{{ session.get("user_phone") or session.get("owner_phone") or "—" }}</span>
+                    </div>
+                    <div class="saas-profile-item">
+                        <span class="saas-profile-label">{{ t.get("email", "Email") }}</span>
+                        <span class="saas-profile-val" style="word-break:break-all;">{{ session.get("owner_email") or "—" }}</span>
+                    </div>
+                    <div class="saas-profile-item">
+                        <span class="saas-profile-label">{{ t.get("status", "Account Status") }}</span>
+                        <span class="saas-profile-val" style="color:#198754;">🟢 Active Fleet</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
 </div>
-{% else %}<span class="no-action">No action required</span>{% endif %}
-</td>
-</tr>
-{% endfor %}
-</tbody></table></div>
-{% else %}
-<div class="empty"><div class="icon">📭</div><h3>No booking requests yet</h3><p>New customer bookings for your vehicles will appear here.</p></div>
-{% endif %}
-</section>
 
-<section class="od-section">
-<div class="od-section-head"><h2>Quick Management</h2><span>Keep your fleet information up to date</span></div>
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px">
-<a href="/addvehicle" style="padding:18px;border:1px solid var(--od-line);border-radius:13px;text-decoration:none;color:var(--od-dark);font-weight:800">🚚 Add Vehicle<br><small style="color:var(--od-muted)">Register a new vehicle</small></a>
-<a href="/myvehicles" style="padding:18px;border:1px solid var(--od-line);border-radius:13px;text-decoration:none;color:var(--od-dark);font-weight:800">🚛 My Vehicles<br><small style="color:var(--od-muted)">Edit and manage vehicles</small></a>
-<a href="/addroute" style="padding:18px;border:1px solid var(--od-line);border-radius:13px;text-decoration:none;color:var(--od-dark);font-weight:800">📍 Routes & Rent<br><small style="color:var(--od-muted)">Set fixed route pricing</small></a>
-</div>
-</section>
-</div>
-<footer class="footer"><p>© 2026 {{ t.get("vehicle_booking","Business Vehicle Booking") }} • Owner Management Portal</p></footer>
+<!-- Footer -->
+<footer class="saas-footer">
+    <p>© 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }} • {{ t.get("owner_dashboard", "Owner Management Portal") }}</p>
+</footer>
+
+<script>
+function toggleMobileMenu() {
+    var sidebar = document.getElementById('saasSidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('is-open');
+    }
+}
+</script>
+
 </body>
 </html>
+

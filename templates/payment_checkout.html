@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Demo Payment | Business Vehicle Booking</title>
+    <title>{{ t.get('secure_demo_payment', 'Secure Demo Payment') }} | {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         body { background: #f3f7f6; }
@@ -52,40 +52,41 @@
 </head>
 <body>
 <header>
-    <a class="logo" href="/vehicles">🚚 Business Vehicle Booking</a>
+    <a class="logo" href="/vehicles">🚚 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</a>
     <nav>
-        <a href="/mybookings">📋 My Bookings</a>
-        <a href="/farmer-ai">🌿 Farmer AI</a>
+        <a href="/mybookings">📋 {{ t.get('my_bookings', 'My Bookings') }}</a>
+        <a href="/farmer-ai">🌿 {{ t.get('farmer_ai', 'Farmer AI') }}</a>
         <form method="POST" action="/logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">🚪 Logout</button>
+            <button type="submit">🚪 {{ t.get('logout', 'Logout') }}</button>
         </form>
     </nav>
 </header>
+{% include "_language_selector.html" %}
 <main class="payment-page">
     <section class="payment-shell">
         <div class="payment-header">
-            <span class="demo-tag">DEMO PAYMENT — NO REAL MONEY</span>
-            <h1>Secure Demo Payment</h1>
-            <p>This is a project demo transaction only. No real money is charged.</p>
+            <span class="demo-tag">{{ t.get('demo_payment_banner', 'DEMO PAYMENT — NO REAL MONEY') }}</span>
+            <h1>{{ t.get('secure_demo_payment', 'Secure Demo Payment') }}</h1>
+            <p>{{ t.get('demo_payment_disclaimer', 'This is a project demo transaction only. No real money is charged.') }}</p>
         </div>
 
         <div class="payment-body">
             <div class="summary-panel">
-                <div class="label">Payment Summary</div>
+                <div class="label">{{ t.get('payment_summary', 'Payment Summary') }}</div>
                 <div class="summary-grid">
-                    <div class="summary-item"><span class="label">Booking ID</span><strong>#{{ booking[0] }}</strong></div>
-                    <div class="summary-item"><span class="label">Vehicle</span><strong>{{ booking[5] }}</strong></div>
-                    <div class="summary-item"><span class="label">Vehicle Type</span><strong>{{ booking[6] }}</strong></div>
-                    <div class="summary-item"><span class="label">From</span><strong>{{ booking[7] or 'Not specified' }}</strong></div>
-                    <div class="summary-item"><span class="label">To</span><strong>{{ booking[8] or 'Not specified' }}</strong></div>
-                    <div class="summary-item"><span class="label">Booking Date</span><strong>{{ booking[3] }}</strong></div>
-                    <div class="summary-item"><span class="label">Amount</span><strong>₹{{ amount }}</strong></div>
-                    <div class="summary-item"><span class="label">Booking Status</span><strong>{{ booking[4] }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('booking_id_col', 'Booking ID') }}</span><strong>#{{ booking[0] }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('vehicle', 'Vehicle') }}</span><strong>{{ booking[5] }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('vehicle_type', 'Vehicle Type') }}</span><strong>{{ booking[6] }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('from', 'From') }}</span><strong>{{ booking[7] or t.get('not_specified', 'Not specified') }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('to', 'To') }}</span><strong>{{ booking[8] or t.get('not_specified', 'Not specified') }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('booking_date', 'Booking Date') }}</span><strong>{{ booking[3] }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('amount', 'Amount') }}</span><strong>₹{{ amount }}</strong></div>
+                    <div class="summary-item"><span class="label">{{ t.get('status', 'Booking Status') }}</span><strong>{{ t.get(booking[4]|lower, booking[4]) }}</strong></div>
                 </div>
                 <div class="amount-box">
                     <div>
-                        <div class="amount-title">Total Due</div>
+                        <div class="amount-title">{{ t.get('total_due', 'Total Due') }}</div>
                     </div>
                     <div class="amount-value">₹{{ amount }}</div>
                 </div>
@@ -95,7 +96,7 @@
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
-                            <div class="message {{ category }}" role="alert">{{ message }}</div>
+                            <div class="message {{ category }}" role="alert">{{ t.get(message, message) }}</div>
                         {% endfor %}
                     {% endif %}
                 {% endwith %}
@@ -104,36 +105,36 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                     <div class="field">
-                        <div class="label">Payment Method</div>
+                        <div class="label">{{ t.get('payment_method', 'Payment Method') }}</div>
                         <div class="radio-list">
                             <label class="radio-option">
                                 <input type="radio" name="payment_method" value="Demo Card" {% if payment_method == 'Demo Card' %}checked{% endif %}>
-                                <span>Demo Card</span>
+                                <span>{{ t.get('demo_card', 'Demo Card') }}</span>
                             </label>
                             <label class="radio-option">
                                 <input type="radio" name="payment_method" value="Demo UPI" {% if payment_method == 'Demo UPI' %}checked{% endif %}>
-                                <span>Demo UPI</span>
+                                <span>{{ t.get('demo_upi', 'Demo UPI') }}</span>
                             </label>
                         </div>
                     </div>
 
                     <div class="field" id="cardholder-field">
-                        <label for="cardholder_name">Cardholder Name</label>
-                        <input type="text" id="cardholder_name" name="cardholder_name" placeholder="Enter demo cardholder name" value="{{ request.form.get('cardholder_name','') }}">
+                        <label for="cardholder_name">{{ t.get('cardholder_name', 'Cardholder Name') }}</label>
+                        <input type="text" id="cardholder_name" name="cardholder_name" placeholder="{{ t.get('enter_cardholder_name', 'Enter demo cardholder name') }}" value="{{ request.form.get('cardholder_name','') }}">
                     </div>
 
                     <div class="field" id="upi-field" style="display:none;">
-                        <label for="demo_upi_id">Demo UPI ID</label>
-                        <input type="text" id="demo_upi_id" name="demo_upi_id" placeholder="demo@upi" value="{{ request.form.get('demo_upi_id','') }}">
+                        <label for="demo_upi_id">{{ t.get('demo_upi_id', 'Demo UPI ID') }}</label>
+                        <input type="text" id="demo_upi_id" name="demo_upi_id" placeholder="{{ t.get('enter_demo_upi_id', 'demo@upi') }}" value="{{ request.form.get('demo_upi_id','') }}">
                     </div>
 
-                    <div class="note">Simulation only: this demo payment does not process any real card, bank, or UPI data.</div>
+                    <div class="note">{{ t.get('demo_simulation_notice', 'Simulation only: this demo payment does not process any real card, bank, or UPI data.') }}</div>
 
                     <div class="submit-row">
-                        <button type="submit" class="btn btn-primary" id="pay-button">Pay ₹{{ amount }}</button>
-                        <a href="/mybookings" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary" id="pay-button">{{ t.get('pay', 'Pay') }} ₹{{ amount }}</button>
+                        <a href="/mybookings" class="btn btn-secondary">{{ t.get('cancel', 'Cancel') }}</a>
                     </div>
-                    <div class="loader" id="processing-loader"><span class="loading-spinner"></span>Processing demo payment...</div>
+                    <div class="loader" id="processing-loader"><span class="loading-spinner"></span>{{ t.get('processing_demo_payment', 'Processing demo payment...') }}</div>
                 </form>
             </div>
         </div>
@@ -164,7 +165,7 @@
     form.addEventListener('submit', function () {
         processingLoader.classList.add('active');
         payButton.disabled = true;
-        payButton.textContent = 'Processing...';
+        payButton.textContent = '{{ t.get("processing", "Processing...") }}';
     });
 </script>
 </body>

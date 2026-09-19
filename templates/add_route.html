@@ -1,61 +1,416 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ current_language or 'en' }}">
 <head>
-    <title>Add Route and Rent</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.get('add_route_rent', 'Add Vehicle Route & Rent') }} | {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .route-page-wrap { width: min(880px, 94%); margin: 28px auto 60px; }
+        .route-hero {
+            background: linear-gradient(135deg, #123c34, #176b58);
+            color: #fff;
+            padding: 26px 30px;
+            border-radius: 18px;
+            box-shadow: 0 12px 35px rgba(22, 55, 48, 0.1);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        .route-hero h1 { color: #fff; margin: 0 0 6px; font-size: clamp(22px, 3.5vw, 28px); }
+        .route-hero p { margin: 0; opacity: 0.9; font-size: 14px; }
+        .route-hero .hero-badge {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .route-form-card {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: 0 8px 30px rgba(20, 45, 38, 0.06);
+            padding: clamp(20px, 4vw, 36px);
+        }
+        .form-section-block {
+            margin-bottom: 28px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--line-light);
+        }
+        .form-section-block:last-of-type {
+            border-bottom: none;
+            margin-bottom: 16px;
+            padding-bottom: 0;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .section-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--brand-soft);
+            color: var(--brand-dark);
+            font-weight: 800;
+            font-size: 13px;
+            display: grid;
+            place-items: center;
+        }
+        .section-title {
+            margin: 0;
+            font-size: 17px;
+            font-weight: 800;
+            color: var(--ink);
+        }
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 20px;
+        }
+        .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-field.full-width {
+            grid-column: 1 / -1;
+        }
+        .form-field label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .form-field label .req {
+            color: #d94a4a;
+            font-weight: 900;
+        }
+        .form-field input, .form-field select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--ink);
+            background: #fff;
+            transition: all 0.2s ease;
+        }
+        .form-field input:focus, .form-field select:focus {
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(20, 107, 91, 0.12);
+            outline: none;
+        }
+        .input-with-symbol {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-with-symbol .symbol {
+            position: absolute;
+            left: 14px;
+            font-weight: 800;
+            color: var(--muted);
+        }
+        .input-with-symbol input {
+            padding-left: 32px;
+        }
+        .field-tip {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+        .info-panel {
+            background: #f8fbfa;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--ink-light);
+        }
+        .info-panel-icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+        .form-actions-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--line);
+        }
+        .btn-save-route {
+            background: var(--brand);
+            color: #fff;
+            border: none;
+            padding: 13px 26px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-save-route:hover {
+            background: var(--brand-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(20, 107, 91, 0.25);
+        }
+        .btn-cancel-route {
+            background: var(--line-light);
+            color: var(--ink);
+            text-decoration: none;
+            padding: 13px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .btn-cancel-route:hover {
+            background: #e2ebe8;
+            color: var(--ink);
+        }
+        .success-banner {
+            background: #dff3e8;
+            border: 1px solid #bde4cf;
+            color: #166541;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .success-banner strong { font-size: 15px; }
+        .success-banner .quick-links { display: flex; gap: 10px; }
+        .success-banner .quick-links a {
+            background: #fff;
+            color: #166541;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        @media (max-width: 700px) {
+            .route-hero { flex-direction: column; align-items: flex-start; }
+            .form-grid-2 { grid-template-columns: 1fr; }
+            .form-actions-row { flex-direction: column-reverse; }
+            .form-actions-row button, .form-actions-row a { width: 100%; justify-content: center; }
+        }
+    </style>
 </head>
-
 <body>
 
-<h2>Add Route & Rent</h2>
+<header>
+    <a href="/" class="logo">🚚 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</a>
+    <nav aria-label="Owner Navigation">
+        <a href="/owner_dashboard">📊 {{ t.get("dashboard", "Dashboard") }}</a>
+        <a href="/addvehicle">➕ {{ t.get("add_vehicle", "Add Vehicle") }}</a>
+        <a href="/myvehicles">🚛 {{ t.get("my_vehicles", "My Vehicles") }}</a>
+        <a href="/addroute" class="active">📍 {{ t.get("add_route", "Add Route") }}</a>
+        <form method="POST" action="/owner_logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 {{ t.get("logout", "Logout") }}</button>
+        </form>
+    </nav>
+</header>
 
-<form method="POST">
+<div class="route-page-wrap">
+    {% include "_language_selector.html" %}
 
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <section class="route-hero">
+        <div>
+            <h1>📍 {{ t.get("add_route_rent", "Add Vehicle Route & Rent") }}</h1>
+            <p>{{ t.get("add_route_subtitle", "Set fixed route pricing for your commercial vehicles so customers can book instantly.") }}</p>
+        </div>
+        <div class="hero-badge">💼 {{ t.get("for_owners", "Fleet Owner Portal") }}</div>
+    </section>
 
-    <label>Select Vehicle</label><br>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}" role="alert" style="margin-bottom: 20px;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-    <select name="vehicle_id" required>
+    {% if error %}
+        <div class="message error" role="alert" style="margin-bottom: 20px;">
+            {{ error }}
+        </div>
+    {% endif %}
 
-        <option value="">-- Select Vehicle --</option>
+    {% if success and added_route %}
+        <div class="success-banner">
+            <div>
+                <strong>✅ {{ t.get("route_added_success", "Route and rent added successfully!") }}</strong>
+                <div style="font-size: 13px; margin-top: 4px;">
+                    {{ added_route.vehicle_name }} ({{ added_route.vehicle_type }}): {{ added_route.from_location }} → {{ added_route.to_location }} — ₹{{ added_route.rent }}
+                </div>
+            </div>
+            <div class="quick-links">
+                <a href="/vehicles">🚚 {{ t.get("available_vehicles", "View Vehicles") }}</a>
+                <a href="/owner_dashboard">🏠 {{ t.get("owner_dashboard", "Dashboard") }}</a>
+            </div>
+        </div>
+    {% endif %}
 
-        {% for vehicle in vehicles %}
-            <option value="{{ vehicle[0] }}">
-                {{ vehicle[1] }} - {{ vehicle[2] }}
-            </option>
-        {% endfor %}
+    <main class="route-form-card">
+        <form method="POST" action="/addroute" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    </select>
+            <!-- SECTION A: ROUTE DETAILS -->
+            <div class="form-section-block">
+                <div class="section-header">
+                    <span class="section-num">1</span>
+                    <h2 class="section-title">{{ t.get("route_details", "Route Details") }}</h2>
+                </div>
 
-    <br><br>
+                <div class="form-grid-2">
+                    <div class="form-field full-width">
+                        <label for="vehicle_id">
+                            🚚 {{ t.get("select_vehicle", "Select Vehicle") }} <span class="req">*</span>
+                        </label>
+                        <select name="vehicle_id" id="vehicle_id" required>
+                            <option value="">{{ t.get("choose_vehicle_prompt", "-- Select Your Vehicle --") }}</option>
+                            {% for vehicle in vehicles %}
+                                <option value="{{ vehicle[0] }}">
+                                    {{ vehicle[1] }} ({{ vehicle[2] }}){% if vehicle|length > 3 and vehicle[3] %} — Base: {{ vehicle[3] }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <span class="field-tip">Choose the vehicle from your active registered fleet.</span>
+                    </div>
 
-    <label>From Location</label><br>
-    <input type="text"
-           name="from_location"
-           placeholder="Example: Tadipatri"
-           required>
+                    <div class="form-field">
+                        <label for="from_location">
+                            🛫 {{ t.get("from_location", "Origin / From Location") }} <span class="req">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="from_location"
+                            name="from_location"
+                            placeholder="Example: Tadipatri"
+                            maxlength="255"
+                            required
+                        >
+                        <span class="field-tip">Starting town, village or loading point.</span>
+                    </div>
 
-    <br><br>
+                    <div class="form-field">
+                        <label for="to_location">
+                            🛬 {{ t.get("to_location", "Destination / To Location") }} <span class="req">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="to_location"
+                            name="to_location"
+                            placeholder="Example: Anantapur"
+                            maxlength="255"
+                            required
+                        >
+                        <span class="field-tip">Delivery market, warehouse or destination town.</span>
+                    </div>
+                </div>
+            </div>
 
-    <label>To Location</label><br>
-    <input type="text"
-           name="to_location"
-           placeholder="Example: Anantapur"
-           required>
+            <!-- SECTION B: RENT DETAILS -->
+            <div class="form-section-block">
+                <div class="section-header">
+                    <span class="section-num">2</span>
+                    <h2 class="section-title">{{ t.get("rent_details", "Rent Details") }}</h2>
+                </div>
 
-    <br><br>
+                <div class="form-grid-2">
+                    <div class="form-field">
+                        <label for="rent">
+                            💰 {{ t.get("fixed_route_rent", "Route-Based Fixed Rent (₹)") }} <span class="req">*</span>
+                        </label>
+                        <div class="input-with-symbol">
+                            <span class="symbol">₹</span>
+                            <input
+                                type="number"
+                                id="rent"
+                                name="rent"
+                                placeholder="Example: 2500"
+                                min="1"
+                                step="1"
+                                required
+                            >
+                        </div>
+                        <span class="field-tip">Total fixed rent for this one-way route trip.</span>
+                    </div>
 
-    <label>Rent (₹)</label><br>
-    <input type="number"
-           name="rent"
-           placeholder="Example: 2500"
-           min="1"
-           required>
+                    <div class="form-field">
+                        <label for="availability">
+                            🟢 {{ t.get("availability_status", "Availability") }}
+                        </label>
+                        <select id="availability" name="availability" disabled>
+                            <option selected>{{ t.get("available_ready", "Available (Ready for booking)") }}</option>
+                        </select>
+                        <span class="field-tip">Vehicle route will immediately be open for customer bookings.</span>
+                    </div>
+                </div>
+            </div>
 
-    <br><br>
+            <!-- SECTION C: ADDITIONAL INFORMATION -->
+            <div class="form-section-block">
+                <div class="section-header">
+                    <span class="section-num">3</span>
+                    <h2 class="section-title">{{ t.get("additional_info", "Additional Information") }}</h2>
+                </div>
 
-    <button type="submit">Add Route</button>
+                <div class="info-panel">
+                    <span class="info-panel-icon">💡</span>
+                    <div>
+                        <strong>Transparent Route-Based Pricing</strong>
+                        <p style="margin: 4px 0 0; font-size: 12.5px; opacity: 0.9;">
+                            All rents set here are displayed transparently to customers. Zero commission surge pricing ensures higher customer trust and more bookings for your vehicles.
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-</form>
+            <!-- ACTION BUTTONS -->
+            <div class="form-actions-row">
+                <a href="/owner_dashboard" class="btn-cancel-route">
+                    ← {{ t.get("back_to_dashboard", "Back to Dashboard") }}
+                </a>
+                <button type="submit" class="btn-save-route">
+                    💾 {{ t.get("save_route_rent", "Save Route & Rent") }}
+                </button>
+            </div>
+        </form>
+    </main>
+</div>
+
+<footer>
+    <p>© 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</p>
+    <p>{{ t.get("footer_message", "Simple transportation service for everyone.") }}</p>
+</footer>
 
 </body>
 </html>

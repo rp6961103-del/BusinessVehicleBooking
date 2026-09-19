@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_language or 'en' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ADMIN LOGIN | Business Vehicle Booking</title>
+    <title>{{ t.get('admin_login', 'Admin Login') }} | {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="admin-auth-page">
@@ -11,22 +11,24 @@
         <div class="admin-auth-brand">
             <span class="admin-auth-logo-mark" aria-hidden="true">🚜</span>
             <div class="admin-auth-brand-text">
-                <span class="admin-auth-brand-title">Business Vehicle Booking</span>
-                <span class="admin-auth-brand-badge">Control Center</span>
+                <span class="admin-auth-brand-title">{{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</span>
+                <span class="admin-auth-brand-badge">{{ t.get('control_center', 'Control Center') }}</span>
             </div>
         </div>
 
+        {% include "_language_selector.html" %}
+
         <main class="admin-auth-card">
             <div class="admin-auth-card-header">
-                <div class="admin-badge-pill">Security Clearance</div>
-                <h1>ADMIN LOGIN</h1>
-                <p>Sign in to access platform management and real-time operations.</p>
+                <div class="admin-badge-pill">{{ t.get('admin_login_badge', 'ADMIN LOGIN') }}</div>
+                <h1>{{ t.get('admin_login', 'Admin Login') }}</h1>
+                <p>{{ t.get('admin_login_desc', 'Sign in to access platform management and real-time operations.') }}</p>
             </div>
 
             {% if error %}
             <div class="admin-alert-box admin-alert-danger" role="alert">
                 <span class="admin-alert-icon">⚠️</span>
-                <span>{{ error }}</span>
+                <span>{{ t.get(error, error) }}</span>
             </div>
             {% endif %}
 
@@ -34,7 +36,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <div class="admin-form-group">
-                    <label for="admin-username" class="admin-form-label">Username</label>
+                    <label for="admin-username" class="admin-form-label">{{ t.get('username', 'Username') }}</label>
                     <div class="admin-input-wrapper">
                         <span class="admin-input-icon">👤</span>
                         <input
@@ -42,7 +44,7 @@
                             id="admin-username"
                             name="username"
                             class="admin-form-control"
-                            placeholder="Enter admin username"
+                            placeholder="{{ t.get('enter_admin_username', 'Enter admin username') }}"
                             maxlength="100"
                             required
                             autocomplete="username"
@@ -52,7 +54,7 @@
                 </div>
 
                 <div class="admin-form-group">
-                    <label for="admin-password" class="admin-form-label">Password</label>
+                    <label for="admin-password" class="admin-form-label">{{ t.get('password', 'Password') }}</label>
                     <div class="admin-input-wrapper">
                         <span class="admin-input-icon">🔒</span>
                         <input
@@ -60,7 +62,7 @@
                             id="admin-password"
                             name="password"
                             class="admin-form-control"
-                            placeholder="Enter admin password"
+                            placeholder="{{ t.get('enter_admin_password', 'Enter admin password') }}"
                             required
                             autocomplete="current-password"
                         >
@@ -68,20 +70,20 @@
                 </div>
 
                 <button type="submit" class="admin-btn admin-btn-primary admin-btn-block">
-                    <span>Login</span>
+                    <span>{{ t.get('login', 'Login') }}</span>
                     <span class="admin-btn-arrow" aria-hidden="true">→</span>
                 </button>
             </form>
 
             <div class="admin-auth-footer">
                 <a href="{{ url_for('home') }}" class="admin-auth-back-link">
-                    <span aria-hidden="true">←</span> Back to Public Site
+                    <span aria-hidden="true">←</span> {{ t.get('back_to_public', 'Back to Public Site') }}
                 </a>
             </div>
         </main>
 
         <footer class="admin-auth-copyright">
-            &copy; 2026 Business Vehicle Booking &bull; Administrative Systems
+            &copy; 2026 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }} &bull; {{ t.get('admin_copyright', 'Administrative Systems') }}
         </footer>
     </div>
 </body>

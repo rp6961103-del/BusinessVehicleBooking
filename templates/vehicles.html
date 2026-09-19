@@ -44,7 +44,7 @@
     <!-- WELCOME BANNER -->
     <div class="page-header">
         <h1>👋 {{ t.get("welcome", "Welcome") }}, {{ session.get("user_name") }}</h1>
-        <p>{{ t.get("available_vehicles", "Available Vehicles") }} — Select a route and book transparently with zero surge pricing.</p>
+        <p>{{ t.get("available_vehicles", "Available Vehicles") }} — {{ t.get("transportation_message", "Book the right vehicle for your transportation needs.") }}</p>
     </div>
 
     <!-- FLASH MESSAGES -->
@@ -52,7 +52,7 @@
         {% if messages %}
             {% for category, message in messages %}
                 <div class="message {{ category }}" role="alert">
-                    {{ message }}
+                    {{ t.get(message, message) }}
                 </div>
             {% endfor %}
         {% endif %}
@@ -64,14 +64,14 @@
             type="search"
             name="q"
             value="{{ filters.search or '' }}"
-            placeholder="🔍 Search name, route, or location"
-            aria-label="Search vehicles"
+            placeholder="🔍 {{ t.get('search_placeholder', 'Search name, route, or location') }}"
+            aria-label="{{ t.get('search', 'Search') }}"
         >
 
-        <select name="vehicle_type" aria-label="Filter by vehicle type">
-            <option value="">All Vehicle Types</option>
-            {% for vtype in ["Tractor", "Mini Truck", "Pickup", "Lorry", "Tipper", "JCB", "Goods Auto", "Other"] %}
-                <option value="{{ vtype }}" {% if filters.vehicle_type == vtype %}selected{% endif %}>{{ vtype }}</option>
+        <select name="vehicle_type" aria-label="{{ t.get('vehicle_type', 'Vehicle Type') }}">
+            <option value="">{{ t.get('all_vehicle_types', 'All Vehicle Types') }}</option>
+            {% for vtype, vlabel in [("Tractor", t.get("tractor", "Tractor")), ("Mini Truck", t.get("mini_truck", "Mini Truck")), ("Pickup", t.get("pickup", "Pickup")), ("Lorry", t.get("lorry", "Lorry")), ("Goods Auto", t.get("goods_auto", "Goods Auto"))] %}
+                <option value="{{ vtype }}" {% if filters.vehicle_type == vtype %}selected{% endif %}>{{ vlabel }}</option>
             {% endfor %}
         </select>
 
@@ -79,8 +79,8 @@
             type="text"
             name="location"
             value="{{ filters.location or '' }}"
-            placeholder="📍 Location or town"
-            aria-label="Filter by location"
+            placeholder="📍 {{ t.get('location_placeholder', 'Location or town') }}"
+            aria-label="{{ t.get('location', 'Location') }}"
         >
 
         <input
@@ -89,8 +89,8 @@
             value="{{ filters.minimum_rent or '' }}"
             min="0"
             step="50"
-            placeholder="Min Rent (₹)"
-            aria-label="Minimum Rent"
+            placeholder="{{ t.get('min_rent', 'Min Rent (₹)') }}"
+            aria-label="{{ t.get('min_rent', 'Min Rent') }}"
         >
 
         <input
@@ -99,16 +99,16 @@
             value="{{ filters.maximum_rent or '' }}"
             min="0"
             step="50"
-            placeholder="Max Rent (₹)"
-            aria-label="Maximum Rent"
+            placeholder="{{ t.get('max_rent', 'Max Rent (₹)') }}"
+            aria-label="{{ t.get('max_rent', 'Max Rent') }}"
         >
 
         <button type="submit" class="btn btn-primary filter-button">
-            Filter
+            {{ t.get('filter', 'Filter') }}
         </button>
 
         <a href="/vehicles" class="clear-filter">
-            Clear
+            {{ t.get('reset_filters', 'Reset') }}
         </a>
     </form>
 
@@ -131,7 +131,7 @@
                         </div>
                         <div class="vehicle-title-group">
                             <h2>{{ vehicle[1] }}</h2>
-                            <span class="vehicle-type-tag">{{ vehicle[2] }}</span>
+                            <span class="vehicle-type-tag">{{ t.get(vehicle[2]|lower|replace(' ', '_'), vehicle[2]) }}</span>
                         </div>
                     </div>
 
@@ -142,14 +142,14 @@
                         </div>
 
                         <div class="detail-row">
-                            <span class="detail-label">🛣️ Route:</span>
+                            <span class="detail-label">🛣️ {{ t.get("route_label", "Route") }}:</span>
                             <span class="detail-value route-highlight">
-                                {{ vehicle[6] }} → {{ vehicle[7] }}
+                                {{ vehicle[6] or '—' }} → {{ vehicle[7] or '—' }}
                             </span>
                         </div>
 
                         <div class="detail-row">
-                            <span class="detail-label">💰 Fixed Route Rent:</span>
+                            <span class="detail-label">💰 {{ t.get("fixed_route_rent_label", "Fixed Route Rent") }}:</span>
                             <span class="detail-value rent-pill">
                                 ₹{{ vehicle[8] }}
                             </span>
@@ -163,7 +163,7 @@
 
                     <div class="vehicle-card-actions">
                         <a href="/vehicle/{{ vehicle[0] }}" class="btn btn-secondary btn-sm">
-                            ℹ️ View Details
+                            ℹ️ {{ t.get("view_details", "View Details") }}
                         </a>
                         <a href="/book/{{ vehicle[0] }}?route_id={{ vehicle[9] }}" class="btn btn-primary btn-sm">
                             🚛 {{ t.get("book_now", "Book Now") }}
@@ -179,7 +179,7 @@
             <p>{{ t.get("no_vehicles_message", "There are currently no vehicles matching your search criteria.") }}</p>
             <div style="margin-top: 18px;">
                 <a href="/vehicles" class="btn btn-primary">
-                    Clear Filters & Show All Vehicles
+                    {{ t.get("reset_filters", "Clear Filters & Show All Vehicles") }}
                 </a>
             </div>
         </div>

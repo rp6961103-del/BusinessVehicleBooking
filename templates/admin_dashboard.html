@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_language or 'en' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin Dashboard | Business Vehicle Booking</title>
+    <title>{{ t.get('admin_dashboard', 'Admin Dashboard') }} | {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="admin-dashboard-page">
@@ -13,8 +13,8 @@
                 <a href="{{ url_for('configured_admin_dashboard') }}" class="admin-brand-link">
                     <span class="admin-brand-icon" aria-hidden="true">🚜</span>
                     <span class="admin-brand-text">
-                        <strong>Business Vehicle Booking</strong>
-                        <span class="admin-brand-pill">Admin Dashboard</span>
+                        <strong>{{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</strong>
+                        <span class="admin-brand-pill">{{ t.get('admin_dashboard', 'Admin Dashboard') }}</span>
                     </span>
                 </a>
             </div>
@@ -68,6 +68,7 @@
             </div>
         </div>
     </header>
+    {% include "_language_selector.html" %}
 
     <main class="admin-content-shell">
         <div class="admin-content-container">

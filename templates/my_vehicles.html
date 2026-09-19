@@ -341,7 +341,7 @@
 
     <div class="logo">
 
-        🚚 Business Vehicle Booking
+        🚚 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}
 
     </div>
 
@@ -349,26 +349,27 @@
     <nav>
 
         <a href="/owner_dashboard">
-            📊 Dashboard
+            📊 {{ t.get("dashboard", "Dashboard") }}
         </a>
 
         <a href="/addvehicle">
-            🚚 Add Vehicle
+            🚚 {{ t.get("add_vehicle", "Add Vehicle") }}
         </a>
 
         <a href="/addroute">
-            📍 Add Route
+            📍 {{ t.get("add_route", "Add Route") }}
         </a>
 
         <form method="POST" action="/owner_logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">🚪 Logout</button>
+            <button type="submit">🚪 {{ t.get("logout", "Logout") }}</button>
         </form>
 
     </nav>
 
 </header>
 
+{% include "_language_selector.html" %}
 
 <!-- ================= MAIN ================= -->
 
@@ -378,11 +379,11 @@
     <div class="page-header">
 
         <h1>
-            🚛 My Vehicles
+            🚛 {{ t.get("my_vehicles", "My Vehicles") }}
         </h1>
 
         <p>
-            Manage the vehicles registered under your owner account.
+            {{ t.get("manage_fleet_desc", "Manage the vehicles registered under your owner account.") }}
         </p>
 
     </div>
@@ -391,7 +392,7 @@
         {% if messages %}
             {% for category, message in messages %}
                 <div class="message {{ category }}" role="alert">
-                    {{ message }}
+                    {{ t.get(message, message) }}
                 </div>
             {% endfor %}
         {% endif %}
@@ -405,7 +406,7 @@
         <a href="/addvehicle"
            class="action-btn primary">
 
-            ➕ Add Vehicle
+            ➕ {{ t.get("add_vehicle", "Add Vehicle") }}
 
         </a>
 
@@ -413,7 +414,7 @@
         <a href="/addroute"
            class="action-btn secondary">
 
-            📍 Add Route & Rent
+            📍 {{ t.get("add_route_rent", "Add Route & Rent") }}
 
         </a>
 
@@ -421,7 +422,7 @@
         <a href="/owner_dashboard"
            class="action-btn secondary">
 
-            📊 Dashboard
+            📊 {{ t.get("dashboard", "Dashboard") }}
 
         </a>
 
@@ -473,7 +474,7 @@
                             </h2>
 
                             <p>
-                                Vehicle ID: {{ vehicle[0] }}
+                                {{ t.get("booking_id", "ID") }}: #{{ vehicle[0] }}
                             </p>
 
                         </div>
@@ -488,11 +489,11 @@
                         <div class="detail-row">
 
                             <span class="label">
-                                🚚 Vehicle Type
+                                🚚 {{ t.get("vehicle_type", "Vehicle Type") }}
                             </span>
 
                             <span class="value">
-                                {{ vehicle[2] }}
+                                {{ t.get(vehicle[2]|lower|replace(' ', '_'), vehicle[2]) }}
                             </span>
 
                         </div>
@@ -501,7 +502,7 @@
                         <div class="detail-row">
 
                             <span class="label">
-                                📞 Contact
+                                📞 {{ t.get("contact", "Contact") }}
                             </span>
 
                             <span class="value">
@@ -514,7 +515,7 @@
                         <div class="detail-row">
 
                             <span class="label">
-                                📍 Location
+                                📍 {{ t.get("location", "Location") }}
                             </span>
 
                             <span class="value">
@@ -530,24 +531,24 @@
                         <a href="/addroute"
                            class="action-btn"
                            style="background: #e5f3ef; color: #146b5b; border: 1px solid #d8e4e0; font-size: 12px; padding: 7px 10px;">
-                            📍 Add Route
+                            📍 {{ t.get("add_route", "Add Route") }}
                         </a>
 
                         <a href="/editvehicle/{{ vehicle[0] }}"
                            class="action-btn secondary"
                            style="font-size: 12px; padding: 7px 10px;">
-                            ✏️ Edit
+                            ✏️ {{ t.get("edit_vehicle", "Edit") }}
                         </a>
 
                         <form method="POST"
                               action="/deletevehicle/{{ vehicle[0] }}"
-                              onsubmit="return confirm('Delete this vehicle? This cannot be undone.');"
+                              onsubmit="return confirm('Delete this vehicle?');"
                               style="display: inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit"
                                     class="action-btn"
                                     style="border: 0; background: #f8d7da; color: #842029; cursor: pointer; font-size: 12px; padding: 7px 10px;">
-                                🗑️ Delete
+                                🗑️ {{ t.get("delete_vehicle", "Delete") }}
                             </button>
                         </form>
                     </div>
@@ -567,11 +568,11 @@
         <div class="empty-box">
 
             <h2>
-                🚫 No Vehicles Added
+                🚫 {{ t.get("no_vehicles", "No Vehicles Added") }}
             </h2>
 
             <p>
-                You have not added any vehicles yet.
+                {{ t.get("no_vehicles_message", "You have not added any vehicles yet.") }}
             </p>
 
 
@@ -581,7 +582,7 @@
             <a href="/addvehicle"
                class="action-btn primary">
 
-                ➕ Add Your First Vehicle
+                ➕ {{ t.get("add_vehicle", "Add Vehicle") }}
 
             </a>
 
@@ -599,11 +600,11 @@
 <footer>
 
     <p>
-        © 2026 Business Vehicle Booking System
+        © 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}
     </p>
 
     <p>
-        Owner Management Portal
+        {{ t.get("footer_message", "Simple transportation service for everyone.") }}
     </p>
 
 </footer>

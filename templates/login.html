@@ -16,7 +16,7 @@
     <nav>
         <a href="/">{{ t.get("back_home", "Back to Home") }}</a>
         <a href="/farmer-ai">🌿 {{ t.get("farmer_ai", "Farmer AI") }}</a>
-        <a href="/ownerlogin">👤 Owner Login</a>
+        <a href="/ownerlogin">👤 {{ t.get("owner_login", "Owner Login") }}</a>
     </nav>
 </header>
 
@@ -31,7 +31,7 @@
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="message {{ category }}" role="alert">
-                        {{ message }}
+                        {{ t.get(message, message) }}
                     </div>
                 {% endfor %}
             {% endif %}
@@ -46,7 +46,7 @@
                     type="tel"
                     id="phone"
                     name="phone"
-                    placeholder="Enter 10-digit mobile number"
+                    placeholder="{{ t.get('enter_phone_placeholder', 'Enter 10-digit mobile number') }}"
                     pattern="[0-9]{10}"
                     maxlength="10"
                     required
@@ -55,12 +55,12 @@
             </div>
 
             <div class="form-group">
-                <label for="password">🔑 Password</label>
+                <label for="password">🔑 {{ t.get("password", "Password") }}</label>
                 <input
                     type="password"
                     id="password"
                     name="password"
-                    placeholder="Enter your password (min 8 characters)"
+                    placeholder="{{ t.get('enter_password_placeholder', 'Enter your password (min 8 characters)') }}"
                     minlength="8"
                     required
                     autocomplete="current-password"
@@ -73,12 +73,12 @@
         </form>
 
         <p style="margin-top: 14px; text-align: center;">
-            <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
+            <a href="{{ url_for('forgot_password') }}">{{ t.get("forgot_password", "Forgot Password?") }}</a>
         </p>
 
         <div style="margin-top: 24px; text-align: center; border-top: 1px solid var(--line); padding-top: 18px;">
             <a href="/ownerlogin" style="font-size: 0.88rem; font-weight: 600;">
-                🚚 Are you a vehicle owner? Sign in here →
+                🚚 {{ t.get("for_owners", "For Commercial Vehicle Owners") }} — {{ t.get("owner_sign_in", "Vehicle Owner Sign In") }} →
             </a>
         </div>
     </div>

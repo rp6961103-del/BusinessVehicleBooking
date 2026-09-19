@@ -3,54 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Registration | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
+    <title>{{ t.get("customer_registration", "Customer Registration") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
 <body>
+
+<header>
+    <a href="/" class="logo">
+        <span>🚚</span> {{ t.get("vehicle_booking", "Business Vehicle Booking") }}
+    </a>
+    <nav>
+        <a href="/">{{ t.get("back_home", "Back to Home") }}</a>
+        <a href="/login">{{ t.get("customer_login", "Customer Login") }}</a>
+        <a href="/farmer-ai">🌿 {{ t.get("farmer_ai", "Farmer AI") }}</a>
+    </nav>
+</header>
+
+{% include "_language_selector.html" %}
+
 <main class="container container-narrow">
     <div class="form-card">
-        <h1>Customer Registration</h1>
-        <p class="subtitle">Create your customer account.</p>
+        <h1>👤 {{ t.get("customer_registration", "Customer Registration") }}</h1>
+        <p class="subtitle">{{ t.get("customer_desc", "Create your customer account to book vehicles easily.") }}</p>
 
         {% if error %}
-            <div class="message error" role="alert">{{ error }}</div>
+            <div class="message error" role="alert">{{ t.get(error, error) }}</div>
         {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="message {{ category }}" role="alert">
+                        {{ t.get(message, message) }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
         <form method="POST" action="/register">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="form-group">
-                <label for="name">Name</label>
-                <input type="text" id="name" name="name" maxlength="100" required autocomplete="name">
+                <label for="name">👤 {{ t.get("customer_name", "Customer Name") }}</label>
+                <input type="text" id="name" name="name" maxlength="100" placeholder="{{ t.get('customer_name', 'Full Name') }}" required autocomplete="name">
             </div>
 
             <div class="form-group">
-                <label for="phone">Mobile Number</label>
-                <input type="tel" id="phone" name="phone" pattern="[0-9]{10}" maxlength="10" required autocomplete="tel">
+                <label for="phone">📱 {{ t.get("mobile_number", "Mobile Number") }}</label>
+                <input type="tel" id="phone" name="phone" pattern="[0-9]{10}" maxlength="10" placeholder="{{ t.get('enter_phone_placeholder', 'Enter 10-digit mobile number') }}" required autocomplete="tel">
             </div>
 
             <div class="form-group">
-                <label for="email">Email (optional)</label>
-                <input type="email" id="email" name="email" maxlength="255" autocomplete="email">
+                <label for="email">📧 {{ t.get("email_address", "Email Address") }}</label>
+                <input type="email" id="email" name="email" maxlength="255" placeholder="user@example.com" autocomplete="email">
             </div>
 
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" minlength="8" maxlength="128" required autocomplete="new-password">
+                <label for="password">🔑 {{ t.get("password", "Password") }}</label>
+                <input type="password" id="password" name="password" minlength="8" maxlength="128" placeholder="{{ t.get('enter_password_placeholder', 'Enter your password (min 8 characters)') }}" required autocomplete="new-password">
             </div>
 
             <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
-                <input type="password" id="confirm_password" name="confirm_password" minlength="8" maxlength="128" required autocomplete="new-password">
+                <label for="confirm_password">🔑 {{ t.get("confirm_password", "Confirm Password") }}</label>
+                <input type="password" id="confirm_password" name="confirm_password" minlength="8" maxlength="128" placeholder="{{ t.get('enter_password_placeholder', 'Enter your password (min 8 characters)') }}" required autocomplete="new-password">
             </div>
 
-            <button type="submit" class="btn btn-primary full-btn">Register</button>
+            <button type="submit" class="btn btn-primary full-btn">{{ t.get("register_as_customer", "Register as Customer") }}</button>
         </form>
 
         <p style="margin-top: 18px; text-align: center;">
-            Already have an account? <a href="/login">Customer Sign In</a>
+            {{ t.get("already_have_account", "Already have an account?") }} <a href="/login">{{ t.get("customer_sign_in", "Customer Sign In") }}</a>
         </p>
     </div>
 </main>
+
+<footer>
+    <p>© 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</p>
+    <p>{{ t.get("footer_message", "Simple transportation service for everyone.") }}</p>
+</footer>
+
 </body>
 </html>

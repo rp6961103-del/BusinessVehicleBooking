@@ -59,7 +59,7 @@
 <header>
     <a class="logo" href="/">🚚 {{ t.get('vehicle_booking','Business Vehicle Booking') }}</a>
     <nav>
-        <a href="/">Home</a>
+        <a href="/">{{ t.get('home', 'Home') }}</a>
         <a href="/vehicles">🚚 {{ t.get('available_vehicles','Available Vehicles') }}</a>
         {% if session.get('user_id') %}<a href="/mybookings">📋 {{ t.get('my_bookings','My Bookings') }}</a>{% endif %}
         <a href="/farmer-ai" class="active">🌿 {{ t.get('farmer_ai','Farmer AI') }}</a>
@@ -73,19 +73,19 @@
 <main class="ai-page">
     <section class="ai-hero">
         <div>
-            <div style="font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px;opacity:.8">SMART FARMING</div>
+            <div style="font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px;opacity:.8">{{ t.get('smart_farming_support', 'SMART FARMING') }}</div>
             <h1>🌿 {{ t.get('farmer_ai_assistant','Farmer AI Crop Disease Assistant') }}</h1>
-            <p>Upload a clear crop-leaf photo and get an AI-assisted explanation of possible disease, visible symptoms, safe management steps and prevention guidance.</p>
+            <p>{{ t.get('farmer_ai_desc', 'Upload a clear crop-leaf photo and get an AI-assisted explanation of possible disease, visible symptoms, safe management steps and prevention guidance.') }}</p>
         </div>
         <div class="hero-points">
-            <div class="hero-point">📷 Image-based analysis</div>
-            <div class="hero-point">💬 Ask follow-up questions</div>
-            <div class="hero-point">🌐 English • Telugu • Hindi</div>
+            <div class="hero-point">📷 {{ t.get('image_based_analysis', 'Image-based analysis') }}</div>
+            <div class="hero-point">💬 {{ t.get('ask_followup_questions', 'Ask follow-up questions') }}</div>
+            <div class="hero-point">🌐 English • Telugu • Tamil • Hindi</div>
         </div>
     </section>
 
     {% if not is_configured %}
-    <div class="error" style="display:block;margin-top:22px">⚙️ AI service is not configured yet. Add <strong>AI_API_KEY</strong> and the provider settings to your <code>.env</code> file, then restart Flask.</div>
+    <div class="error" style="display:block;margin-top:22px">⚙️ {{ t.get('ai_service_not_configured', 'AI service is not configured yet. Add AI_API_KEY and the provider settings to your .env file, then restart Flask.') }}</div>
     {% endif %}
 
     <div id="errorAlert" class="error" role="alert"><span id="errorMessage"></span></div>
@@ -93,11 +93,11 @@
     <section class="ai-grid">
         <div class="ai-card">
             <h2>📸 {{ t.get('upload_leaf_image','Upload Leaf Image') }}</h2>
-            <p class="sub">For best results, photograph one leaf in good daylight with the affected area clearly visible.</p>
+            <p class="sub">{{ t.get('upload_leaf_tip', 'For best results, photograph one leaf in good daylight with the affected area clearly visible.') }}</p>
             <div class="dropzone" id="dropzone" role="button" tabindex="0">
                 <div class="drop-icon">🌱</div>
-                <strong>Choose or drag a leaf photo here</strong>
-                <small>JPG, JPEG, PNG or WEBP • Maximum 10 MB</small>
+                <strong>{{ t.get('choose_or_drag_photo', 'Choose or drag a leaf photo here') }}</strong>
+                <small>{{ t.get('file_format_limit', 'JPG, JPEG, PNG or WEBP • Maximum 10 MB') }}</small>
                 <input id="leafInput" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
             </div>
             <div class="preview" id="previewContainer">
@@ -107,45 +107,48 @@
                 <button class="btn-primary" id="analyzeBtn" disabled><span id="analyzeBtnText">🔍 {{ t.get('analyze_leaf','Analyze Leaf') }}</span></button>
                 <button class="btn-secondary" id="changeImageBtn" type="button">↻ {{ t.get('upload_another_image','Upload another image') }}</button>
             </div>
-            <div class="status-note">Your image is analyzed only to provide the requested AI assistance. Do not use the result as a guaranteed diagnosis.</div>
+            <div class="status-note">{{ t.get('ai_disclaimer_note', 'Your image is analyzed only to provide the requested AI assistance. Do not use the result as a guaranteed diagnosis.') }}</div>
         </div>
 
         <div class="ai-card results" id="resultsCard">
-            <h2>📊 Analysis Result</h2>
-            <p class="sub">AI-assisted result based on the uploaded image.</p>
+            <h2>📊 {{ t.get('analysis_result', 'Analysis Result') }}</h2>
+            <p class="sub">{{ t.get('ai_assisted_result_sub', 'AI-assisted result based on the uploaded image.') }}</p>
             <div class="overview">
-                <div class="overview-box"><div class="overview-label">🌾 Crop</div><div class="overview-value" id="resCrop">-</div></div>
-                <div class="overview-box"><div class="overview-label">🦠 Possible Disease</div><div class="overview-value" id="resDisease">-</div></div>
-                <div class="overview-box"><div class="overview-label">📈 Confidence</div><div class="overview-value"><span class="confidence" id="resConfidence">-</span></div></div>
+                <div class="overview-box"><div class="overview-label">🌾 {{ t.get('crop', 'Crop') }}</div><div class="overview-value" id="resCrop">-</div></div>
+                <div class="overview-box"><div class="overview-label">🦠 {{ t.get('possible_disease', 'Possible Disease') }}</div><div class="overview-value" id="resDisease">-</div></div>
+                <div class="overview-box"><div class="overview-label">📈 {{ t.get('confidence', 'Confidence') }}</div><div class="overview-value"><span class="confidence" id="resConfidence">-</span></div></div>
             </div>
-            {% for id,title,icon in [('resSymptoms','Symptoms & Visual Explanation','🔍'),('resCauses','Possible Causes','💡'),('resImmediate','Immediate Steps','⚡'),('resManagement','Treatment / Management','🧑‍🌾'),('resPrevention','Prevention','🛡️'),('resExpert','When to Contact an Expert','👨‍🌾')] %}
-            <div class="detail"><div class="detail-title">{{ icon }} {{ title }}</div><div class="detail-content" id="{{ id }}">-</div></div>
-            {% endfor %}
-            <div class="safety"><strong>⚠️ Safety notice</strong><br>AI identification is an estimate. Before purchasing or applying pesticides, fungicides or other agricultural chemicals, verify the product, crop suitability, concentration and label directions with a qualified agricultural officer or local agriculture department.</div>
+            <div class="detail"><div class="detail-title">🔍 {{ t.get('symptoms_explanation', 'Symptoms & Visual Explanation') }}</div><div class="detail-content" id="resSymptoms">-</div></div>
+            <div class="detail"><div class="detail-title">💡 {{ t.get('possible_causes', 'Possible Causes') }}</div><div class="detail-content" id="resCauses">-</div></div>
+            <div class="detail"><div class="detail-title">⚡ {{ t.get('immediate_steps', 'Immediate Steps') }}</div><div class="detail-content" id="resImmediate">-</div></div>
+            <div class="detail"><div class="detail-title">🧑‍🌾 {{ t.get('treatment_management', 'Treatment / Management') }}</div><div class="detail-content" id="resManagement">-</div></div>
+            <div class="detail"><div class="detail-title">🛡️ {{ t.get('prevention', 'Prevention') }}</div><div class="detail-content" id="resPrevention">-</div></div>
+            <div class="detail"><div class="detail-title">👨‍🌾 {{ t.get('contact_expert', 'When to Contact an Expert') }}</div><div class="detail-content" id="resExpert">-</div></div>
+            <div class="safety"><strong>⚠️ {{ t.get('safety_notice', 'Safety notice') }}</strong><br>{{ t.get('safety_notice_desc', 'AI identification is an estimate. Before purchasing or applying pesticides, fungicides or other agricultural chemicals, verify the product, crop suitability, concentration and label directions with a qualified agricultural officer or local agriculture department.') }}</div>
         </div>
 
         <div class="ai-card chat-card">
             <h2>💬 {{ t.get('ask_ai_assistant','Ask AI Assistant') }}</h2>
-            <p class="sub">Ask about the analyzed leaf, symptoms, prevention or general crop care. The current analysis is kept in this session for follow-up questions.</p>
+            <p class="sub">{{ t.get('ask_ai_sub', 'Ask about the analyzed leaf, symptoms, prevention or general crop care. The current analysis is kept in this session for follow-up questions.') }}</p>
             <div class="chips">
-                <button class="chip" type="button" data-query="What disease could this leaf have?">What disease is this?</button>
-                <button class="chip" type="button" data-query="What should I do now?">What should I do now?</button>
-                <button class="chip" type="button" data-query="How can I prevent this problem from spreading?">How can I prevent it?</button>
-                <button class="chip" type="button" data-query="Explain this in Telugu.">Explain in Telugu</button>
+                <button class="chip" type="button" data-query="{{ t.get('chip_disease_query', 'What disease could this leaf have?') }}">{{ t.get('chip_disease_label', 'What disease is this?') }}</button>
+                <button class="chip" type="button" data-query="{{ t.get('chip_steps_query', 'What should I do now?') }}">{{ t.get('chip_steps_label', 'What should I do now?') }}</button>
+                <button class="chip" type="button" data-query="{{ t.get('chip_prevent_query', 'How can I prevent this problem from spreading?') }}">{{ t.get('chip_prevent_label', 'How can I prevent it?') }}</button>
+                <button class="chip" type="button" data-query="{{ t.get('chip_lang_query', 'Explain this in my language.') }}">{{ t.get('chip_lang_label', 'Explain in my language') }}</button>
             </div>
             <div class="chat-history" id="chatHistory">
-                <div class="chat-msg msg-ai">👋 Hello! Upload a leaf image above, then ask me questions about the result.</div>
+                <div class="chat-msg msg-ai">👋 {{ t.get('ai_chat_welcome', 'Hello! Upload a leaf image above, then ask me questions about the result.') }}</div>
                 {% for msg in chat_history %}<div class="chat-msg {{ 'msg-farmer' if msg.role == 'user' else 'msg-ai' }}">{{ msg.content }}</div>{% endfor %}
             </div>
             <form id="chatForm" class="chat-input-row">
-                <input type="text" id="chatInput" class="chat-input" maxlength="1000" placeholder="Type your farming question here..." autocomplete="off">
-                <button type="submit" class="btn-send" id="chatSendBtn">Send</button>
+                <input type="text" id="chatInput" class="chat-input" maxlength="1000" placeholder="{{ t.get('type_question_placeholder', 'Type your farming question here...') }}" autocomplete="off">
+                <button type="submit" class="btn-send" id="chatSendBtn">{{ t.get('send', 'Send') }}</button>
             </form>
         </div>
     </section>
 </main>
 
-<footer class="footer"><p>© 2026 {{ t.get('vehicle_booking','Business Vehicle Booking') }} • Farmer AI Assistant</p><p>AI results are informational and should be verified with agricultural professionals.</p></footer>
+<footer class="footer"><p>© 2026 {{ t.get('vehicle_booking','Business Vehicle Booking') }} • {{ t.get('farmer_ai_assistant', 'Farmer AI Assistant') }}</p><p>{{ t.get('ai_disclaimer_short', 'AI results are informational and should be verified with agricultural professionals.') }}</p></footer>
 
 <input type="hidden" id="csrfToken" value="{{ csrf_token() }}">
 <script>

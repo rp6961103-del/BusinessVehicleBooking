@@ -297,6 +297,11 @@ def analyze_crop_leaf(image_bytes: bytes, mime_type: str, language: str = "en") 
             "IMPORTANT: Output all textual explanations (crop, possible_disease, symptoms, possible_causes, "
             "immediate_steps, management, prevention, expert_advice) in Telugu language (తెలుగు). Keep JSON keys in English."
         )
+    elif language == "ta":
+        language_instruction = (
+            "IMPORTANT: Output all textual explanations (crop, possible_disease, symptoms, possible_causes, "
+            "immediate_steps, management, prevention, expert_advice) in Tamil language (தமிழ்). Keep JSON keys in English."
+        )
     elif language == "hi":
         language_instruction = (
             "IMPORTANT: Output all textual explanations (crop, possible_disease, symptoms, possible_causes, "
@@ -404,6 +409,8 @@ def chat_about_crop(
 
     if language == "te":
         context_prompt += "Respond in Telugu (తెలుగు) unless the user asks for another language.\n"
+    elif language == "ta":
+        context_prompt += "Respond in Tamil (தமிழ்) unless the user asks for another language.\n"
     elif language == "hi":
         context_prompt += "Respond in Hindi (हिन्दी) unless the user asks for another language.\n"
     else:

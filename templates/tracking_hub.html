@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Vehicle Location Tracking — Hub & Testing Portal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='live_tracking.css') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+</head>
+<body>
+
+<div class="tracking-page-container">
+
+    <!-- Top Navigation Header -->
+    <header class="tracking-header-bar">
+        <div class="tracking-title-group">
+            <h1>🛰️ Live Vehicle Location Tracking</h1>
+            <p class="tracking-subtitle">Real-time GPS tracking for Business Vehicle Booking</p>
+        </div>
+        <div class="tracking-nav-links">
+            <a href="/" class="track-btn-secondary">🏠 Back to Home</a>
+            {% if owner_id %}
+                <a href="/owner_dashboard" class="track-btn-secondary">📊 Owner Dashboard</a>
+            {% endif %}
+            {% if user_id %}
+                <a href="{{ url_for('mybookings') }}" class="track-btn-secondary">📦 My Bookings</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Role Cards / Entry Points -->
+    <div class="hub-features-grid">
+
+        <!-- Vehicle Owner Broadcaster Card -->
+        <div class="hub-card">
+            <div>
+                <div class="hub-card-icon">📡</div>
+                <h2>Vehicle Owner Broadcaster</h2>
+                <p>
+                    Vehicle owners can start live GPS location sharing from their mobile browser or desktop.
+                    Select your vehicle, grant GPS permission, and view your position on the map.
+                </p>
+            </div>
+            <div>
+                {% if owner_id %}
+                    <a href="/live-tracking/owner" class="btn-track-start" style="text-decoration: none;">
+                        🚀 Open Broadcaster Console
+                    </a>
+                {% else %}
+                    <a href="/ownerlogin" class="track-btn-secondary" style="display: block; text-align: center; margin-bottom: 8px;">
+                        🔐 Login as Vehicle Owner First
+                    </a>
+                    <a href="/live-tracking/owner" class="track-btn-secondary" style="display: block; text-align: center;">
+                        Preview Broadcaster Page
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Customer Live Tracker Card -->
+        <div class="hub-card">
+            <div>
+                <div class="hub-card-icon">🗺️</div>
+                <h2>Customer Live Tracker</h2>
+                <p>
+                    Customers can track the vehicle's actual latest GPS position on an interactive Leaflet map with smooth vehicle gliding, auto-follow, actual road routing via OSRM, remaining distance, and live ETA calculations.
+                </p>
+            </div>
+            <div>
+                <a href="/live-tracking/customer" class="track-btn-secondary" style="display: block; text-align: center; margin-bottom: 8px; font-weight: 700;">
+                    🔍 Open Tracking Page
+                </a>
+            </div>
+        </div>
+
+        <!-- Security & Architecture Card -->
+        <div class="hub-card">
+            <div>
+                <div class="hub-card-icon">🛡️</div>
+                <h2>Architecture & Safety</h2>
+                <p>
+                    Built cleanly according to requirements:
+                </p>
+                <ul style="font-size: 0.88rem; color: #5e726d; line-height: 1.6; margin-left: 18px; margin-bottom: 16px;">
+                    <li><strong>Owner-only GPS controls</strong> with server-side session and vehicle authorization.</li>
+                    <li><strong>Customer booking access</strong> is scoped to the signed-in customer; share links use validated access tokens.</li>
+                    <li><strong>Real GPS coordinates</strong> via Geolocation API.</li>
+                    <li><strong>No simulated fake movement</strong>.</li>
+                    <li><strong>Coordinate range validation</strong> and CSRF protection.</li>
+                    <li><strong>Leaflet + OpenStreetMap</strong> integration.</li>
+                </ul>
+            </div>
+            <div>
+                <span class="map-status-pill pill-live" style="width: 100%; justify-content: center;">
+                    <span class="pulsing-dot dot-live"></span> System Healthy & Isolated
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Live Test Bookings / Quick Access -->
+    <div class="track-card" style="margin-bottom: 24px;">
+        <div class="track-card-header">
+            <h3>📋 Test Direct Tracking with Active Bookings</h3>
+            <span style="font-size: 0.85rem; color: #5e726d;">From existing database</span>
+        </div>
+        <p style="font-size: 0.9rem; color: #5e726d; margin-bottom: 16px;">
+            Click any booking below to test the customer tracking view for that trip:
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+            {% for b in sample_bookings %}
+                <div style="background: #f8faf9; border: 1px solid #d8e4e0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <strong style="color: #146b5b;">Booking #{{ b.booking_id }}</strong>
+                            <span class="map-status-pill {% if b.status == 'Accepted' %}pill-live{% else %}pill-waiting{% endif %}" style="font-size: 0.72rem; padding: 2px 8px;">
+                                {{ b.status }}
+                            </span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #18302b;">
+                            <strong>Vehicle:</strong> {{ b.vehicle_name }} ({{ b.vehicle_type }})<br>
+                            <strong>Customer:</strong> {{ b.customer_name }} ({{ b.phone }})<br>
+                            {% if b.from_location and b.to_location %}
+                                <strong>Route:</strong> {{ b.from_location }} ➔ {{ b.to_location }}<br>
+                            {% endif %}
+                            <strong>Date:</strong> {{ b.booking_date }}
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <a href="/live-tracking/booking/{{ b.booking_id }}" class="track-btn-secondary" style="display: block; text-align: center; font-size: 0.82rem; padding: 6px;">
+                            🗺️ Track Booking #{{ b.booking_id }}
+                        </a>
+                    </div>
+                </div>
+            {% else %}
+                <p style="color: #5e726d; font-size: 0.9rem;">No sample bookings found in database.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent Tracking Sessions -->
+    {% if sample_sessions %}
+    <div class="track-card">
+        <div class="track-card-header">
+            <h3>⚡ Active & Recent Tracking Sessions</h3>
+            <span style="font-size: 0.85rem; color: #5e726d;">Real-time sessions</span>
+        </div>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #d8e4e0; text-align: left; color: #5e726d;">
+                        <th style="padding: 8px;">Session ID</th>
+                        <th style="padding: 8px;">Vehicle</th>
+                        <th style="padding: 8px;">Reg No</th>
+                        <th style="padding: 8px;">Status</th>
+                        <th style="padding: 8px;">GPS Position</th>
+                        <th style="padding: 8px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sample_sessions %}
+                    <tr style="border-bottom: 1px solid #eef3f1;">
+                        <td style="padding: 10px 8px; font-weight: 600;">#{{ s.id }}</td>
+                        <td style="padding: 10px 8px;">{{ s.vehicle_name }} ({{ s.vehicle_type }})</td>
+                        <td style="padding: 10px 8px;">{{ s.registration_number or 'VH-' ~ s.vehicle_id }}</td>
+                        <td style="padding: 10px 8px;">
+                            <span class="map-status-pill {% if s.status == 'ACTIVE' %}pill-live{% else %}pill-stopped{% endif %}" style="font-size: 0.72rem; padding: 2px 8px;">
+                                {{ s.status }}
+                            </span>
+                        </td>
+                        <td style="padding: 10px 8px;">
+                            {% if s.latitude and s.longitude %}
+                                {{ "%.4f"|format(s.latitude) }}, {{ "%.4f"|format(s.longitude) }}
+                            {% else %}
+                                <span style="color: #9ca3af;">Awaiting GPS</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 8px;">
+                            {% if s.booking_id %}
+                                <a href="/live-tracking/booking/{{ s.booking_id }}" class="track-btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;">
+                                    View Booking Map
+                                </a>
+                            {% else %}
+                                <span style="color: #9ca3af;">No linked booking</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html>

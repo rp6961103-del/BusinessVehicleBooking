@@ -3,7 +3,7 @@
 A Flask + MySQL vehicle booking system for farmers/business customers and vehicle owners.
 
 ## Included
-- Existing customer login
+- Customer registration/login
 - Owner registration/login
 - Add, edit and delete vehicles
 - Route-wise rent (a vehicle can have multiple routes)

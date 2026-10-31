@@ -1,8 +1,10 @@
 from datetime import date, timedelta
-from unittest.mock import patch
+import logging
 
+import mysql.connector
+import app as app_module
 from .conftest import csrf_token
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 
 def test_database_connection_and_cleanup(test_db):
@@ -14,22 +16,187 @@ def test_database_connection_and_cleanup(test_db):
         cursor.close()
 
 
-def test_customer_registration_is_available(app_client, seeded_data):
-    token = csrf_token(app_client, "/register")
-    assert app_client.get("/register").status_code == 200
+def test_customer_registration_and_duplicate_handling(app_client, test_db, seeded_data):
+    token = csrf_token(app_client)
     response = app_client.post(
         "/register",
         data={
             "csrf_token": token,
-            "name": "New Customer",
-            "phone": "9000000003",
+            "name": "New Integration Customer",
+            "phone": "9000000010",
+            "email": "new-integration@test.example",
             "password": "customer-password",
-            "confirm_password": "customer-password",
         },
     )
-    assert response.status_code == 302
-    assert response.location.endswith("/login")
+    assert response.status_code == 200
+    assert b"Registration Successful" in response.data
 
+    cursor = test_db.cursor()
+    try:
+        cursor.execute(
+            "SELECT email, password_hash FROM users WHERE phone = %s",
+            ("9000000010",),
+        )
+        registered_email, password_hash = cursor.fetchone()
+        assert registered_email == "new-integration@test.example"
+        assert check_password_hash(password_hash, "customer-password")
+    finally:
+        cursor.close()
+
+    duplicate_token = csrf_token(app_client)
+    duplicate = app_client.post(
+        "/register",
+        data={
+            "csrf_token": duplicate_token,
+            "name": "Duplicate Customer",
+            "phone": "9000000010",
+            "password": "customer-password",
+        },
+    )
+    assert duplicate.status_code == 200
+    assert b"Already Registered" in duplicate.data
+
+    duplicate_email = app_client.post(
+        "/register",
+        data={
+            "csrf_token": duplicate_token,
+            "name": "Duplicate Email Customer",
+            "phone": "9000000011",
+            "email": "new-integration@test.example",
+            "password": "customer-password",
+        },
+    )
+    assert duplicate_email.status_code == 200
+    assert b"Already Registered" in duplicate_email.data
+
+    cursor = test_db.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE phone IN (%s, %s)", ("9000000010", "9000000011"))
+        assert cursor.fetchone()[0] == 1
+    finally:
+        cursor.close()
+
+
+def test_customer_registration_rejects_invalid_input(app_client, test_db):
+    invalid_registrations = (
+        {"name": "Invalid Phone", "phone": "123", "password": "customer-password"},
+        {"name": "Invalid Email", "phone": "9000000012", "email": "not-an-email", "password": "customer-password"},
+        {"name": "Short Password", "phone": "9000000013", "password": "short"},
+        {"name": "Long Email", "phone": "9000000014", "email": "a" * 90 + "@test.example", "password": "customer-password"},
+    )
+    for registration in invalid_registrations:
+        token = csrf_token(app_client)
+        response = app_client.post(
+            "/register",
+            data={"csrf_token": token, **registration},
+        )
+        assert response.status_code == 400
+        assert b"Invalid registration details" in response.data
+
+    cursor = test_db.cursor()
+    try:
+        cursor.execute(
+            "SELECT COUNT(*) FROM users WHERE phone IN (%s, %s, %s)",
+            ("9000000012", "9000000013", "9000000014"),
+        )
+        assert cursor.fetchone()[0] == 0
+    finally:
+        cursor.close()
+
+
+def test_customer_registration_database_failure_is_reported_without_secrets(
+    app_client, test_db, monkeypatch, caplog
+):
+    class FailingCursor:
+        def execute(self, *_args, **_kwargs):
+            raise mysql.connector.Error(
+                "simulated connection failure containing private-password",
+                errno=2003,
+            )
+
+    monkeypatch.setattr(app_module, "cursor", FailingCursor())
+    token = csrf_token(app_client)
+    with caplog.at_level(logging.ERROR, logger="app"):
+        response = app_client.post(
+            "/register",
+            data={
+                "csrf_token": token,
+                "name": "Database Failure Customer",
+                "phone": "9000000015",
+                "password": "customer-password",
+            },
+        )
+
+    assert response.status_code == 503
+    assert b"temporarily unavailable" in response.data
+    assert "private-password" not in caplog.text
+
+    cursor = test_db.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE phone = %s", ("9000000015",))
+        assert cursor.fetchone()[0] == 0
+    finally:
+        cursor.close()
+
+
+def test_customer_registration_handles_duplicate_key_race(app_client, test_db, monkeypatch):
+    class DuplicateKeyCursor:
+        def __init__(self):
+            self.execute_count = 0
+
+        def execute(self, *_args, **_kwargs):
+            self.execute_count += 1
+            if self.execute_count == 2:
+                raise mysql.connector.IntegrityError(
+                    "duplicate value must not be exposed",
+                    errno=1062,
+                )
+
+        def fetchone(self):
+            return None
+
+    monkeypatch.setattr(app_module, "cursor", DuplicateKeyCursor())
+    token = csrf_token(app_client)
+    response = app_client.post(
+        "/register",
+        data={
+            "csrf_token": token,
+            "name": "Concurrent Registration",
+            "phone": "9000000017",
+            "email": "race@test.example",
+            "password": "customer-password",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"Already Registered" in response.data
+    assert b"duplicate value must not be exposed" not in response.data
+
+    cursor = test_db.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE phone = %s", ("9000000017",))
+        assert cursor.fetchone()[0] == 0
+    finally:
+        cursor.close()
+
+
+def test_customer_registration_requires_csrf_without_saving(app_client, test_db):
+    response = app_client.post(
+        "/register",
+        data={
+            "name": "CSRF Failure Customer",
+            "phone": "9000000016",
+            "password": "customer-password",
+        },
+    )
+    assert response.status_code == 400
+
+    cursor = test_db.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE phone = %s", ("9000000016",))
+        assert cursor.fetchone()[0] == 0
+    finally:
+        cursor.close()
 
 def test_customer_login_and_authentication(app_client, seeded_data):
     token = csrf_token(app_client)
@@ -119,6 +286,84 @@ def test_vehicle_listing_details_search_and_filtering(app_client, seeded_data):
     assert app_client.get("/vehicle/999999").status_code == 404
 
 
+def test_customer_vehicle_listing_includes_multiple_owners_and_route_status(
+    app_client, test_db, seeded_data
+):
+    cursor = test_db.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO owners (owner_name, phone, email, password_hash) "
+            "VALUES (%s, %s, %s, %s)",
+            (
+                "Second Listing Owner",
+                "9000000021",
+                "second-listing-owner@test.example",
+                generate_password_hash("owner-password"),
+            ),
+        )
+        second_owner_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO vehicles (vehicle_name, vehicle_type, owner_id, contact_number, location) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("Second Owner Route Truck", "Lorry", second_owner_id, "9000000021", "Second Town"),
+        )
+        routed_vehicle_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO vehicle_routes (vehicle_id, from_location, to_location, rent) "
+            "VALUES (%s, %s, %s, %s)",
+            (routed_vehicle_id, "Second Town", "Second City", "3500.00"),
+        )
+        cursor.execute(
+            "INSERT INTO vehicles (vehicle_name, vehicle_type, owner_id, contact_number, location) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("Second Owner Setup Truck", "Pickup", second_owner_id, "9000000021", "Setup Town"),
+        )
+        unconfigured_vehicle_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO vehicles (vehicle_name, vehicle_type, owner_id, contact_number, location, is_active) "
+            "VALUES (%s, %s, %s, %s, %s, FALSE)",
+            ("Inactive Owner Truck", "Tipper", second_owner_id, "9000000021", "Inactive Town"),
+        )
+        test_db.commit()
+    finally:
+        cursor.close()
+
+    token = csrf_token(app_client)
+    login = app_client.post(
+        "/login",
+        data={
+            "csrf_token": token,
+            "phone": "9000000002",
+            "password": "customer-password",
+        },
+    )
+    assert login.status_code == 302
+
+    response = app_client.get("/vehicles")
+    assert response.status_code == 200
+    assert b"Integration Truck" in response.data
+    assert b"Integration Owner" in response.data
+    assert b"Second Owner Route Truck" in response.data
+    assert b"Second Listing Owner" in response.data
+    assert b"Second Town" in response.data
+    assert b"Second City" in response.data
+    assert b"3500.00" in response.data
+    assert b"Second Owner Setup Truck" in response.data
+    assert b"No routes configured" in response.data
+    assert b"Not bookable yet" in response.data
+    assert b"Inactive Owner Truck" not in response.data
+    assert f"/book/{routed_vehicle_id}?route_id=".encode() in response.data
+    assert f"/book/{unconfigured_vehicle_id}?route_id=".encode() not in response.data
+
+    details = app_client.get(f"/vehicle/{unconfigured_vehicle_id}")
+    assert details.status_code == 200
+    assert b"Second Listing Owner" in details.data
+    assert b"not available for booking" in details.data
+    assert b"Book This Vehicle" not in details.data
+
+    assert app_client.get(f"/book/{unconfigured_vehicle_id}").status_code == 404
+
+
 def test_booking_is_stored_and_visible_to_customer_and_owner(app_client, test_db, seeded_data):
     token = csrf_token(app_client)
     login = app_client.post(
@@ -138,16 +383,23 @@ def test_booking_is_stored_and_visible_to_customer_and_owner(app_client, test_db
         data={"csrf_token": token, "booking_date": booking_date},
     )
     assert booking.status_code == 200
-    assert b"Booking Request Submitted" in booking.data
-    assert app_client.get("/mybookings").status_code == 200
+    assert b"Booking Successful" in booking.data
+    assert b"Integration Owner" in booking.data
+    customer_history = app_client.get("/mybookings")
+    assert customer_history.status_code == 200
+    assert b"Integration Owner" in customer_history.data
+    assert app_client.get("/dashboard").status_code == 200
 
     cursor = test_db.cursor()
     try:
         cursor.execute(
-            "SELECT status FROM bookings WHERE vehicle_id = %s AND phone = %s",
+            "SELECT status, created_at FROM bookings WHERE vehicle_id = %s AND phone = %s",
             (seeded_data["vehicle_id"], "9000000002"),
         )
-        assert cursor.fetchone()[0].lower() == "pending"
+        created_booking = cursor.fetchone()
+        assert created_booking[0].lower() == "pending"
+        assert created_booking[1] is not None
+        expected_booked_on = app_module.format_booking_created_at(created_booking[1])
     finally:
         cursor.close()
 
@@ -163,97 +415,41 @@ def test_booking_is_stored_and_visible_to_customer_and_owner(app_client, test_db
         },
     )
     assert owner_login.status_code == 302
-    assert app_client.get("/owner_dashboard").status_code == 200
+    owner_dashboard = app_client.get("/owner_dashboard")
+    assert owner_dashboard.status_code == 200
+    assert f"Booked on: {expected_booked_on}".encode() in owner_dashboard.data
 
 
-def test_owner_decision_updates_pending_booking_and_emails_customer(app_client, test_db, seeded_data):
+def test_customer_booking_history_uses_authenticated_customer_id(
+    app_client, test_db, seeded_data
+):
     cursor = test_db.cursor()
     try:
         cursor.execute(
-            "INSERT INTO bookings (vehicle_id, route_id, customer_name, phone, booking_date, status) "
-            "VALUES (%s, %s, %s, %s, %s, %s)",
-            (seeded_data["vehicle_id"], 1, "Integration Customer", "9000000002", "2099-02-01", "Pending"),
+            "INSERT INTO users (name, phone, password_hash, email) "
+            "VALUES (%s, %s, %s, %s)",
+            (
+                "Other Integration Customer",
+                "9000000022",
+                generate_password_hash("other-customer-password"),
+                "other-customer@test.example",
+            ),
         )
-        booking_id = cursor.lastrowid
-        test_db.commit()
-    finally:
-        cursor.close()
-
-
-def test_owner_dashboard_renders_actions_only_for_pending_bookings(app_client, test_db, seeded_data):
-    cursor = test_db.cursor()
-    try:
-        booking_ids = {}
-        for status in ("Pending", "Accepted", "Rejected"):
-            cursor.execute(
-                "INSERT INTO bookings (vehicle_id, customer_name, phone, booking_date, status) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (seeded_data["vehicle_id"], f"{status} Customer", "9000000002", "2099-03-01", status),
-            )
-            booking_ids[status] = cursor.lastrowid
-        test_db.commit()
-    finally:
-        cursor.close()
-
-    token = csrf_token(app_client)
-    response = app_client.post(
-        "/ownerlogin",
-        data={
-            "csrf_token": token,
-            "email": "owner@test.example",
-            "password": "owner-password",
-        },
-    )
-    assert response.status_code == 302
-
-    dashboard = app_client.get("/owner_dashboard")
-    assert dashboard.status_code == 200
-    assert b"customer@test.example" in dashboard.data
-    assert f"/update_booking/{booking_ids['Pending']}/Accepted".encode() in dashboard.data
-    assert f"/update_booking/{booking_ids['Pending']}/Rejected".encode() in dashboard.data
-    assert f"/update_booking/{booking_ids['Accepted']}/Accepted".encode() not in dashboard.data
-    assert f"/update_booking/{booking_ids['Rejected']}/Rejected".encode() not in dashboard.data
-
-    token = csrf_token(app_client)
-    owner_login = app_client.post(
-        "/ownerlogin",
-        data={
-            "csrf_token": token,
-            "email": "owner@test.example",
-            "password": "owner-password",
-        },
-    )
-    assert owner_login.status_code == 302
-
-    token = csrf_token(app_client, "/owner_dashboard")
-    with patch("app.send_booking_decision_email", return_value=True) as send:
-        response = app_client.post(
-            f"/update_booking/{booking_id}/Accepted",
-            data={"csrf_token": token},
-        )
-
-    assert response.status_code == 302
-    send.assert_called_once()
-    assert send.call_args.args[0]["status"] == "Accepted"
-    assert send.call_args.args[0]["customer_email"] == "customer@test.example"
-
-    cursor = test_db.cursor()
-    try:
-        cursor.execute("SELECT status FROM bookings WHERE id = %s", (booking_id,))
-        assert cursor.fetchone()[0] == "Accepted"
-    finally:
-        cursor.close()
-
-
-def test_demo_payment_flow_for_accepted_booking(app_client, test_db, seeded_data):
-    cursor = test_db.cursor()
-    try:
+        other_customer_id = cursor.lastrowid
         cursor.execute(
-            "INSERT INTO bookings (vehicle_id, route_id, customer_name, phone, booking_date, status) "
+            "INSERT INTO bookings "
+            "(vehicle_id, route_id, customer_name, phone, booking_date, status) "
             "VALUES (%s, %s, %s, %s, %s, %s)",
-            (seeded_data["vehicle_id"], 1, "Integration Customer", "9000000002", "2099-04-01", "Accepted"),
+            (
+                seeded_data["vehicle_id"],
+                seeded_data["route_id"],
+                "Other Integration Customer",
+                "9000000022",
+                (date.today() + timedelta(days=40)).isoformat(),
+                "Pending",
+            ),
         )
-        booking_id = cursor.lastrowid
+        other_booking_id = cursor.lastrowid
         test_db.commit()
     finally:
         cursor.close()
@@ -269,49 +465,201 @@ def test_demo_payment_flow_for_accepted_booking(app_client, test_db, seeded_data
     )
     assert login.status_code == 302
 
-    my_bookings = app_client.get("/mybookings")
-    assert my_bookings.status_code == 200
-    assert b"Pay Now" in my_bookings.data
+    booking_date = (date.today() + timedelta(days=39)).isoformat()
+    token = csrf_token(app_client, f"/book/{seeded_data['vehicle_id']}")
+    created = app_client.post(
+        f"/book/{seeded_data['vehicle_id']}",
+        data={"csrf_token": token, "booking_date": booking_date},
+    )
+    assert created.status_code == 200
+    cursor = test_db.cursor()
+    try:
+        cursor.execute(
+            "SELECT id FROM bookings WHERE phone = %s AND booking_date = %s",
+            ("9000000002", booking_date),
+        )
+        customer_booking_id = cursor.fetchone()[0]
+    finally:
+        cursor.close()
 
-    pay_page = app_client.get(f"/booking/{booking_id}/pay")
-    assert pay_page.status_code == 200
-    assert b"Secure Demo Payment" in pay_page.data
+    with app_client.session_transaction() as customer_session:
+        assert customer_session["user_id"] == seeded_data["customer_id"]
+        customer_session["user_phone"] = "9000000022"
 
-    token = csrf_token(app_client, f"/booking/{booking_id}/pay")
-    response = app_client.post(
-        f"/booking/{booking_id}/pay",
+    dashboard = app_client.get("/dashboard")
+    history = app_client.get("/mybookings")
+    expected_booking_link = f"/live-tracking/booking/{customer_booking_id}".encode()
+    other_booking_link = f"/live-tracking/booking/{other_booking_id}".encode()
+    assert expected_booking_link in dashboard.data
+    assert other_booking_link not in dashboard.data
+    assert expected_booking_link in history.data
+    assert other_booking_link not in history.data
+
+    with app_client.session_transaction() as customer_session:
+        customer_session["user_id"] = other_customer_id
+        customer_session["user_phone"] = "9000000002"
+    other_dashboard = app_client.get("/dashboard")
+    assert other_booking_link in other_dashboard.data
+    assert expected_booking_link not in other_dashboard.data
+
+
+def test_bookings_are_scoped_to_vehicle_owner_and_actions(app_client, test_db, seeded_data):
+    cursor = test_db.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO owners (owner_name, phone, email, password_hash) "
+            "VALUES (%s, %s, %s, %s)",
+            ("Second Owner", "9000000011", "second-owner@test.example",
+             generate_password_hash("owner-password")),
+        )
+        second_owner_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO vehicles (vehicle_name, vehicle_type, owner_id, contact_number, location) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("Second Owner Truck", "Pickup", second_owner_id, "9000000011", "Other Town"),
+        )
+        second_vehicle_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO vehicle_routes (vehicle_id, from_location, to_location, rent) "
+            "VALUES (%s, %s, %s, %s)",
+            (second_vehicle_id, "Other Town", "Other City", "3000.00"),
+        )
+        test_db.commit()
+    finally:
+        cursor.close()
+
+    token = csrf_token(app_client)
+    login = app_client.post(
+        "/login",
         data={
             "csrf_token": token,
-            "payment_method": "Demo Card",
-            "cardholder_name": "Demo Customer",
+            "phone": "9000000002",
+            "password": "customer-password",
         },
     )
-    assert response.status_code == 302
-    assert response.location.endswith(f"/booking/{booking_id}/payment-success")
+    assert login.status_code == 302
+
+    first_date = (date.today() + timedelta(days=30)).isoformat()
+    second_date = (date.today() + timedelta(days=31)).isoformat()
+    for vehicle_id, booking_date in (
+        (seeded_data["vehicle_id"], first_date),
+        (second_vehicle_id, second_date),
+    ):
+        token = csrf_token(app_client, f"/book/{vehicle_id}")
+        response = app_client.post(
+            f"/book/{vehicle_id}",
+            data={"csrf_token": token, "booking_date": booking_date},
+        )
+        assert response.status_code == 200
 
     cursor = test_db.cursor()
     try:
         cursor.execute(
-            "SELECT status, payment_method, transaction_reference FROM payments WHERE booking_id = %s",
-            (booking_id,),
+            "SELECT id, vehicle_id, status FROM bookings WHERE vehicle_id IN (%s, %s) "
+            "ORDER BY vehicle_id",
+            (seeded_data["vehicle_id"], second_vehicle_id),
         )
-        payment = cursor.fetchone()
-        assert payment is not None
-        assert payment[0] == "Paid"
-        assert payment[1] == "Demo Card"
-        assert payment[2].startswith("DEMO-")
+        first_booking, second_booking = cursor.fetchall()
+        assert first_booking[1] == seeded_data["vehicle_id"]
+        assert second_booking[1] == second_vehicle_id
     finally:
         cursor.close()
 
-    duplicate = app_client.post(
-        f"/booking/{booking_id}/pay",
+    token = csrf_token(app_client)
+    first_owner_login = app_client.post(
+        "/ownerlogin",
         data={
-            "csrf_token": csrf_token(app_client, f"/booking/{booking_id}/pay"),
-            "payment_method": "Demo UPI",
-            "demo_upi_id": "demo@upi",
+            "csrf_token": token,
+            "email": "owner@test.example",
+            "password": "owner-password",
         },
     )
-    assert duplicate.status_code in {302, 400, 403}
+    assert first_owner_login.status_code == 302
+    first_owner_dashboard = app_client.get("/owner_dashboard")
+    assert b"Integration Truck" in first_owner_dashboard.data
+    assert b"Second Owner Truck" not in first_owner_dashboard.data
+
+    token = csrf_token(app_client, "/owner_dashboard")
+    for status in ("Accepted", "Rejected"):
+        denied = app_client.post(
+            f"/update_booking/{second_booking[0]}/{status}",
+            data={"csrf_token": token},
+        )
+        assert denied.status_code == 403
+
+    cursor = test_db.cursor()
+    try:
+        cursor.execute("SELECT status FROM bookings WHERE id = %s", (second_booking[0],))
+        assert cursor.fetchone()[0] == "Pending"
+    finally:
+        cursor.close()
+
+    with app_client.session_transaction() as session:
+        session.clear()
+    token = csrf_token(app_client)
+    second_owner_login = app_client.post(
+        "/ownerlogin",
+        data={
+            "csrf_token": token,
+            "email": "second-owner@test.example",
+            "password": "owner-password",
+        },
+    )
+    assert second_owner_login.status_code == 302
+    second_owner_dashboard = app_client.get("/owner_dashboard")
+    assert b"Second Owner Truck" in second_owner_dashboard.data
+    assert b"Integration Truck" not in second_owner_dashboard.data
+
+    token = csrf_token(app_client, "/owner_dashboard")
+    denied = app_client.post(
+        f"/update_booking/{first_booking[0]}/Rejected",
+        data={"csrf_token": token},
+    )
+    assert denied.status_code == 403
+
+    token = csrf_token(app_client, "/owner_dashboard")
+    accepted = app_client.post(
+        f"/update_booking/{second_booking[0]}/Accepted",
+        data={"csrf_token": token},
+    )
+    assert accepted.status_code == 302
+
+    cursor = test_db.cursor()
+    try:
+        cursor.execute("SELECT status FROM bookings WHERE id = %s", (second_booking[0],))
+        assert cursor.fetchone()[0] == "Accepted"
+    finally:
+        cursor.close()
+
+
+def test_booking_form_rejects_missing_csrf_without_saving(app_client, test_db, seeded_data):
+    token = csrf_token(app_client)
+    login = app_client.post(
+        "/login",
+        data={
+            "csrf_token": token,
+            "phone": "9000000002",
+            "password": "customer-password",
+        },
+    )
+    assert login.status_code == 302
+
+    booking_date = (date.today() + timedelta(days=45)).isoformat()
+    response = app_client.post(
+        f"/book/{seeded_data['vehicle_id']}",
+        data={"booking_date": booking_date},
+    )
+
+    assert response.status_code == 400
+    cursor = test_db.cursor()
+    try:
+        cursor.execute(
+            "SELECT COUNT(*) FROM bookings WHERE vehicle_id = %s AND booking_date = %s",
+            (seeded_data["vehicle_id"], booking_date),
+        )
+        assert cursor.fetchone()[0] == 0
+    finally:
+        cursor.close()
 
 
 def test_booking_validation_and_duplicate_prevention(app_client, seeded_data):

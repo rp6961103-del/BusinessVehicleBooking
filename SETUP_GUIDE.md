@@ -30,6 +30,7 @@ MAIL_ENABLED=true
 MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USE_TLS=true
+MAIL_USE_SSL=false
 MAIL_USERNAME=your-email@gmail.com
 MAIL_PASSWORD=your-app-password
 MAIL_DEFAULT_SENDER=BusinessVehicleBooking <your-email@gmail.com>
@@ -39,6 +40,8 @@ For Gmail, use a Google App Password rather than your normal account password wh
 
 If email is not configured, bookings still work and the success page will accurately say that email confirmation is unavailable.
 
+The current `.env` must set `MAIL_ENABLED=true` to send notifications. For SMTP providers that require implicit SSL, use the provider's SSL port (commonly 465), set `MAIL_USE_SSL=true`, and set `MAIL_USE_TLS=false`. Never enable both. Set `MAIL_USERNAME` and `MAIL_PASSWORD` together if the SMTP server requires authentication. SMTP acceptance does not guarantee inbox delivery.
+
 ### Farmer AI
 
 For Gemini:
@@ -46,8 +49,7 @@ For Gemini:
 ```text
 AI_PROVIDER=gemini
 AI_API_KEY=your-api-key
-AI_MODEL=gemini-3.6-flash
-GEMINI_TIMEOUT=30
+AI_MODEL=gemini-2.5-flash
 ```
 
 For an OpenAI-compatible provider:
@@ -75,7 +77,7 @@ Then open the local address shown by Flask, normally:
 
 ## 4. Test booking email
 
-1. Use an existing customer account with a real email address.
+1. Register a customer with a real email address.
 2. Register/login as an owner and add a vehicle + route.
 3. Login as the customer.
 4. Open Available Vehicles.

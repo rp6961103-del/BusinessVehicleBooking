@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if booking_id or (initial_data and initial_data.booking and initial_data.booking.id) %}Booking #{{ booking_id or initial_data.booking.id }} Details & Live Tracking | Business Vehicle Booking{% else %}Live Vehicle Location Tracking | Business Vehicle Booking{% endif %}</title>
+    <!-- Core App CSS & Dedicated Tracking CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='live_tracking.css') }}">
+    <!-- Leaflet.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+</head>
+<body class="customer-tracking-page">
+
+<!-- Standard Application Header -->
+<header>
+    <a href="/" class="logo">🚚 Business Vehicle Booking</a>
+    <nav aria-label="Customer Navigation">
+        <a href="/dashboard">📊 Dashboard</a>
+        <a href="/vehicles">🚚 Vehicles</a>
+        <a href="/mybookings" class="active">📋 My Bookings</a>
+        <a href="/farmer-ai" class="nav-highlight">🌿 Farmer AI</a>
+        {% if session.get('user_id') %}
+            <form method="POST" action="/logout" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit">🚪 Logout</button>
+            </form>
+        {% elif session.get('owner_id') %}
+            <form method="POST" action="/owner_logout" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit">🚪 Owner Logout</button>
+            </form>
+        {% else %}
+            <a href="/login">🔑 Login</a>
+        {% endif %}
+    </nav>
+</header>
+
+<div class="tracking-page-container">
+
+    <!-- Breadcrumbs Navigation -->
+    <div class="tracking-breadcrumbs-bar">
+        <div class="breadcrumb-trail">
+            <a href="/dashboard">📊 Dashboard</a>
+            <span class="breadcrumb-sep">›</span>
+            <a href="/mybookings">📋 My Bookings</a>
+            <span class="breadcrumb-sep">›</span>
+            <span class="breadcrumb-current">
+                {% if booking_id or (initial_data and initial_data.booking and initial_data.booking.id) %}
+                    Booking #{{ booking_id or initial_data.booking.id }} Details & Live Tracking
+                {% else %}
+                    Live Vehicle Tracking
+                {% endif %}
+            </span>
+        </div>
+        <div class="breadcrumb-actions">
+            <a href="/mybookings" class="track-btn-secondary" style="font-size: 0.85rem; padding: 6px 12px;">← Back to My Bookings</a>
+            <a href="/dashboard" class="track-btn-secondary" style="font-size: 0.85rem; padding: 6px 12px;">📊 Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Page Header Bar -->
+    <header class="tracking-header-bar">
+        <div class="tracking-title-group">
+            <h1>
+                {% if booking_id or (initial_data and initial_data.booking and initial_data.booking.id) %}
+                    📋 Booking #{{ booking_id or initial_data.booking.id }} Details & Live Tracking
+                {% else %}
+                    🗺️ Live Vehicle Tracking
+                {% endif %}
+            </h1>
+            <p class="tracking-subtitle">
+                {% if initial_data and initial_data.vehicle %}
+                    Vehicle: <strong>{{ initial_data.vehicle.name }}</strong> ({{ initial_data.vehicle.registration_number or 'In Transit' }}) •
+                    Route: <strong>{{ initial_data.booking.pickup or 'Pickup' }} → {{ initial_data.booking.destination or 'Destination' }}</strong>
+                {% else %}
+                    Real-time vehicle location monitor
+                {% endif %}
+            </p>
+        </div>
+        <div class="tracking-nav-links">
+            <a href="/mybookings" class="track-btn-secondary">📋 My Bookings</a>
+            <a href="/dashboard" class="track-btn-secondary">📊 Dashboard</a>
+            <a href="/live-tracking/" class="track-btn-secondary">🛰️ Tracking Hub</a>
+        </div>
+    </header>
+
+    {% if error_message and not initial_data %}
+        <!-- Authorization / Token Error Card -->
+        <div class="track-card" style="text-align: center; max-width: 540px; margin: 40px auto; padding: 36px 24px;">
+            <div style="font-size: 3rem; margin-bottom: 12px;">🚫</div>
+            <h2 style="margin-bottom: 8px; color: var(--track-text);">Access Restricted</h2>
+            <p style="color: var(--track-muted); font-size: 0.95rem; margin-bottom: 20px;">
+                {{ error_message }}
+            </p>
+            <p style="font-size: 0.85rem; color: #5e726d; margin-bottom: 24px;">
+                Please ensure you are logged in with the customer account that made this booking, or ask the vehicle owner for the direct shareable tracking link.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <a href="/login" class="track-btn-secondary">Customer Login</a>
+                <a href="/dashboard" class="track-btn-secondary">Customer Dashboard</a>
+                <a href="/mybookings" class="track-btn-secondary">My Bookings</a>
+            </div>
+        </div>
+    {% else %}
+
+        <!-- If accessed directly without token or booking_id, show a search box -->
+        {% if not access_token and not booking_id and not initial_data %}
+            <div class="track-card" style="max-width: 540px; margin: 20px auto 30px auto;">
+                <div class="track-card-header">
+                    <h3>🔍 Enter Tracking Details</h3>
+                </div>
+                <form action="/live-tracking/customer" method="GET">
+                    <div class="track-form-group">
+                        <label for="inputToken">Tracking Token or Booking ID</label>
+                        <input type="text" id="inputToken" name="token" class="track-input" placeholder="Paste tracking token here..." required>
+                    </div>
+                    <button type="submit" class="btn-track-start" style="padding: 10px 18px; font-size: 0.95rem;">
+                        Track Vehicle
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+
+        {% if initial_data %}
+        <!-- Booking Key Metrics Bar -->
+        <div class="booking-key-metrics-card">
+            <div class="booking-metric-box">
+                <span class="metric-label">Booking ID</span>
+                <strong class="metric-val" id="metricBookingId">#{{ booking_id or (initial_data.booking.id if initial_data and initial_data.booking else 'N/A') }}</strong>
+            </div>
+            <div class="booking-metric-box">
+                <span class="metric-label">Booking Status</span>
+                <span id="metricBookingStatus" class="status-badge {% if initial_data and initial_data.booking and initial_data.booking.status|lower in ['confirmed', 'accepted'] %}badge-confirmed{% elif initial_data and initial_data.booking and initial_data.booking.status|lower == 'rejected' %}badge-rejected{% else %}badge-pending{% endif %}">
+                    {% if initial_data and initial_data.booking and initial_data.booking.status|lower in ['confirmed', 'accepted'] %}
+                        ✅ Confirmed
+                    {% elif initial_data and initial_data.booking and initial_data.booking.status|lower == 'rejected' %}
+                        ❌ Rejected
+                    {% else %}
+                        ⏳ Pending Confirmation
+                    {% endif %}
+                </span>
+            </div>
+            <div class="booking-metric-box">
+                <span class="metric-label">Assigned Vehicle</span>
+                <strong class="metric-val" id="metricVehicleName">{{ initial_data.vehicle.name if initial_data and initial_data.vehicle else 'Vehicle' }}</strong>
+                <small class="metric-sub" id="metricVehicleType">{{ initial_data.vehicle.type if initial_data and initial_data.vehicle else '' }} ({{ initial_data.vehicle.registration_number or 'In Transit' }})</small>
+            </div>
+            <div class="booking-metric-box">
+                <span class="metric-label">Trip Rent</span>
+                <strong class="metric-val" id="metricRent" style="color: var(--track-primary);">₹{{ initial_data.booking.rent if initial_data and initial_data.booking and initial_data.booking.rent else 'N/A' }}</strong>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Main Tracking Workspace -->
+        <div class="tracking-grid">
+
+            <!-- Booking details appear before the read-only live tracking map. -->
+            <div class="tracking-sidebar">
+
+                <!-- Booking / Route Card -->
+                <div class="track-card">
+                    <div class="track-card-header">
+                        <h3>📍 Trip & Route Details</h3>
+                    </div>
+                    <div class="track-detail-list">
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Booking ID:</span>
+                            <span id="valBookingId" class="track-detail-value" style="font-weight: 700;">
+                                #{{ booking_id or (initial_data.booking.id if initial_data and initial_data.booking else '-') }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Customer:</span>
+                            <span id="valCustomerName" class="track-detail-value">
+                                {{ initial_data.booking.customer_name if initial_data and initial_data.booking else '-' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">🟢 Pickup Point:</span>
+                            <span id="valPickup" class="track-detail-value">
+                                {{ initial_data.booking.pickup if initial_data and initial_data.booking else 'Not Specified' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">🏁 Destination:</span>
+                            <span id="valDestination" class="track-detail-value">
+                                {{ initial_data.booking.destination if initial_data and initial_data.booking else 'Not Specified' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">📍 Base/Start:</span>
+                            <span id="valBaseLocation" class="track-detail-value">
+                                {{ initial_data.vehicle.base_location if initial_data and initial_data.vehicle else '-' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">💰 Trip Rent:</span>
+                            <span id="valRent" class="track-detail-value" style="font-weight: 700; color: var(--track-primary);">
+                                ₹{{ initial_data.booking.rent if initial_data and initial_data.booking and initial_data.booking.rent else 'N/A' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">🛣️ Remaining:</span>
+                            <span id="valSidebarDistance" class="track-detail-value" style="color: var(--track-primary); font-weight: 700;">
+                                {% if initial_data and not initial_data.booking.destination %}No destination{% else %}Waiting for driver location{% endif %}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">⏱️ Est. Time:</span>
+                            <span id="valSidebarDuration" class="track-detail-value" style="color: var(--track-primary); font-weight: 700;">
+                                {% if initial_data and not initial_data.booking.destination %}--{% else %}Waiting for driver location{% endif %}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">🏁 ETA:</span>
+                            <span id="valSidebarEta" class="track-detail-value" style="font-weight: 700;">--:--</span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Trip Date:</span>
+                            <span id="valBookingDate" class="track-detail-value">
+                                {{ initial_data.booking.booking_date if initial_data and initial_data.booking else '-' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Booking Status:</span>
+                            <span id="valBookingStatus" class="track-detail-value">
+                                {{ initial_data.booking.status if initial_data and initial_data.booking else '-' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vehicle Information Card -->
+                <div class="track-card">
+                    <div class="track-card-header">
+                        <h3>🚚 Vehicle Details</h3>
+                    </div>
+                    <div class="track-detail-list">
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Vehicle Name:</span>
+                            <span id="valVehicleName" class="track-detail-value">
+                                {{ initial_data.vehicle.name if initial_data and initial_data.vehicle else 'Loading...' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Vehicle Type:</span>
+                            <span id="valVehicleType" class="track-detail-value">
+                                {{ initial_data.vehicle.type if initial_data and initial_data.vehicle else '-' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Registration No:</span>
+                            <span id="valRegNumber" class="track-detail-value" style="background: #eef3f1; padding: 2px 8px; border-radius: 4px; font-family: monospace;">
+                                {{ initial_data.vehicle.registration_number if initial_data and initial_data.vehicle else '-' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Driver / Owner:</span>
+                            <span id="valDriverName" class="track-detail-value">
+                                {{ initial_data.vehicle.owner_name if initial_data and initial_data.vehicle else '-' }}
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Contact Driver:</span>
+                            <span id="valDriverPhone" class="track-detail-value">
+                                {% if initial_data and initial_data.vehicle and initial_data.vehicle.contact_number %}
+                                    <a href="tel:{{ initial_data.vehicle.contact_number }}" style="color: var(--track-primary); text-decoration: underline;">
+                                        📞 {{ initial_data.vehicle.contact_number }}
+                                    </a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Read-only Live Tracking section -->
+            <section class="tracking-map-card" aria-labelledby="liveTrackingHeading">
+                <div class="track-card-header" style="padding: 16px 18px;">
+                    <h2 id="liveTrackingHeading">🛰️ Live Tracking</h2>
+                    <p style="margin: 4px 0 0; color: var(--track-muted);">
+                        Vehicle location refreshes automatically while the driver shares GPS.
+                    </p>
+                </div>
+                <!-- Map Toolbar -->
+                <div class="map-toolbar">
+                    <div id="statusPill" class="map-status-pill pill-waiting">
+                        <span id="statusDot" class="pulsing-dot dot-waiting"></span>
+                        <span id="statusText">{% if initial_data and initial_data.tracking_state == 'NOT_STARTED' %}LIVE TRACKING NOT STARTED{% elif initial_data and initial_data.tracking_state == 'STOPPED' %}TRIP ENDED / STOPPED{% else %}WAITING FOR DRIVER LOCATION{% endif %}</span>
+                    </div>
+                    <div class="map-actions">
+                        <button type="button" id="btnToggleFollow" class="map-btn-icon btn-follow-active" title="Toggle auto-centering and following the vehicle">
+                            <span id="followIndicator">🟢</span> <span id="followText">Following (Click to Stop)</span>
+                        </button>
+                        <button type="button" id="btnFitBounds" class="map-btn-icon" title="Zoom to show pickup, vehicle, route, and destination">
+                            🗺️ Full Route
+                        </button>
+                        <button type="button" id="btnRecenterMap" class="map-btn-icon" title="Center map on vehicle's current position">
+                            🎯 Center Vehicle
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Google Maps-Style Trip Navigation Bar -->
+                <div class="trip-nav-summary-bar">
+                    <div class="trip-stat-item highlight-stat">
+                        <span class="trip-stat-label">🛣️ Remaining Distance</span>
+                        <span id="valRemainingDistance" class="trip-stat-value">{% if initial_data and not initial_data.booking.destination %}No destination{% else %}Waiting for driver{% endif %}</span>
+                    </div>
+                    <div class="trip-stat-item highlight-stat">
+                        <span class="trip-stat-label">⏱️ Estimated Time</span>
+                        <span id="valEstDuration" class="trip-stat-value">{% if initial_data and not initial_data.booking.destination %}--{% else %}Waiting for driver{% endif %}</span>
+                    </div>
+                    <div class="trip-stat-item highlight-stat">
+                        <span class="trip-stat-label">🏁 Est. Arrival (ETA)</span>
+                        <span id="valEstArrival" class="trip-stat-value">--:--</span>
+                    </div>
+                    <div class="trip-stat-item">
+                        <span class="trip-stat-label">🔄 Last GPS Update</span>
+                        <span id="telemetryLastUpdated" class="trip-stat-value" style="color: var(--track-primary);">Checking...</span>
+                    </div>
+                </div>
+
+                <!-- Alert Banner for Stale/Unavailable GPS or Routing -->
+                <div id="alertBanner" class="map-alert-banner" style="{% if initial_data and initial_data.tracking_state == 'NOT_STARTED' %}display: flex;{% else %}display: none;{% endif %}">
+                    <span id="alertIcon" style="font-size: 1.2rem;">ℹ️</span>
+                    <p id="alertMessage">{% if initial_data and initial_data.tracking_state == 'NOT_STARTED' %}Live tracking has not started yet.{% elif initial_data and initial_data.tracking_state == 'STOPPED' %}Live location sharing has been stopped by the driver.{% endif %}</p>
+                </div>
+
+                <!-- Leaflet Canvas -->
+                <div class="map-canvas-container">
+                    <div id="trackingMap"></div>
+                </div>
+
+                <!-- Telemetry Readout -->
+                <div class="telemetry-bar">
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">Vehicle Speed</span>
+                        <span id="telemetrySpeed" class="telemetry-value">0 km/h</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">GPS Accuracy</span>
+                        <span id="telemetryAccuracy" class="telemetry-value">--</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">Heading</span>
+                        <span id="telemetryHeading" class="telemetry-value">--</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">Vehicle Position</span>
+                        <span id="telemetryCoords" class="telemetry-value" style="font-size: 0.85rem; font-family: monospace;">--.---, --.---</span>
+                    </div>
+                </div>
+                <!-- Info Help Card -->
+                <div class="track-card" style="background: #fafcfb;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 700; color: var(--track-primary); font-size: 0.9rem;">
+                        <span>💡 Automatic Status Refresh</span>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--track-muted); line-height: 1.5; margin: 0;">
+                        This map refreshes every 5 seconds. If the driver's updates are stale or sharing has stopped, the map identifies the last reported position and does not show a current route or ETA.
+                    </p>
+                </section>
+
+            </div>
+
+        </div>
+
+        <!-- Meta elements for JS Initialization -->
+        <div id="trackingMeta" data-token="{{ access_token }}" data-booking-id="{{ booking_id }}" style="display: none;"></div>
+        {% if initial_data %}
+            <div id="initialTrackingData" data-json='{{ initial_data | tojson | safe }}' style="display: none;"></div>
+        {% endif %}
+
+    {% endif %}
+
+</div>
+
+<!-- Leaflet.js JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Customer Tracking Script -->
+<script src="{{ url_for('static', filename='customer_tracking.js') }}"></script>
+
+</body>
+</html>

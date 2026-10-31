@@ -14,26 +14,40 @@ def apply_migrations(connection):
     cursor = connection.cursor()
     try:
         for statement in (
-            """CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                user_id INT UNSIGNED NOT NULL,
-                token_hash CHAR(64) NOT NULL,
-                expires_at DATETIME NOT NULL,
-                used_at DATETIME NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (id),
-                UNIQUE KEY uq_password_reset_token_hash (token_hash),
-                KEY idx_password_reset_user (user_id),
-                CONSTRAINT fk_password_reset_user
-                    FOREIGN KEY (user_id) REFERENCES users (id)
-                    ON UPDATE CASCADE ON DELETE CASCADE
-            ) ENGINE=InnoDB""",
             "ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NULL",
             "ALTER TABLE users ADD COLUMN email VARCHAR(255) NULL",
             "ALTER TABLE owners ADD COLUMN password_hash VARCHAR(255) NULL",
             "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
             "ALTER TABLE owners ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
             "ALTER TABLE vehicles ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
+            "ALTER TABLE bookings ADD COLUMN created_at DATETIME NULL DEFAULT NULL",
+            """
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                account_type VARCHAR(10) NOT NULL,
+                account_id INT UNSIGNED NOT NULL,
+                token_hash CHAR(64) NOT NULL,
+                created_at DATETIME NOT NULL,
+                expires_at DATETIME NOT NULL,
+                used_at DATETIME NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_password_reset_token_hash (token_hash),
+                KEY idx_password_reset_account (account_type, account_id, expires_at),
+                KEY idx_password_reset_expiry (expires_at)
+            ) ENGINE=InnoDB
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS password_reset_attempts (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                account_type VARCHAR(10) NOT NULL,
+                email_hash CHAR(64) NOT NULL,
+                ip_hash CHAR(64) NOT NULL,
+                requested_at DATETIME NOT NULL,
+                PRIMARY KEY (id),
+                KEY idx_password_reset_attempt_ip (ip_hash, requested_at),
+                KEY idx_password_reset_attempt_email (account_type, email_hash, requested_at)
+            ) ENGINE=InnoDB
+            """,
         ):
             try:
                 cursor.execute(statement)

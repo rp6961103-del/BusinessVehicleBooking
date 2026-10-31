@@ -19,7 +19,7 @@ def create_booking(client, vehicle_id):
     )
 
 
-def test_pending_booking_notifies_owner_only(app_client, seeded_data, monkeypatch):
+def test_booking_attempts_customer_and_owner_email(app_client, seeded_data, monkeypatch):
     enable_email(monkeypatch)
     login_customer(app_client, {"phone": "9000000002"})
 
@@ -28,12 +28,14 @@ def test_pending_booking_notifies_owner_only(app_client, seeded_data, monkeypatc
 
     assert response.status_code == 200
     send.assert_called_once()
-    assert send.call_args.kwargs["include_customer"] is False
     booking = send.call_args.args[0]
     assert booking["customer_email"] == "customer@test.example"
     assert booking["owner_email"] == "owner@test.example"
     assert booking["vehicle_name"] == "Integration Truck"
     assert booking["booking_id"]
+    assert b"Customer confirmation:" in response.data
+    assert b"Owner notification:" in response.data
+    assert b"inbox delivery is not verified" in response.data
 
 
 def test_email_failure_does_not_cancel_booking(app_client, test_db, seeded_data, monkeypatch):
@@ -44,6 +46,8 @@ def test_email_failure_does_not_cancel_booking(app_client, test_db, seeded_data,
         response = create_booking(app_client, seeded_data["vehicle_id"])
 
     assert response.status_code == 200
+    assert b"booking is saved in the system" in response.data
+    assert b"not submitted successfully" in response.data
     cursor = test_db.cursor()
     try:
         cursor.execute(
@@ -63,6 +67,7 @@ def test_disabled_email_does_not_attempt_delivery(app_client, seeded_data, monke
         response = create_booking(app_client, seeded_data["vehicle_id"])
 
     assert response.status_code == 200
+    assert b"Email notifications are disabled" in response.data
     send.assert_called_once()
 
 

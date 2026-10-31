@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+/instance/flask_secret_key
 .venv/
 __pycache__/
 *.pyc
@@ -14,5 +15,3 @@ backups/
 *.bak
 *.restore
 _backup_original/
-
-login_code.txt

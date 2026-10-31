@@ -3,84 +3,94 @@ import re
 import secrets
 import logging
 import hashlib
-from datetime import date, datetime, timedelta
+import hmac
+from urllib.parse import urlsplit
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 
 from dotenv import load_dotenv
-
-load_dotenv()
-
 from flask import Flask, render_template, request, redirect, session, flash, jsonify, url_for
 import mysql.connector
 from mysql.connector import Error
-from mysql.connector.errors import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 from email_service import (
-    send_booking_notifications,
-    send_booking_decision_email,
+    email_configuration_status,
     send_password_reset_email,
-    send_demo_payment_confirmation_email,
-    is_mail_configured,
+    send_booking_notifications,
 )
 from ai_disease_service import is_ai_configured, validate_image_file, analyze_crop_leaf, chat_about_crop
 
-logger = logging.getLogger(__name__)
-APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
-IS_RENDER = bool(os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID"))
-PRODUCTION_ENVIRONMENTS = {"production", "prod"}
-IS_PRODUCTION = APP_ENV in PRODUCTION_ENVIRONMENTS or IS_RENDER
 
+load_dotenv()
+
+logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.INFO if IS_PRODUCTION else logging.WARNING,
+    level=logging.INFO if os.getenv("APP_ENV", "development").lower() in {"production", "prod"} else logging.WARNING,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+PRODUCTION_ENVIRONMENTS = {"production", "prod"}
+SUPPORTED_LANGUAGES = ("en", "te", "ta", "hi")
+LANGUAGE_NAMES = {
+    "en": "English",
+    "te": "తెలుగు",
+    "ta": "தமிழ்",
+    "hi": "हिन्दी",
+}
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def format_booking_created_at(value):
+    if value is None:
+        return "Booking time unavailable"
+
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return "Booking time unavailable"
+
+    if not isinstance(value, datetime):
+        return "Booking time unavailable"
+
+    utc_value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return utc_value.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
+
 
 def validate_production_configuration():
-    if not IS_PRODUCTION:
+    if APP_ENV not in PRODUCTION_ENVIRONMENTS:
         return
 
-    missing_variables = []
-    if not (os.getenv("SECRET_KEY") or os.getenv("FLASK_SECRET_KEY")):
-        missing_variables.append("SECRET_KEY")
-    if not (os.getenv("MYSQL_HOST") or os.getenv("DB_HOST")):
-        missing_variables.append("MYSQL_HOST")
-    if not (os.getenv("MYSQL_PORT") or os.getenv("DB_PORT")):
-        missing_variables.append("MYSQL_PORT")
-    if not (os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME") or os.getenv("DB_DATABASE")):
-        missing_variables.append("MYSQL_DATABASE")
-    if not (os.getenv("MYSQL_USER") or os.getenv("DB_USER")):
-        missing_variables.append("MYSQL_USER")
-    if not (os.getenv("MYSQL_PASSWORD") or os.getenv("DB_PASSWORD")):
-        missing_variables.append("MYSQL_PASSWORD")
-
-    secure_cookie_val = (
-        os.getenv("SESSION_COOKIE_SECURE")
-        or os.getenv("FLASK_SESSION_COOKIE_SECURE")
-        or ""
-    ).strip().lower()
-    if not secure_cookie_val:
-        missing_variables.append("SESSION_COOKIE_SECURE")
-
+    required_variables = (
+        "SECRET_KEY",
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_DATABASE",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
+        "SESSION_COOKIE_SECURE",
+    )
+    missing_variables = [
+        name for name in required_variables if not os.getenv(name)
+    ]
     if missing_variables:
         raise RuntimeError(
             "Missing required production environment variable(s): "
             + ", ".join(missing_variables)
         )
 
-    resolved_host = (os.getenv("MYSQL_HOST") or os.getenv("DB_HOST") or "").strip().lower()
-    if resolved_host in {"localhost", "127.0.0.1", "::1"}:
-        raise RuntimeError(
-            "MYSQL_HOST cannot be localhost or 127.0.0.1 in production. "
-            "Configure your external production database host (e.g., Aiven MySQL)."
-        )
-
     if os.getenv("FLASK_DEBUG", "0") == "1":
         raise RuntimeError("FLASK_DEBUG must be 0 in production")
 
-    if secure_cookie_val not in {"1", "true", "yes", "on"}:
+    if os.getenv("SESSION_COOKIE_SECURE", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
         raise RuntimeError("SESSION_COOKIE_SECURE must be enabled in production")
 
 
@@ -88,14 +98,35 @@ validate_production_configuration()
 
 app = Flask(__name__)
 
-app.secret_key = (
-    os.getenv("SECRET_KEY")
-    or os.getenv("FLASK_SECRET_KEY")
-    or secrets.token_urlsafe(32)
-)
+
+def load_development_secret_key(instance_path):
+    os.makedirs(instance_path, exist_ok=True)
+    secret_path = os.path.join(instance_path, "flask_secret_key")
+
+    try:
+        with open(secret_path, "x", encoding="ascii") as secret_file:
+            secret_key = secrets.token_urlsafe(48)
+            secret_file.write(secret_key)
+            secret_file.flush()
+    except FileExistsError:
+        with open(secret_path, "r", encoding="ascii") as secret_file:
+            secret_key = secret_file.read().strip()
+
+    if not secret_key:
+        raise RuntimeError(f"Development session secret is empty: {secret_path}")
+
+    return secret_key
+
+
+app.secret_key = os.getenv("SECRET_KEY") or os.getenv("FLASK_SECRET_KEY")
+if not app.secret_key:
+    if APP_ENV in PRODUCTION_ENVIRONMENTS:
+        raise RuntimeError("SECRET_KEY must be configured in production")
+    app.secret_key = load_development_secret_key(app.instance_path)
+
 app.config.update(
     ENVIRONMENT=APP_ENV,
-    DEBUG=os.getenv("FLASK_DEBUG", "0") == "1" and not IS_PRODUCTION,
+    DEBUG=os.getenv("FLASK_DEBUG", "0") == "1" and APP_ENV not in PRODUCTION_ENVIRONMENTS,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=(
@@ -158,7 +189,11 @@ def inject_csrf_token():
 
 @app.after_request
 def prevent_auth_form_caching(response):
-    if request.method == "GET" or request.path in {"/login", "/ownerlogin", "/adminlogin"}:
+    if (
+        request.method == "GET"
+        or request.path in {"/login", "/ownerlogin", "/adminlogin"}
+        or request.path.startswith(("/forgot-password/", "/reset-password/"))
+    ):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
     return response
@@ -166,14 +201,6 @@ def prevent_auth_form_caching(response):
 
 @app.before_request
 def protect_state_changing_requests():
-    # Maintain global language in session with cookie fallback
-    if "language" not in session:
-        cookie_lang = request.cookies.get("language", "").strip().lower()
-        if cookie_lang in SUPPORTED_LANGUAGES:
-            session["language"] = cookie_lang
-        else:
-            session["language"] = "en"
-
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         submitted_token = (
             request.form.get("csrf_token")
@@ -223,15 +250,20 @@ def login_required(role):
     return decorator
 
 
+def configured_admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("admin_logged_in") and not session.get("configured_admin_authenticated"):
+            return redirect("/admin/login")
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
 def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        is_admin = (
-            "admin_id" in session
-            or session.get("admin_logged_in")
-            or session.get("configured_admin_authenticated")
-        )
-        if not is_admin:
+        if "admin_id" not in session:
             if "user_id" in session or "owner_id" in session:
                 return "Access denied", 403
             return redirect("/adminlogin")
@@ -239,18 +271,8 @@ def admin_required(view):
             return view(*args, **kwargs)
         except Error:
             if db is not None:
-                safe_db_rollback()
+                db.rollback()
             return "Admin data is temporarily unavailable.", 503
-
-    return wrapped
-
-
-def configured_admin_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if not session.get("admin_logged_in") and not session.get("configured_admin_authenticated"):
-            return redirect("/admin/login")
-        return view(*args, **kwargs)
 
     return wrapped
 
@@ -262,7 +284,36 @@ def valid_text(value, maximum=255):
 
 def valid_phone(value):
     value = (value or "").strip()
-    return value if value.isdigit() and len(value) == 10 else None
+    if (
+        not value
+        or value.count("+") > 1
+        or ("+" in value and not value.startswith("+"))
+        or any(char not in "0123456789+().- \t" for char in value)
+    ):
+        return None
+
+    digits = "".join(char for char in value if char in "0123456789")
+    if len(digits) == 10:
+        return digits
+    if len(digits) == 12 and digits.startswith("91"):
+        return digits[2:]
+    if len(digits) == 14 and digits.startswith("0091"):
+        return digits[4:]
+    return None
+
+
+def log_database_failure(operation, error):
+    logger.error(
+        "%s failed because the MySQL database is unavailable "
+        "(error_type=%s, errno=%s, host=%s, port=%s, database=%s, user_configured=%s)",
+        operation,
+        type(error).__name__,
+        getattr(error, "errno", None),
+        db_config["host"],
+        db_config["port"],
+        db_config["database"],
+        bool(db_config["user"]),
+    )
 
 
 def valid_password(value):
@@ -271,7 +322,52 @@ def valid_password(value):
 
 def valid_email(value):
     value = (value or "").strip().lower()
-    return value if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value) and len(value) <= 255 else None
+    return value if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value) and len(value) <= 100 else None
+
+
+def valid_reset_password(value):
+    password = valid_password(value)
+    if not password or not any(character.isalpha() for character in password):
+        return None
+    if not any(character.isdigit() for character in password):
+        return None
+    return password
+
+
+def password_reset_fingerprint(value):
+    secret = app.secret_key.encode("utf-8")
+    return hmac.new(secret, value.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def password_reset_url(account_type, token):
+    base_url = os.getenv("PASSWORD_RESET_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL")
+    if not base_url:
+        if APP_ENV in PRODUCTION_ENVIRONMENTS:
+            return None
+        base_url = request.url_root
+
+    try:
+        parsed_url = urlsplit(base_url)
+    except ValueError:
+        return None
+    if (
+        not parsed_url.hostname
+        or parsed_url.username
+        or parsed_url.password
+        or parsed_url.path not in {"", "/"}
+        or parsed_url.query
+        or parsed_url.fragment
+        or (APP_ENV in PRODUCTION_ENVIRONMENTS and parsed_url.scheme != "https")
+        or parsed_url.scheme not in {"http", "https"}
+    ):
+        return None
+
+    reset_path = url_for("reset_password", account_type=account_type)
+    return base_url.rstrip("/") + reset_path + "#" + token
+
+
+def reset_password_generic_message():
+    return "If an account matches that email address, we will send a password reset link shortly."
 
 
 def valid_admin_username(value):
@@ -287,16 +383,8 @@ def valid_rent(value):
     return amount if amount > 0 and amount <= Decimal("99999999.99") else None
 
 # =========================================================
-# LANGUAGE SUPPORT & LOCALIZATION
+# LANGUAGE SUPPORT
 # =========================================================
-
-SUPPORTED_LANGUAGES = ("en", "te", "ta", "hi")
-LANGUAGE_NAMES = {
-    "en": "English",
-    "te": "తెలుగు",
-    "ta": "தமிழ்",
-    "hi": "हिन्दी",
-}
 
 TRANSLATIONS = {   'en': {
         'email_or_phone': 'Email or Phone Number',
@@ -2451,188 +2539,57 @@ def change_language(language):
     response = redirect(target if target else "/")
     response.set_cookie("language", language, max_age=30 * 24 * 3600, samesite="Lax")
     return response
+
 # =========================================================
 # MYSQL DATABASE CONNECTION
 # =========================================================
 
 db = None
 cursor = None
-payment_table_initialized = False
-MAX_DB_RETRIES = 3
 
-def get_db_config():
-    host = os.getenv("MYSQL_HOST") or os.getenv("DB_HOST")
-    port = os.getenv("MYSQL_PORT") or os.getenv("DB_PORT")
-    user = os.getenv("MYSQL_USER") or os.getenv("DB_USER")
-    password = os.getenv("MYSQL_PASSWORD") or os.getenv("DB_PASSWORD")
-    database = os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME") or os.getenv("DB_DATABASE")
-
-    if not IS_PRODUCTION:
-        host = host or "localhost"
-        port = port or "3306"
-        user = user or "root"
-        database = database or "vehicle_booking"
-
-    config = {
-        "host": host,
-        "port": int(port or "3306"),
-        "user": user,
-        "password": password,
-        "database": database,
-    }
-
-    # SSL / TLS configuration for cloud MySQL (e.g. Aiven)
-    ssl_ca = os.getenv("MYSQL_SSL_CA") or os.getenv("DB_SSL_CA")
-    ssl_disabled_val = os.getenv("MYSQL_SSL_DISABLED", "").strip().lower()
-    if ssl_disabled_val in {"1", "true", "yes"}:
-        config["ssl_disabled"] = True
-    else:
-        config["ssl_disabled"] = False
-        if ssl_ca and os.path.isfile(ssl_ca):
-            config["ssl_ca"] = ssl_ca
-            config["ssl_verify_cert"] = True
-            if os.getenv("MYSQL_SSL_VERIFY_IDENTITY", "").strip().lower() in {"1", "true", "yes"}:
-                config["ssl_verify_identity"] = True
-
-    return config
-
-db_config = get_db_config()
-
-def _is_lost_connection(error):
-    return getattr(error, "errno", None) in {2006, 2013}
-
-
-def _reset_db_connection():
-    """Discard a possibly broken connection without raising a second database error."""
-    global db, cursor
-    old_db = db
-    db = None
-    cursor = None
-    if old_db is not None:
-        try:
-            old_db.close()
-        except Error:
-            logger.debug("Ignoring error while closing broken database connection", exc_info=True)
-
-
-class ResilientCursor:
-    """Retry cursor operations after MySQL reports a dropped connection."""
-
-    def __init__(self, mysql_cursor):
-        self._cursor = mysql_cursor
-
-    def execute(self, operation, params=None, *args, **kwargs):
-        global cursor
-        for attempt in range(MAX_DB_RETRIES):
-            try:
-                return self._cursor.execute(operation, params, *args, **kwargs)
-            except Error as error:
-                if not _is_lost_connection(error) or attempt == MAX_DB_RETRIES - 1:
-                    raise
-                logger.warning(
-                    "MySQL connection lost during query; reconnecting (attempt %d/%d)",
-                    attempt + 1,
-                    MAX_DB_RETRIES - 1,
-                )
-                _reset_db_connection()
-                if ensure_db_connection() is None:
-                    raise
-                self._cursor = db.cursor()
-                cursor = self
-
-    def __getattr__(self, name):
-        return getattr(self._cursor, name)
-
+db_config = {
+    "host": os.getenv("MYSQL_HOST") or "localhost",
+    "port": int(os.getenv("MYSQL_PORT") or "3306"),
+    "user": os.getenv("MYSQL_USER") or "root",
+    "password": os.getenv("MYSQL_PASSWORD"),
+    "database": os.getenv("MYSQL_DATABASE") or "vehicle_booking"
+}
 
 def ensure_db_connection():
-    """Ensure the shared connector and cursor are connected and healthy."""
+    """Ensure database and cursor are connected and healthy, auto-reconnecting if dropped."""
     global db, cursor
-    if not db_config.get("password"):
-        if IS_PRODUCTION:
-            logger.error("Database connection refused: MYSQL_PASSWORD is missing in production")
+    if not db_config["password"]:
+        db = None
+        cursor = None
         return None
     try:
         if db is None or not db.is_connected():
-            _reset_db_connection()
-            connect_kwargs = {k: v for k, v in db_config.items() if v is not None}
-            db = mysql.connector.connect(**connect_kwargs)
-            cursor = ResilientCursor(db.cursor())
-            logger.info("Database connection established to database: %s", db_config.get("database"))
+            db = mysql.connector.connect(**db_config)
+            cursor = db.cursor()
+            logger.info(
+                "Connected to MySQL target host=%s port=%s database=%s user_configured=%s",
+                db_config["host"],
+                db_config["port"],
+                db_config["database"],
+                bool(db_config["user"]),
+            )
         else:
-            db.ping(reconnect=True, attempts=3, delay=1)
+            db.ping(reconnect=True, attempts=2, delay=1)
             if cursor is None:
-                cursor = ResilientCursor(db.cursor())
+                cursor = db.cursor()
     except Error as error:
-        logger.error("Database connection is unavailable: %s (%s)", type(error).__name__, str(error))
-        _reset_db_connection()
+        log_database_failure("Database connection check", error)
+        db = None
+        cursor = None
     return db
-
-
-def safe_db_rollback():
-    """Rollback only on a live connection, then discard dead state if necessary."""
-    if db is None:
-        return
-    try:
-        if db.is_connected():
-            db.rollback()
-        else:
-            _reset_db_connection()
-    except Error:
-        logger.debug("Database rollback failed; discarding connection", exc_info=True)
-        _reset_db_connection()
 
 # Initialize at startup if password is set
 ensure_db_connection()
 
-
-def ensure_payment_table():
-    """Ensure the demo payments table exists without altering the existing schema."""
-    global payment_table_initialized
-    if payment_table_initialized:
-        return True
-    if ensure_db_connection() is None:
-        return False
-
-    try:
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS payments (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                booking_id INT UNSIGNED NOT NULL,
-                user_id INT UNSIGNED NOT NULL,
-                amount DECIMAL(10, 2) NOT NULL,
-                currency VARCHAR(10) NOT NULL DEFAULT 'INR',
-                payment_method VARCHAR(50) NOT NULL,
-                transaction_reference VARCHAR(100) NOT NULL,
-                status VARCHAR(20) NOT NULL DEFAULT 'Paid',
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                paid_at TIMESTAMP NULL DEFAULT NULL,
-                PRIMARY KEY (id),
-                UNIQUE KEY uq_payments_booking (booking_id),
-                UNIQUE KEY uq_payments_transaction_reference (transaction_reference),
-                KEY idx_payments_user_id (user_id)
-            ) ENGINE=InnoDB
-            """
-        )
-        db.commit()
-        payment_table_initialized = True
-        return True
-    except Error:
-        safe_db_rollback()
-        logger.exception("Could not create the payments table")
-        return False
-
-
-ensure_payment_table()
-
-
 @app.before_request
 def verify_db_connectivity():
     """Ensure connection is alive before each request."""
-    if request.path.startswith("/static/"):
-        return None
     ensure_db_connection()
-    ensure_payment_table()
 
 
 
@@ -2642,12 +2599,6 @@ def verify_db_connectivity():
 # =========================================================
 
 @app.route("/")
-def account_choice():
-
-    return render_template("account_choice.html")
-
-
-@app.route("/home")
 def home():
 
     return render_template("index.html")
@@ -2660,89 +2611,106 @@ def home():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
-        if session.get("user_id"):
+        if "user_id" in session:
             return redirect("/vehicles")
-        if session.get("owner_id"):
-            return redirect("/owner_dashboard")
+        csrf_token()
+        return render_template("register.html")
 
     if request.method == "POST":
 
         name = valid_text(request.form.get("name"), 100)
         phone = valid_phone(request.form.get("phone"))
-        email = valid_email(request.form.get("email")) if request.form.get("email") else None
+        email = valid_email(request.form.get("email"))
         password = valid_password(request.form.get("password"))
-        confirm_password = request.form.get("confirm_password", "")
 
-        if not name or not phone or not password or password != confirm_password:
-            return render_template(
-                "register.html",
-                error="Enter valid registration details and matching passwords.",
-            ), 400
-        if request.form.get("email") and not email:
-            return render_template(
-                "register.html",
-                error="Enter a valid email address.",
-            ), 400
+        if not name or not phone or not password or (request.form.get("email") and not email):
 
+            return """
+            <h2>Invalid registration details ❌</h2>
+
+            <p>
+            Enter a name, a valid 10-digit mobile number (optionally with the +91 country code), an email address of at most 100 characters when provided, and a password of at least 8 characters.
+            </p>
+
+            <a href="/register">
+            Try Again
+            </a>
+            """, 400
+
+        if db is None or cursor is None:
+            logger.error("Customer registration unavailable: database connection is not configured")
+            return "Registration is temporarily unavailable. Please try again later.", 503
+
+        check_sql = """
+        SELECT id
+        FROM users
+        """
+        check_values = (phone,)
+        check_sql += " WHERE phone = %s"
         if email:
-            cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
-            if cursor.fetchone():
-                return render_template(
-                    "register.html",
-                    error=(
-                        "This email address is already registered. "
-                        "Please use a different email or sign in."
-                    ),
-                ), 409
+            check_sql += " OR email = %s"
+            check_values = (phone, email)
 
-        cursor.execute("SELECT id FROM users WHERE phone = %s", (phone,))
-        if cursor.fetchone():
-            return render_template(
-                "register.html",
-                error=(
-                    "This mobile number is already registered. "
-                    "Please use a different number or sign in."
-                ),
-            ), 409
+        duplicate_registration = """
+        <h2>Account Already Registered ❌</h2>
+        <p>This mobile number or email address is already registered.</p>
+        <a href="/login">Go to Customer Login</a>
+        <br><br>
+        <a href="/register">Use Another Number or Email</a>
+        """
 
         try:
-            cursor.execute(
-                "INSERT INTO users (name, phone, email, password_hash) "
-                "VALUES (%s, %s, %s, %s)",
-                (name, phone, email, generate_password_hash(password)),
-            )
-            db.commit()
-        except IntegrityError as error:
-            safe_db_rollback()
-            if getattr(error, "errno", None) != 1062:
-                logger.exception("Customer registration insert failed")
-                raise
-
-            cursor.execute(
-                "SELECT phone, email FROM users "
-                "WHERE phone = %s OR email = %s LIMIT 1",
-                (phone, email),
-            )
+            cursor.execute(check_sql, check_values)
             existing_user = cursor.fetchone()
-            if existing_user and existing_user[1] and email and existing_user[1].lower() == email.lower():
-                duplicate_message = (
-                    "This email address is already registered. "
-                    "Please use a different email or sign in."
+
+            if existing_user:
+                return duplicate_registration
+
+            sql = """
+            INSERT INTO users
+            (name, phone, password_hash, email)
+            VALUES (%s, %s, %s, %s)
+            """
+            values = (
+                name,
+                phone,
+                generate_password_hash(password),
+                email
+            )
+            cursor.execute(sql, values)
+            db.commit()
+        except Error as error:
+            try:
+                db.rollback()
+            except Error as rollback_error:
+                logger.error(
+                    "Customer registration rollback failed (%s, errno=%s)",
+                    type(rollback_error).__name__,
+                    rollback_error.errno,
                 )
-            elif existing_user and existing_user[0] == phone:
-                duplicate_message = (
-                    "This mobile number is already registered. "
-                    "Please use a different number or sign in."
-                )
-            else:
-                logger.error("Customer registration encountered an unknown duplicate constraint")
-                raise
 
-            return render_template("register.html", error=duplicate_message), 409
+            if error.errno == 1062:
+                return duplicate_registration
 
-        return redirect("/login")
+            logger.error(
+                "Customer registration database operation failed (%s, errno=%s)",
+                type(error).__name__,
+                error.errno,
+            )
+            return "Registration is temporarily unavailable. Please try again later.", 503
 
-    csrf_token()
+        return """
+        <h2>Customer Registration Successful! ✅</h2>
+
+        <p>
+        Your account has been created successfully.
+        </p>
+
+        <a href="/login">
+        Login Now
+        </a>
+        """
+
     return render_template("register.html")
 
 
@@ -2753,10 +2721,10 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        if session.get("user_id"):
+        if "user_id" in session:
             return redirect("/vehicles")
-        if session.get("owner_id"):
-            return redirect("/owner_dashboard")
+        csrf_token()
+        return render_template("login.html")
 
     if request.method == "POST":
 
@@ -2764,208 +2732,263 @@ def login():
         password = valid_password(request.form.get("password"))
 
         if not phone or not password:
+            flash("Enter a valid 10-digit mobile number and password.", "error")
+            return render_template("login.html"), 400
 
-            return """
-            <h2>Invalid Mobile Number ❌</h2>
-
-            <p>Enter a valid mobile number and password.</p>
-
-            <a href="/login">
-            Try Again
-            </a>
-            """
+        if cursor is None:
+            logger.error("Customer login unavailable because the MySQL cursor is not initialized")
+            flash("Login is temporarily unavailable. Please try again shortly.", "error")
+            return render_template("login.html"), 503
 
         sql = """
-        SELECT id, name, phone, email, password_hash, is_active
+        SELECT id, name, phone, password_hash, email
         FROM users
-        WHERE phone = %s
+        WHERE is_active = TRUE
+          AND REGEXP_REPLACE(phone, '[^0-9]', '') IN (%s, %s, %s)
         """
 
-        cursor.execute(
-            sql,
-            (phone,)
-        )
+        try:
+            cursor.execute(sql, (phone, f"91{phone}", f"0091{phone}"))
+            matching_users = []
+            for candidate in cursor.fetchall():
+                if not candidate[3]:
+                    continue
+                try:
+                    if check_password_hash(candidate[3], password):
+                        matching_users.append(candidate)
+                except (TypeError, ValueError):
+                    logger.error("Customer account has an invalid stored password hash")
 
-        user = cursor.fetchone()
-        user_active = bool(user[5]) if user and len(user) > 5 else bool(user)
-        password_hash = user[4] if user and len(user) > 4 else (user[3] if user else None)
-        password_valid = False
-        if password_hash:
-            try:
-                password_valid = check_password_hash(password_hash, password)
-            except (ValueError, TypeError):
-                logger.exception("Invalid password hash for customer phone ending %s", phone[-2:])
+            if len(matching_users) != 1:
+                if len(matching_users) > 1:
+                    logger.error(
+                        "Customer login rejected because multiple active accounts "
+                        "share the submitted normalized mobile number"
+                    )
+                flash("Mobile number or password is incorrect.", "error")
+                return render_template("login.html"), 200
 
-        if user and user_active and password_valid:
+            user = matching_users[0]
 
-            logger.info("Customer login successful for phone ending %s", phone[-4:])
-            saved_lang = session.get("language", "en")
             session.clear()
+            csrf_token()
             session.permanent = True
-            session["language"] = saved_lang
             session["user_id"] = user[0]
             session["user_name"] = user[1]
             session["user_phone"] = user[2]
-            session["user_role"] = "customer"
-            session["logged_in"] = True
-            if user and len(user) > 4:
-                session["user_email"] = user[3]
-            else:
-                cursor.execute("SELECT email FROM users WHERE id = %s", (user[0],))
-                session["user_email"] = (cursor.fetchone() or (None,))[0]
-
+            session["user_email"] = user[4]
             return redirect("/vehicles")
-
-        else:
-
-            if not user:
-                logger.warning(
-                    "Customer login failed: account not found in database '%s' for phone ending %s",
-                    db_config.get("database"),
-                    phone[-4:],
-                )
-            elif not user_active:
-                logger.warning("Customer login failed: account inactive for customer ID %s", user[0])
-            elif not password_hash:
-                logger.warning("Customer login failed: password hash missing for customer ID %s", user[0])
-            elif not password_valid:
-                logger.warning("Customer login failed: password mismatch for customer ID %s", user[0])
-
-            return f"""
-            <h2>Invalid Customer Login</h2>
-
-            <p>The mobile number or password is incorrect.</p>
-
-            <a href="/login">
-            Try Again
-            </a>
-            """
+        except Error as error:
+            log_database_failure("Customer login", error)
+            flash("Login is temporarily unavailable. Please try again shortly.", "error")
+            return render_template("login.html"), 503
 
     csrf_token()
     return render_template("login.html")
 
 
-# =========================================================
-# CUSTOMER PASSWORD RESET
-# =========================================================
+@app.route("/forgot-password/<any(customer,owner):account_type>", methods=["GET", "POST"])
+def forgot_password(account_type):
+    if request.method == "GET":
+        csrf_token()
+        return render_template("forgot_password.html", account_type=account_type)
 
-@app.route("/forgot-password", methods=["GET", "POST"])
-def forgot_password():
-    generic_message = (
-        "If an account exists for that email, a password reset link has been sent. "
-        "Please check your inbox."
-    )
+    generic_message = reset_password_generic_message()
+    supplied_email = (request.form.get("email") or "").strip().lower()[:320]
+    email = valid_email(supplied_email)
+    email_key = password_reset_fingerprint(supplied_email or "invalid-email")
+    client_ip = password_reset_fingerprint(request.remote_addr or "unknown")
 
-    if request.method == "POST":
-        email = valid_email(request.form.get("email"))
-        if email:
-            try:
-                cursor.execute(
-                    "SELECT id, email FROM users "
-                    "WHERE LOWER(email) = LOWER(%s) AND is_active = TRUE",
-                    (email,),
-                )
-                user = cursor.fetchone()
-                if user:
-                    reset_token = secrets.token_urlsafe(32)
-                    token_hash = hashlib.sha256(reset_token.encode("utf-8")).hexdigest()
-                    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    if db is None or cursor is None:
+        logger.error("Password reset request unavailable because the database is not configured")
+        flash(generic_message, "info")
+        return redirect(url_for("forgot_password", account_type=account_type))
+
+    try:
+        cursor.execute(
+            "DELETE FROM password_reset_attempts "
+            "WHERE requested_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)"
+        )
+        cursor.execute(
+            "SELECT COUNT(*) FROM password_reset_attempts "
+            "WHERE ip_hash = %s AND requested_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 15 MINUTE)",
+            (client_ip,),
+        )
+        ip_attempts = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT COUNT(*) FROM password_reset_attempts "
+            "WHERE account_type = %s AND email_hash = %s "
+            "AND requested_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)",
+            (account_type, email_key),
+        )
+        email_attempts = cursor.fetchone()[0]
+        cursor.execute(
+            "INSERT INTO password_reset_attempts "
+            "(account_type, email_hash, ip_hash, requested_at) "
+            "VALUES (%s, %s, %s, UTC_TIMESTAMP())",
+            (account_type, email_key, client_ip),
+        )
+        db.commit()
+    except Error as error:
+        db.rollback()
+        log_database_failure("Password reset rate-limit check", error)
+        flash(generic_message, "info")
+        return redirect(url_for("forgot_password", account_type=account_type))
+
+    if ip_attempts >= 5 or email_attempts >= 3 or not email:
+        flash(generic_message, "info")
+        return redirect(url_for("forgot_password", account_type=account_type))
+
+    table = "users" if account_type == "customer" else "owners"
+    try:
+        cursor.execute(
+            f"SELECT id, email FROM {table} "
+            "WHERE LOWER(email) = %s AND is_active = TRUE LIMIT 2",
+            (email,),
+        )
+        matches = cursor.fetchall()
+        db.commit()
+    except Error as error:
+        db.rollback()
+        log_database_failure("Password reset account lookup", error)
+        flash(generic_message, "info")
+        return redirect(url_for("forgot_password", account_type=account_type))
+
+    if len(matches) == 1:
+        configuration = email_configuration_status()
+        reset_url = None
+        if configuration["configured"]:
+            token = secrets.token_urlsafe(32)
+            reset_url = password_reset_url(account_type, token)
+            if reset_url:
+                token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
+                try:
                     cursor.execute(
                         "UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() "
-                        "WHERE user_id = %s AND used_at IS NULL",
-                        (user[0],),
+                        "WHERE account_type = %s AND account_id = %s AND used_at IS NULL",
+                        (account_type, matches[0][0]),
+                    )
+                    cursor.execute(
+                        "DELETE FROM password_reset_tokens "
+                        "WHERE expires_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY) "
+                        "OR used_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)"
                     )
                     cursor.execute(
                         "INSERT INTO password_reset_tokens "
-                        "(user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
-                        (user[0], token_hash, expires_at),
+                        "(account_type, account_id, token_hash, created_at, expires_at) "
+                        "VALUES (%s, %s, %s, UTC_TIMESTAMP(), "
+                        "DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 MINUTE))",
+                        (account_type, matches[0][0], token_hash),
                     )
                     db.commit()
-                    reset_url = url_for("reset_password", token=reset_token, _external=True)
                     try:
-                        send_password_reset_email(user[1], reset_url)
-                    except Exception:
-                        logger.exception("Password reset email failed")
-                else:
-                    logger.info("Password reset requested for an unknown customer email")
-            except Error:
-                safe_db_rollback()
-                logger.exception("Password reset request could not be stored")
-
-        flash(generic_message, "info")
-        return redirect("/forgot-password")
-
-    csrf_token()
-    return render_template("forgot_password.html")
-
-
-@app.route("/reset-password/<token>", methods=["GET", "POST"])
-def reset_password(token):
-    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-    if request.method == "POST":
-        password = request.form.get("password", "")
-        confirm_password = request.form.get("confirm_password", "")
-        if not valid_password(password):
-            flash("Password must be 8 to 128 characters.", "error")
-            return render_template("reset_password.html", token=token), 400
-        if password != confirm_password:
-            flash("Passwords do not match.", "error")
-            return render_template("reset_password.html", token=token), 400
-
-        try:
-            cursor.execute(
-                "SELECT id, user_id FROM password_reset_tokens "
-                "WHERE token_hash = %s AND used_at IS NULL "
-                "AND expires_at > UTC_TIMESTAMP()",
-                (token_hash,),
+                        sent = send_password_reset_email(matches[0][1], reset_url, account_type)
+                    except Exception as error:
+                        logger.error(
+                            "Password reset email submission failed (account_type=%s, error_type=%s)",
+                            account_type,
+                            type(error).__name__,
+                        )
+                        sent = False
+                    if not sent:
+                        cursor.execute(
+                            "UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() "
+                            "WHERE token_hash = %s AND used_at IS NULL",
+                            (token_hash,),
+                        )
+                        db.commit()
+                        logger.warning(
+                            "Password reset email was not accepted by SMTP (account_type=%s)",
+                            account_type,
+                        )
+                except Error as error:
+                    db.rollback()
+                    log_database_failure("Password reset token creation", error)
+            else:
+                logger.error(
+                    "Password reset email not sent: secure public base URL is not configured"
+                )
+        else:
+            logger.warning(
+                "Password reset email not sent because mail is unavailable (account_type=%s, reason=%s)",
+                account_type,
+                configuration["message"],
             )
-            reset_record = cursor.fetchone()
-            if not reset_record:
-                safe_db_rollback()
-                flash("This password reset link is invalid or expired.", "error")
-                return redirect("/forgot-password")
 
-            cursor.execute(
-                "UPDATE users SET password_hash = %s "
-                "WHERE id = %s AND is_active = TRUE",
-                (generate_password_hash(password), reset_record[1]),
-            )
-            if cursor.rowcount != 1:
-                safe_db_rollback()
-                flash("This password reset link is invalid or expired.", "error")
-                return redirect("/forgot-password")
+    flash(generic_message, "info")
+    return redirect(url_for("forgot_password", account_type=account_type))
 
-            cursor.execute(
-                "UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() "
-                "WHERE id = %s AND used_at IS NULL",
-                (reset_record[0],),
-            )
-            if cursor.rowcount != 1:
-                safe_db_rollback()
-                flash("This password reset link is invalid or expired.", "error")
-                return redirect("/forgot-password")
-            db.commit()
-        except Error:
-            safe_db_rollback()
-            logger.exception("Password reset could not be completed")
-            flash("Password reset could not be completed. Please try again.", "error")
-            return redirect("/forgot-password")
 
-        flash("Your password has been reset. You can now log in.", "success")
-        return redirect("/login")
+@app.route("/reset-password/<any(customer,owner):account_type>", methods=["GET", "POST"])
+def reset_password(account_type):
+    if request.method == "GET":
+        csrf_token()
+        return render_template("reset_password.html", account_type=account_type, token="")
 
-    cursor.execute(
-        "SELECT id FROM password_reset_tokens "
-        "WHERE token_hash = %s AND used_at IS NULL "
-        "AND expires_at > UTC_TIMESTAMP()",
-        (token_hash,),
-    )
-    if cursor.fetchone() is None:
-        return "This password reset link is invalid or expired.", 400
+    token = request.form.get("token", "")
+    password = valid_reset_password(request.form.get("password"))
+    confirmation = request.form.get("confirm_password", "")
+    if not password:
+        flash("Use a password of 8 to 128 characters containing at least one letter and one number.", "error")
+        return render_template("reset_password.html", account_type=account_type, token=token), 400
+    if password != confirmation:
+        flash("The passwords do not match.", "error")
+        return render_template("reset_password.html", account_type=account_type, token=token), 400
+    if not re.fullmatch(r"[A-Za-z0-9_-]{43}", token):
+        flash("This reset link is invalid or expired. Request a new link.", "error")
+        return render_template("reset_password.html", account_type=account_type, token=""), 400
+    if db is None or cursor is None:
+        logger.error("Password reset submission unavailable because the database is not configured")
+        flash("Password reset is temporarily unavailable. Please try again.", "error")
+        return render_template("reset_password.html", account_type=account_type, token=token), 503
 
-    csrf_token()
-    return render_template("reset_password.html", token=token)
+    token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
+    table = "users" if account_type == "customer" else "owners"
+    try:
+        cursor.execute(
+            "SELECT id, account_id FROM password_reset_tokens "
+            "WHERE account_type = %s AND token_hash = %s AND used_at IS NULL "
+            "AND expires_at > UTC_TIMESTAMP() FOR UPDATE",
+            (account_type, token_hash),
+        )
+        reset_record = cursor.fetchone()
+        if reset_record is None:
+            db.rollback()
+            flash("This reset link is invalid or expired. Request a new link.", "error")
+            return render_template("reset_password.html", account_type=account_type, token=""), 400
+
+        cursor.execute(
+            f"SELECT id FROM {table} WHERE id = %s AND is_active = TRUE FOR UPDATE",
+            (reset_record[1],),
+        )
+        if cursor.fetchone() is None:
+            db.rollback()
+            flash("This reset link is invalid or expired. Request a new link.", "error")
+            return render_template("reset_password.html", account_type=account_type, token=""), 400
+
+        cursor.execute(
+            "UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() "
+            "WHERE id = %s AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()",
+            (reset_record[0],),
+        )
+        if cursor.rowcount != 1:
+            db.rollback()
+            flash("This reset link is invalid or expired. Request a new link.", "error")
+            return render_template("reset_password.html", account_type=account_type, token=""), 400
+
+        cursor.execute(
+            f"UPDATE {table} SET password_hash = %s WHERE id = %s",
+            (generate_password_hash(password), reset_record[1]),
+        )
+        db.commit()
+    except Error as error:
+        db.rollback()
+        log_database_failure("Password reset password update", error)
+        flash("Password reset is temporarily unavailable. Please try again.", "error")
+        return render_template("reset_password.html", account_type=account_type, token=token), 503
+
+    flash("Your password has been updated. You can now sign in.", "success")
+    return redirect("/login" if account_type == "customer" else "/ownerlogin")
 
 
 # =========================================================
@@ -2974,9 +2997,11 @@ def reset_password(token):
 
 @app.route("/logout", methods=["POST"])
 def logout():
-    saved_lang = session.get("language", "en")
+    saved_lang = session.get("language")
     session.clear()
-    session["language"] = saved_lang
+    if saved_lang in SUPPORTED_LANGUAGES:
+        session["language"] = saved_lang
+    csrf_token()
     return redirect("/")
 
 
@@ -2987,10 +3012,12 @@ def logout():
 @app.route("/ownerregister", methods=["GET", "POST"])
 def ownerregister():
     if request.method == "GET":
-        if session.get("owner_id"):
+        if "owner_id" in session:
             return redirect("/owner_dashboard")
-        if session.get("user_id"):
+        if "user_id" in session:
             return redirect("/vehicles")
+        csrf_token()
+        return render_template("owner_register.html")
 
     if request.method == "POST":
 
@@ -3077,99 +3104,65 @@ def ownerregister():
 @app.route("/ownerlogin", methods=["GET", "POST"])
 def ownerlogin():
     if request.method == "GET":
-        if session.get("owner_id"):
+        if "owner_id" in session:
             return redirect("/owner_dashboard")
-        if session.get("user_id"):
+        if "user_id" in session:
             return redirect("/vehicles")
+        csrf_token()
+        return render_template("owner_login.html")
 
-    if request.method == "POST":
+    identifier = (
+        request.form.get("identifier")
+        or request.form.get("email")
+        or request.form.get("phone")
+        or ""
+    ).strip()
+    password = request.form.get("password", "")
 
-        identifier = (
-            request.form.get("identifier")
-            or request.form.get("email")
-            or request.form.get("phone")
-            or ""
-        ).strip()
-        password = request.form.get("password", "")
+    if not identifier or not password:
+        return render_template(
+            "owner_login.html",
+            error_message="Invalid Owner Login: Email/phone and password are required.",
+            identifier=identifier,
+        ), 200
 
-        is_email = "@" in identifier
-        logger.info(
-            "Owner login attempt: identifier_type=%s, identifier_len=%d",
-            "email" if is_email else "phone",
-            len(identifier),
-        )
+    sql = """
+    SELECT id, owner_name, phone, email, password_hash
+    FROM owners
+    WHERE (email = %s OR phone = %s)
+    AND is_active = TRUE
+    """
 
-        if not identifier or not password:
-            logger.warning("Owner login rejected: missing identifier or password")
-            return "Invalid owner login details", 400
+    cursor.execute(
+        sql,
+        (identifier, identifier)
+    )
 
-        sql = """
-        SELECT id, owner_name, phone, email, password_hash
-        FROM owners
-        WHERE (email = %s OR phone = %s)
-        AND is_active = TRUE
-        """
+    owner = cursor.fetchone()
 
-        cursor.execute(
-            sql,
-            (identifier, identifier)
-        )
+    valid_owner = bool(owner and owner[4] and check_password_hash(owner[4], password))
 
-        owner = cursor.fetchone()
+    if owner and valid_owner:
+        saved_lang = session.get("language", "en")
+        session.clear()
+        csrf_token()
+        session.permanent = True
+        session["owner_id"] = owner[0]
+        session["owner_name"] = owner[1]
+        session["owner_phone"] = owner[2]
+        session["owner_email"] = owner[3]
+        session["user_role"] = "owner"
+        session["logged_in"] = True
+        session["language"] = saved_lang
 
-        valid_owner = bool(owner and owner[4] and check_password_hash(owner[4], password))
+        return redirect("/owner_dashboard")
+    else:
+        return render_template(
+            "owner_login.html",
+            error_message="Invalid Owner Login: Email, phone number, or password is incorrect.",
+            identifier=identifier,
+        ), 200
 
-        if owner and valid_owner:
-            logger.info("Owner login successful for owner ID %s", owner[0])
-
-            saved_lang = session.get("language", "en")
-            session.clear()
-            session.permanent = True
-            session["language"] = saved_lang
-            session["owner_id"] = owner[0]
-            session["owner_name"] = owner[1]
-            session["owner_phone"] = owner[2]
-            session["owner_email"] = owner[3]
-            session["user_role"] = "owner"
-            session["logged_in"] = True
-
-            return redirect("/owner_dashboard")
-
-        else:
-            if not owner:
-                logger.warning(
-                    "Owner login failed: account not found for identifier_type=%s, len=%d",
-                    "email" if is_email else "phone",
-                    len(identifier),
-                )
-            else:
-                logger.warning("Owner login failed: password verification failed for owner ID %s", owner[0])
-
-            return """
-            <h2>Invalid Owner Login ❌</h2>
-
-            <p>
-            Email or password is incorrect.
-            </p>
-
-            <a href="/ownerlogin">
-            Try Again
-            </a>
-
-            <br><br>
-
-            <a href="/ownerregister">
-            Register as Owner
-            </a>
-            """
-
-    csrf_token()
-    return render_template("owner_login.html")
-
-
-# =========================================================
-# ADMIN LOGIN
-# =========================================================
 
 @app.route("/adminlogin", methods=["GET", "POST"])
 def adminlogin():
@@ -3191,10 +3184,9 @@ def adminlogin():
         admin = cursor.fetchone()
 
         if admin and check_password_hash(admin[2], password):
-            saved_lang = session.get("language", "en")
             session.clear()
+            csrf_token()
             session.permanent = True
-            session["language"] = saved_lang
             session["admin_id"] = admin[0]
             session["admin_username"] = admin[1]
             return redirect("/admin_dashboard")
@@ -3211,9 +3203,7 @@ def adminlogin():
 @app.route("/admin_logout", methods=["POST"])
 @admin_required
 def admin_logout():
-    saved_lang = session.get("language", "en")
     session.clear()
-    session["language"] = saved_lang
     return redirect("/adminlogin")
 
 
@@ -3263,10 +3253,6 @@ def admin_dashboard():
         recent_bookings=recent_bookings,
     )
 
-
-# =========================================================
-# CONFIGURED ADMIN LOGIN AND DASHBOARD
-# =========================================================
 
 @app.route("/admin/login", methods=["GET", "POST"])
 def configured_admin_login():
@@ -3662,7 +3648,7 @@ def admin_customer_status(customer_id):
         )
         db.commit()
     except Error:
-        safe_db_rollback()
+        db.rollback()
         flash("Customer status could not be updated.", "error")
         return redirect("/admin/customers")
 
@@ -3691,7 +3677,7 @@ def admin_owner_status(owner_id):
         )
         db.commit()
     except Error:
-        safe_db_rollback()
+        db.rollback()
         flash("Owner status could not be updated.", "error")
         return redirect("/admin/owners")
 
@@ -3720,7 +3706,7 @@ def admin_vehicle_status(vehicle_id):
         )
         db.commit()
     except Error:
-        safe_db_rollback()
+        db.rollback()
         flash("Vehicle status could not be updated.", "error")
         return redirect("/admin/vehicles")
 
@@ -3755,7 +3741,7 @@ def admin_booking_status(booking_id):
         )
         db.commit()
     except Error:
-        safe_db_rollback()
+        db.rollback()
         flash("Booking status could not be updated.", "error")
         return redirect("/admin/bookings")
 
@@ -3928,7 +3914,7 @@ def editvehicle(vehicle_id):
 
     except Error:
 
-        safe_db_rollback()
+        db.rollback()
         flash("We could not load that vehicle. Please try again.", "error")
 
         return redirect("/myvehicles")
@@ -3989,7 +3975,7 @@ def editvehicle(vehicle_id):
 
         except Error:
 
-            safe_db_rollback()
+            db.rollback()
             flash("Vehicle changes could not be saved. Please try again.", "error")
 
             return redirect("/myvehicles")
@@ -4038,7 +4024,7 @@ def deletevehicle(vehicle_id):
 
     except Error:
 
-        safe_db_rollback()
+        db.rollback()
         flash("We could not verify that vehicle. Please try again.", "error")
 
         return redirect("/myvehicles")
@@ -4067,7 +4053,7 @@ def deletevehicle(vehicle_id):
 
     except Error:
 
-        safe_db_rollback()
+        db.rollback()
         flash("We could not check the vehicle bookings. Please try again.", "error")
 
         return redirect("/myvehicles")
@@ -4107,7 +4093,7 @@ def deletevehicle(vehicle_id):
 
     except Error:
 
-        safe_db_rollback()
+        db.rollback()
         flash("Vehicle could not be deleted. Please try again.", "error")
 
         return redirect("/myvehicles")
@@ -4137,7 +4123,7 @@ def addroute():
             return "Invalid route or rent details", 400
 
         check_sql = """
-        SELECT id, vehicle_name, vehicle_type, location
+        SELECT id
         FROM vehicles
         WHERE id = %s
         AND owner_id = %s
@@ -4151,21 +4137,18 @@ def addroute():
         vehicle = cursor.fetchone()
 
         if vehicle is None:
-            cursor.execute(
-                """
-                SELECT id, vehicle_name, vehicle_type, location
-                FROM vehicles
-                WHERE owner_id = %s AND is_active = TRUE
-                ORDER BY id DESC
-                """,
-                (owner_id,)
-            )
-            vehicles_data = cursor.fetchall()
-            return render_template(
-                "add_route.html",
-                vehicles=vehicles_data,
-                error="Access Denied: You can only add routes to your own vehicles."
-            ), 403
+
+            return """
+            <h2>Access Denied ❌</h2>
+
+            <p>
+            You can only add routes to your own vehicles.
+            </p>
+
+            <a href="/addroute">
+            Go Back
+            </a>
+            """
 
         sql = """
         INSERT INTO vehicle_routes
@@ -4192,41 +4175,28 @@ def addroute():
 
         db.commit()
 
-        cursor.execute(
-            """
-            SELECT id, vehicle_name, vehicle_type, location
-            FROM vehicles
-            WHERE owner_id = %s AND is_active = TRUE
-            ORDER BY id DESC
-            """,
-            (owner_id,)
-        )
-        vehicles_data = cursor.fetchall()
+        return """
+        <h2>Route and Rent Added Successfully! ✅</h2>
 
-        flash("Route and rent added successfully! ✅", "success")
-        return render_template(
-            "add_route.html",
-            vehicles=vehicles_data,
-            success=True,
-            added_route={
-                "vehicle_name": vehicle[1],
-                "vehicle_type": vehicle[2],
-                "from_location": from_location,
-                "to_location": to_location,
-                "rent": rent,
-            }
-        ), 200
+        <a href="/addroute">
+        Add Another Route
+        </a>
+
+        <br><br>
+
+        <a href="/vehicles">
+        View Vehicles
+        </a>
+        """
 
     cursor.execute(
         """
         SELECT
             id,
             vehicle_name,
-            vehicle_type,
-            location
+            vehicle_type
         FROM vehicles
-        WHERE owner_id = %s AND is_active = TRUE
-        ORDER BY id DESC
+        WHERE owner_id = %s
         """,
         (owner_id,)
     )
@@ -4255,11 +4225,13 @@ def vehicle_query():
         vr.from_location,
         vr.to_location,
         vr.rent,
-        vr.id AS route_id
+        vr.id AS route_id,
+        o.owner_name,
+        v.is_active
     FROM vehicles v
     INNER JOIN owners o
         ON o.id = v.owner_id
-    INNER JOIN vehicle_routes vr
+    LEFT JOIN vehicle_routes vr
         ON v.id = vr.vehicle_id
     """
 
@@ -4381,7 +4353,10 @@ def book_vehicle(vehicle_id):
         vr.from_location,
         vr.to_location,
         vr.rent,
-        vr.id AS route_id
+        vr.id AS route_id,
+        o.owner_name,
+        o.email AS owner_email,
+        COALESCE(v.contact_number, o.phone) AS owner_phone
     FROM vehicles v
     INNER JOIN owners o ON o.id = v.owner_id
     INNER JOIN vehicle_routes vr ON v.id = vr.vehicle_id
@@ -4417,6 +4392,7 @@ def book_vehicle(vehicle_id):
         customer_name = session["user_name"]
         phone = session["user_phone"]
         booking_date = request.form.get("booking_date", "")
+        customer_id = session["user_id"]
 
         try:
             requested_date = date.fromisoformat(booking_date)
@@ -4427,6 +4403,26 @@ def book_vehicle(vehicle_id):
         if requested_date < date.today():
             flash("Booking date cannot be in the past.", "error")
             return render_template("booking.html", vehicle=vehicle, today=date.today().isoformat()), 400
+
+        try:
+            cursor.execute(
+                "SELECT email FROM users WHERE id = %s AND phone = %s",
+                (customer_id, phone),
+            )
+            customer_record = cursor.fetchone()
+        except Error as error:
+            db.rollback()
+            logger.error(
+                "Booking customer lookup failed (%s, errno=%s)",
+                type(error).__name__,
+                error.errno,
+            )
+            flash("The booking could not be saved. Please try again.", "error")
+            return render_template("booking.html", vehicle=vehicle), 503
+
+        if customer_record is None:
+            logger.error("Booking customer lookup failed: authenticated customer record was not found")
+            return "Your customer account could not be verified. Please sign in again.", 403
 
         check_sql = """
         SELECT id FROM bookings
@@ -4439,84 +4435,86 @@ def book_vehicle(vehicle_id):
             return render_template("booking.html", vehicle=vehicle, today=date.today().isoformat()), 409
 
         insert_sql = """
-        INSERT INTO bookings (vehicle_id, route_id, customer_name, phone, booking_date, status)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO bookings (vehicle_id, route_id, customer_name, phone, booking_date, status, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, UTC_TIMESTAMP())
         """
         try:
             cursor.execute(insert_sql, (vehicle_id, route_id, customer_name, phone, booking_date, "Pending"))
             db.commit()
             booking_id = cursor.lastrowid
-        except Error:
-            safe_db_rollback()
+        except Error as error:
+            db.rollback()
+            logger.error(
+                "Booking database insert or commit failed (%s, errno=%s)",
+                type(error).__name__,
+                error.errno,
+            )
             flash("The booking could not be saved. Please try again.", "error")
             return render_template("booking.html", vehicle=vehicle), 503
 
-        cursor.execute("""
-            SELECT v.vehicle_name, v.vehicle_type, vr.from_location, vr.to_location,
-                   vr.rent, b.customer_name, b.phone, b.booking_date, b.status
-            FROM bookings b
-            JOIN vehicles v ON b.vehicle_id = v.id
-            JOIN vehicle_routes vr ON vr.id = %s AND vr.vehicle_id = v.id
-            WHERE b.id = %s
-        """, (route_id, booking_id))
-        booking = cursor.fetchone()
-
-        cursor.execute(
-            "SELECT u.email, o.owner_name, o.email, COALESCE(v.contact_number, o.phone) "
-            "FROM bookings b JOIN users u ON u.phone = b.phone "
-            "JOIN vehicles v ON v.id = b.vehicle_id JOIN owners o ON o.id = v.owner_id "
-            "WHERE b.id = %s", (booking_id,)
-        )
-        notification_contacts = cursor.fetchone() or (None, None, None, None)
         notification_booking = {
             "booking_id": booking_id,
-            "customer_name": booking[5], "customer_phone": booking[6],
-            "customer_email": notification_contacts[0],
-            "vehicle_name": booking[0], "vehicle_type": booking[1],
-            "owner_name": notification_contacts[1], "owner_email": notification_contacts[2],
-            "owner_phone": notification_contacts[3], "booking_date": booking[7],
-            "rent": booking[4], "status": booking[8], "location": vehicle[5],
-            "from_location": booking[2], "to_location": booking[3],
+            "customer_name": customer_name,
+            "customer_phone": phone,
+            "customer_email": customer_record[0],
+            "vehicle_name": vehicle[1],
+            "vehicle_type": vehicle[2],
+            "owner_name": vehicle[10],
+            "owner_email": vehicle[11],
+            "owner_phone": vehicle[12],
+            "booking_date": booking_date,
+            "rent": vehicle[8],
+            "status": "Pending",
+            "location": vehicle[5],
+            "from_location": vehicle[6],
+            "to_location": vehicle[7],
         }
         try:
-            notification_results = send_booking_notifications(
-                notification_booking,
-                include_customer=False,
+            notification_results = send_booking_notifications(notification_booking)
+        except Exception as error:
+            logger.error(
+                "Booking saved, but email notification processing failed (%s)",
+                type(error).__name__,
             )
-        except Exception:
-            logger.exception("Booking email notification coordinator failed")
             notification_results = {"customer": False, "owner": False}
 
-        if not is_mail_configured():
-            email_status = "unconfigured"
-        elif not notification_booking.get("customer_email"):
-            email_status = "no_email"
-        elif notification_results.get("customer"):
-            email_status = "sent"
-        else:
-            email_status = "failed"
+        email_configuration = email_configuration_status()
+        booking_summary = (
+            booking_id,
+            notification_booking["vehicle_name"],
+            notification_booking["vehicle_type"],
+            notification_booking["from_location"],
+            notification_booking["to_location"],
+            notification_booking["rent"],
+            notification_booking["customer_name"],
+            notification_booking["customer_phone"],
+            notification_booking["booking_date"],
+            notification_booking["status"],
+            notification_booking["owner_name"],
+        )
 
         return render_template(
             "booking_success.html",
-            booking=(booking_id, booking[0], booking[1], booking[2], booking[3], booking[4],
-                     booking[5], booking[6], booking[7], booking[8]),
+            booking=booking_summary,
             notification_results=notification_results,
-            email_status=email_status,
+            email_configuration=email_configuration,
+            customer_email_available=bool(notification_booking["customer_email"]),
+            owner_email_available=bool(notification_booking["owner_email"]),
             customer_email=notification_booking.get("customer_email"),
+            owner_email=notification_booking.get("owner_email"),
         )
 
     return render_template("booking.html", vehicle=vehicle, today=date.today().isoformat())
 
 
 # =========================================================
-# CUSTOMER BOOKING HISTORY
+# CUSTOMER DASHBOARD
 # =========================================================
 
-@app.route("/mybookings")
+@app.route("/dashboard")
 @login_required("customer")
-def mybookings():
-
-    customer_phone = session["user_phone"]
+def dashboard():
+    customer_id = session.get("user_id")
 
     sql = """
     SELECT
@@ -4527,35 +4525,115 @@ def mybookings():
         b.status,
         v.vehicle_name,
         v.vehicle_type,
+        o.owner_name,
         vr.from_location,
         vr.to_location,
         vr.rent,
         r.rating,
-        r.review,
-        COALESCE(p.status, 'Pending') AS payment_status,
-        p.amount AS payment_amount,
-        p.payment_method,
-        p.transaction_reference,
-        p.paid_at
+        r.review
     FROM bookings b
+    INNER JOIN users u
+        ON u.phone = b.phone
     INNER JOIN vehicles v
         ON b.vehicle_id = v.id
+    INNER JOIN owners o
+        ON o.id = v.owner_id
     LEFT JOIN vehicle_routes vr
         ON b.route_id = vr.id
+        AND vr.vehicle_id = b.vehicle_id
     LEFT JOIN ratings r
         ON r.booking_id = b.id
-    LEFT JOIN payments p
-        ON p.booking_id = b.id
-    WHERE b.phone = %s
+    WHERE u.id = %s
     ORDER BY b.id DESC
     """
 
-    cursor.execute(
-        sql,
-        (customer_phone,)
+    cursor.execute(sql, (customer_id,))
+    bookings = cursor.fetchall()
+
+    total_bookings = len(bookings)
+    confirmed_bookings = sum(
+        1 for b in bookings if str(b[4]).lower().strip() in ("confirmed", "accepted")
+    )
+    pending_bookings = sum(
+        1 for b in bookings if str(b[4]).lower().strip() not in ("confirmed", "accepted", "rejected")
     )
 
-    bookings = cursor.fetchall()
+    return render_template(
+        "dashboard.html",
+        customer_id=customer_id,
+        total_bookings=total_bookings,
+        confirmed_bookings=confirmed_bookings,
+        pending_bookings=pending_bookings,
+        bookings=bookings,
+    )
+
+
+@app.route("/booking/<int:booking_id>")
+@app.route("/mybookings/<int:booking_id>")
+@login_required("customer")
+def open_customer_booking(booking_id):
+    return redirect(f"/live-tracking/booking/{booking_id}")
+
+
+# =========================================================
+# CUSTOMER BOOKING HISTORY
+# =========================================================
+
+@app.route("/mybookings")
+@login_required("customer")
+def mybookings():
+    customer_id = session["user_id"]
+
+    sql = """
+    SELECT
+        b.id,
+        b.customer_name,
+        b.phone,
+        b.booking_date,
+        b.status,
+        v.vehicle_name,
+        v.vehicle_type,
+        o.owner_name,
+        vr.from_location,
+        vr.to_location,
+        vr.rent,
+        r.rating,
+        r.review
+    FROM bookings b
+    INNER JOIN users u
+        ON u.phone = b.phone
+    INNER JOIN vehicles v
+        ON b.vehicle_id = v.id
+    INNER JOIN owners o
+        ON o.id = v.owner_id
+    LEFT JOIN vehicle_routes vr
+        ON b.route_id = vr.id
+        AND vr.vehicle_id = b.vehicle_id
+    LEFT JOIN ratings r
+        ON r.booking_id = b.id
+    WHERE u.id = %s
+    ORDER BY b.id DESC
+    """
+
+    if cursor is None:
+        logger.error("My Bookings is unavailable because the database cursor is not initialized")
+        return render_template(
+            "my_bookings.html",
+            bookings=[],
+            error_message="Your bookings are temporarily unavailable. Please try again shortly.",
+        ), 503
+
+    try:
+        cursor.execute(sql, (customer_id,))
+        bookings = cursor.fetchall()
+    except Error:
+        logger.exception("Could not load bookings for customer_id=%s", customer_id)
+        return render_template(
+            "my_bookings.html",
+            bookings=[],
+            error_message="Your bookings are temporarily unavailable. Please try again shortly.",
+        ), 503
+
     return render_template(
         "my_bookings.html",
         bookings=bookings
@@ -4606,264 +4684,11 @@ def rate_booking(booking_id):
             db.commit()
             flash("Thank you! Your rating has been saved.", "success")
         except Error:
-            safe_db_rollback()
+            db.rollback()
             flash("Your rating could not be saved. Please try again.", "error")
         return redirect("/mybookings")
 
     return render_template("rate_booking.html", booking=booking)
-
-
-# =========================================================
-# DEMO PAYMENT FLOW
-# =========================================================
-
-@app.route("/booking/<int:booking_id>/pay", methods=["GET", "POST"])
-@login_required("customer")
-def pay_booking(booking_id):
-    customer_phone = session.get("user_phone")
-    cursor.execute(
-        """
-        SELECT
-            b.id,
-            b.customer_name,
-            b.phone,
-            b.booking_date,
-            b.status,
-            v.vehicle_name,
-            v.vehicle_type,
-            vr.from_location,
-            vr.to_location,
-            vr.rent,
-            p.id AS payment_id,
-            COALESCE(p.status, 'Pending') AS payment_status,
-            p.amount AS payment_amount,
-            p.payment_method,
-            p.transaction_reference,
-            p.paid_at
-        FROM bookings b
-        INNER JOIN vehicles v ON v.id = b.vehicle_id
-        LEFT JOIN vehicle_routes vr ON vr.id = b.route_id
-        LEFT JOIN payments p ON p.booking_id = b.id
-        WHERE b.id = %s AND b.phone = %s
-        """,
-        (booking_id, customer_phone),
-    )
-    booking = cursor.fetchone()
-    if not booking:
-        return "Booking not found", 404
-
-    booking_status = (booking[4] or "").strip().title()
-    payment_status = (booking[11] or "Pending").strip().title()
-
-    if booking_status != "Accepted":
-        if booking_status == "Pending":
-            flash("This booking is still awaiting owner confirmation.", "info")
-        elif booking_status == "Rejected":
-            flash("This booking was rejected and cannot be paid.", "info")
-        else:
-            flash("This booking cannot be paid right now.", "info")
-        return redirect("/mybookings")
-
-    if payment_status == "Paid":
-        return redirect(f"/booking/{booking_id}/payment-success")
-
-    amount = booking[9]
-    if amount is None or valid_rent(amount) is None:
-        return "Booking amount is invalid", 400
-
-    if request.method == "POST":
-        payment_method = (request.form.get("payment_method") or "").strip()
-        if payment_method not in {"Demo Card", "Demo UPI"}:
-            flash("Please choose a valid demo payment method.", "error")
-            return render_template(
-                "payment_checkout.html",
-                booking=booking,
-                amount=amount,
-                payment_method=payment_method,
-            ), 400
-
-        if payment_method == "Demo Card":
-            cardholder_name = (request.form.get("cardholder_name") or "").strip()
-            if not cardholder_name:
-                flash("Please enter the cardholder name for the demo card.", "error")
-                return render_template(
-                    "payment_checkout.html",
-                    booking=booking,
-                    amount=amount,
-                    payment_method=payment_method,
-                ), 400
-            payment_method_label = payment_method
-        else:
-            demo_upi_id = (request.form.get("demo_upi_id") or "").strip()
-            if not demo_upi_id:
-                flash("Please enter the demo UPI ID for payment.", "error")
-                return render_template(
-                    "payment_checkout.html",
-                    booking=booking,
-                    amount=amount,
-                    payment_method=payment_method,
-                ), 400
-            payment_method_label = payment_method
-
-        transaction_reference = "DEMO-" + secrets.token_hex(4).upper()
-        try:
-            cursor.execute(
-                "SELECT id FROM payments WHERE booking_id = %s FOR UPDATE",
-                (booking_id,),
-            )
-            if cursor.fetchone() is not None:
-                return redirect(f"/booking/{booking_id}/payment-success")
-
-            cursor.execute(
-                """
-                INSERT INTO payments (
-                    booking_id,
-                    user_id,
-                    amount,
-                    currency,
-                    payment_method,
-                    transaction_reference,
-                    status,
-                    paid_at
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-                """,
-                (
-                    booking_id,
-                    session["user_id"],
-                    Decimal(str(amount)),
-                    "INR",
-                    payment_method_label,
-                    transaction_reference,
-                    "Paid",
-                ),
-            )
-            db.commit()
-        except Error:
-            safe_db_rollback()
-            logger.exception("Failed to create demo payment for booking %s", booking_id)
-            flash("Demo payment processing failed. Please try again.", "error")
-            return redirect("/mybookings")
-
-        payment_email = {
-            "booking_id": booking_id,
-            "customer_name": booking[1],
-            "customer_email": session.get("user_email"),
-            "vehicle_name": booking[5],
-            "vehicle_type": booking[6],
-            "route": f"{booking[7] or 'Not specified'} → {booking[8] or 'Not specified'}",
-            "amount": Decimal(str(amount)),
-            "payment_method": payment_method_label,
-            "transaction_reference": transaction_reference,
-            "status": "Paid",
-            "booking_date": booking[3],
-        }
-        email_result = False
-        try:
-            email_result = send_demo_payment_confirmation_email(payment_email)
-        except Exception:
-            logger.exception("Demo payment confirmation email failed for booking %s", booking_id)
-
-        if email_result:
-            flash("Demo payment completed successfully. A confirmation email has been sent.", "success")
-        else:
-            flash("Demo payment completed successfully. The confirmation email could not be sent, but payment is recorded.", "warning")
-        return redirect(f"/booking/{booking_id}/payment-success")
-
-    return render_template(
-        "payment_checkout.html",
-        booking=booking,
-        amount=amount,
-        payment_method="Demo Card",
-    )
-
-
-@app.route("/booking/<int:booking_id>/payment-success")
-@login_required("customer")
-def booking_payment_success(booking_id):
-    customer_phone = session.get("user_phone")
-    cursor.execute(
-        """
-        SELECT
-            b.id,
-            b.customer_name,
-            b.phone,
-            b.booking_date,
-            b.status,
-            v.vehicle_name,
-            v.vehicle_type,
-            vr.from_location,
-            vr.to_location,
-            vr.rent,
-            p.amount,
-            p.payment_method,
-            p.transaction_reference,
-            p.status,
-            p.paid_at
-        FROM bookings b
-        INNER JOIN vehicles v ON v.id = b.vehicle_id
-        LEFT JOIN vehicle_routes vr ON vr.id = b.route_id
-        LEFT JOIN payments p ON p.booking_id = b.id
-        WHERE b.id = %s AND b.phone = %s
-        """,
-        (booking_id, customer_phone),
-    )
-    booking = cursor.fetchone()
-    if not booking:
-        return "Booking not found", 404
-
-    payment_status = (booking[13] or "").strip().title()
-    if payment_status != "Paid":
-        flash("No successful demo payment has been recorded for this booking yet.", "info")
-        return redirect("/mybookings")
-
-    return render_template("payment_success.html", booking=booking)
-
-
-@app.route("/booking/<int:booking_id>/receipt")
-@login_required("customer")
-def booking_receipt(booking_id):
-    customer_phone = session.get("user_phone")
-    cursor.execute(
-        """
-        SELECT
-            b.id,
-            b.customer_name,
-            b.phone,
-            b.booking_date,
-            b.status,
-            v.vehicle_name,
-            v.vehicle_type,
-            vr.from_location,
-            vr.to_location,
-            vr.rent,
-            p.amount,
-            p.payment_method,
-            p.transaction_reference,
-            p.status,
-            p.paid_at
-        FROM bookings b
-        INNER JOIN vehicles v ON v.id = b.vehicle_id
-        LEFT JOIN vehicle_routes vr ON vr.id = b.route_id
-        LEFT JOIN payments p ON p.booking_id = b.id
-        WHERE b.id = %s AND b.phone = %s
-        """,
-        (booking_id, customer_phone),
-    )
-    booking = cursor.fetchone()
-    if not booking:
-        return "Booking not found", 404
-
-    if (booking[13] or "").strip().title() != "Paid":
-        return "No payment receipt is available for this booking.", 404
-
-    html = render_template("payment_success.html", booking=booking)
-    if request.args.get("download") == "1":
-        response = app.make_response(html)
-        response.headers["Content-Disposition"] = f"attachment; filename=demo_payment_receipt_booking_{booking_id}.html"
-        response.headers["Content-Type"] = "text/html; charset=utf-8"
-        return response
-    return html
 
 
 # =========================================================
@@ -4885,7 +4710,6 @@ def owner_dashboard():
         b.id,
         b.customer_name,
         b.phone,
-        u.email,
         b.booking_date,
         b.status,
         v.vehicle_name,
@@ -4893,28 +4717,21 @@ def owner_dashboard():
         vr.from_location,
         vr.to_location,
         vr.rent,
-        v.id,
-        v.owner_id,
-        COALESCE(p.status, 'Pending') AS payment_status,
-        p.amount AS payment_amount,
-        p.payment_method,
-        p.transaction_reference
+        b.created_at
 
     FROM bookings b
 
     INNER JOIN vehicles v
         ON b.vehicle_id = v.id
 
-    LEFT JOIN users u
-        ON u.phone = b.phone
+    INNER JOIN owners o
+        ON o.id = v.owner_id
 
     LEFT JOIN vehicle_routes vr
         ON b.route_id = vr.id
+        AND vr.vehicle_id = b.vehicle_id
 
-    LEFT JOIN payments p
-        ON p.booking_id = b.id
-
-    WHERE v.owner_id = %s
+    WHERE o.id = %s
 
     ORDER BY b.id DESC
     """
@@ -4924,17 +4741,10 @@ def owner_dashboard():
         (owner_id,)
     )
 
-    bookings = cursor.fetchall()
-
-    logger.warning(
-        "Owner dashboard bookings: logged_in_owner_id=%s booking_count=%s "
-        "booking_ids=%s vehicle_ids=%s vehicle_owner_ids=%s",
-        owner_id,
-        len(bookings),
-        [booking[0] for booking in bookings],
-        [booking[-2] for booking in bookings],
-        [booking[-1] for booking in bookings],
-    )
+    bookings = [
+        booking + (format_booking_created_at(booking[10]),)
+        for booking in cursor.fetchall()
+    ]
 
 
     # =====================================================
@@ -4948,7 +4758,10 @@ def owner_dashboard():
     INNER JOIN vehicles v
         ON b.vehicle_id = v.id
 
-    WHERE v.owner_id = %s
+    INNER JOIN owners o
+        ON o.id = v.owner_id
+
+    WHERE o.id = %s
     """
 
     cursor.execute(
@@ -4970,7 +4783,10 @@ def owner_dashboard():
     INNER JOIN vehicles v
         ON b.vehicle_id = v.id
 
-    WHERE v.owner_id = %s
+    INNER JOIN owners o
+        ON o.id = v.owner_id
+
+    WHERE o.id = %s
     AND LOWER(TRIM(b.status)) = 'pending'
     """
 
@@ -4993,7 +4809,10 @@ def owner_dashboard():
     INNER JOIN vehicles v
         ON b.vehicle_id = v.id
 
-    WHERE v.owner_id = %s
+    INNER JOIN owners o
+        ON o.id = v.owner_id
+
+    WHERE o.id = %s
     AND LOWER(TRIM(b.status)) = 'accepted'
     """
 
@@ -5016,7 +4835,10 @@ def owner_dashboard():
     INNER JOIN vehicles v
         ON b.vehicle_id = v.id
 
-    WHERE v.owner_id = %s
+    INNER JOIN owners o
+        ON o.id = v.owner_id
+
+    WHERE o.id = %s
     AND LOWER(TRIM(b.status)) = 'rejected'
     """
 
@@ -5074,87 +4896,80 @@ def owner_dashboard():
 @app.route("/update_booking/<int:booking_id>/<status>", methods=["POST"])
 @login_required("owner")
 def update_booking(booking_id, status):
-    # Normalize the URL value so "accepted"/"Accepted" behave consistently.
-    status = (status or "").strip().lower()
-    status_map = {"accepted": "Accepted", "rejected": "Rejected"}
-    status = status_map.get(status)
-    if status is None:
+    # Only Accepted or Rejected allowed
+    if status not in ["Accepted", "Rejected"]:
+
         return "Invalid booking status", 400
 
 
     owner_id = session["owner_id"]
 
 
-    update_sql = """
-    UPDATE bookings b
-    INNER JOIN vehicles v ON v.id = b.vehicle_id
-    SET b.status = %s
+    # =====================================================
+    # CHECK BOOKING BELONGS TO OWNER
+    # =====================================================
+
+    check_sql = """
+    SELECT b.id
+    FROM bookings b
+
+    INNER JOIN vehicles v
+        ON b.vehicle_id = v.id
+
+    INNER JOIN owners o
+        ON o.id = v.owner_id
+
     WHERE b.id = %s
-      AND v.owner_id = %s
-      AND LOWER(TRIM(b.status)) = 'pending'
+    AND o.id = %s
     """
-    try:
-        cursor.execute(update_sql, (status, booking_id, owner_id))
-        if getattr(cursor, "rowcount", 0) != 1:
-            safe_db_rollback()
-            flash("This booking was not found, is not yours, or is already finalized.", "error")
-            return redirect("/owner_dashboard")
 
-        cursor.execute("""
-            SELECT b.id, b.customer_name, b.phone, b.booking_date, b.status,
-                   v.vehicle_name, v.vehicle_type, v.location,
-                   vr.from_location, vr.to_location, vr.rent,
-                   u.email, o.owner_name, o.email, COALESCE(v.contact_number, o.phone)
-            FROM bookings b
-            INNER JOIN vehicles v ON v.id = b.vehicle_id
-            INNER JOIN owners o ON o.id = v.owner_id
-            LEFT JOIN users u ON u.phone = b.phone
-            LEFT JOIN vehicle_routes vr ON vr.id = b.route_id
-            WHERE b.id = %s AND v.owner_id = %s
-        """, (booking_id, owner_id))
-        booking_row = cursor.fetchone()
-        db.commit()
-    except Error:
-        safe_db_rollback()
-        logger.exception("Could not update booking status for booking %s", booking_id)
-        flash("Booking status could not be updated. Please try again.", "error")
-        return redirect("/owner_dashboard")
+    cursor.execute(
+        check_sql,
+        (
+            booking_id,
+            owner_id
+        )
+    )
 
-    notification_booking = {
-        "booking_id": booking_row[0], "customer_name": booking_row[1],
-        "customer_phone": booking_row[2], "booking_date": booking_row[3],
-        "status": booking_row[4], "vehicle_name": booking_row[5],
-        "vehicle_type": booking_row[6], "location": booking_row[7],
-        "from_location": booking_row[8] or "Not specified",
-        "to_location": booking_row[9] or "Not specified", "rent": booking_row[10],
-        "customer_email": booking_row[11], "owner_name": booking_row[12],
-        "owner_email": booking_row[13], "owner_phone": booking_row[14],
-    }
-    email_sent = False
-    email_enabled = os.getenv("MAIL_ENABLED", "false").strip().lower() in {
-        "1", "true", "yes", "on"
-    }
-    logger.warning(
-        "Attempting decision email for booking %s: customer email present=%s",
-        booking_id,
-        bool(notification_booking.get("customer_email")),
+    booking = cursor.fetchone()
+
+
+    if booking is None:
+
+        return """
+        <h2>Access Denied ❌</h2>
+
+        <p>
+        You cannot modify this booking.
+        </p>
+
+        <a href="/owner_dashboard">
+        Back to Dashboard
+        </a>
+        """, 403
+
+
+    # =====================================================
+    # UPDATE BOOKING STATUS
+    # =====================================================
+
+    sql = """
+    UPDATE bookings
+    SET status = %s
+    WHERE id = %s
+    """
+
+    cursor.execute(
+        sql,
+        (
+            status,
+            booking_id
+        )
     )
-    if notification_booking.get("customer_email"):
-        try:
-            email_sent = send_booking_decision_email(notification_booking)
-        except Exception:
-            logger.exception("Booking decision email failed for booking %s", booking_id)
-    else:
-        logger.warning("Customer email is missing for booking %s", booking_id)
-    logger.warning(
-        "Decision email result for booking %s: email result=%s",
-        booking_id,
-        email_sent,
-    )
-    if email_enabled and not email_sent:
-        flash("Booking updated, but the customer email could not be delivered.", "warning")
-    else:
-        flash(f"Booking {status.lower()} successfully.", "success")
+
+    db.commit()
+
+
     return redirect("/owner_dashboard")
 
 
@@ -5163,11 +4978,12 @@ def update_booking(booking_id, status):
 # =========================================================
 
 @app.route("/owner_logout", methods=["POST"])
-@login_required("owner")
 def owner_logout():
-    saved_lang = session.get("language", "en")
+    saved_lang = session.get("language")
     session.clear()
-    session["language"] = saved_lang
+    if saved_lang in SUPPORTED_LANGUAGES:
+        session["language"] = saved_lang
+    csrf_token()
     return redirect("/")
 
 
@@ -5210,29 +5026,56 @@ def farmer_ai_chat():
     data = request.get_json(silent=True) or request.form
     user_message = (data.get("message") or "").strip()
     if not user_message:
-        return jsonify({"success": False, "error": "Please enter a question."}), 400
+        return jsonify({"success": False, "error": "Question cannot be empty."}), 400
 
+    previous_analysis = session.get("leaf_analysis")
+    chat_history = session.get("farmer_chat_history", [])
     language = session.get("language", "en")
-    result = chat_about_crop(
-        user_message,
-        previous_analysis=session.get("leaf_analysis"),
-        chat_history=session.get("farmer_chat_history", []),
+
+    response = chat_about_crop(
+        user_message=user_message,
+        previous_analysis=previous_analysis,
+        chat_history=chat_history,
         language=language,
     )
-    if result.get("success"):
-        history = session.get("farmer_chat_history", [])
-        history.extend([
-            {"role": "user", "content": user_message},
-            {"role": "assistant", "content": result.get("reply", "")},
-        ])
-        session["farmer_chat_history"] = history[-12:]
-    return jsonify(result)
 
+    if response.get("success"):
+        chat_history.append({"role": "user", "content": user_message})
+        chat_history.append({"role": "model", "content": response.get("reply")})
+        session["farmer_chat_history"] = chat_history[-8:]
+
+    return jsonify(response)
+
+
+@app.route("/farmer-ai/reset", methods=["POST"])
+def farmer_ai_reset():
+    session.pop("leaf_analysis", None)
+    session.pop("farmer_chat_history", None)
+    return jsonify({"success": True})
+
+
+# =========================================================
+# LIVE VEHICLE LOCATION TRACKING BLUEPRINT REGISTRATION
+# =========================================================
+try:
+    from tracking_routes import tracking_bp
+    if "live_tracking" not in app.blueprints:
+        app.register_blueprint(tracking_bp)
+except Exception as _track_err:
+    logger.warning("Could not register live tracking blueprint: %s", _track_err)
+
+
+# =========================================================
+# RUN FLASK
+# =========================================================
 
 if __name__ == "__main__":
+
     port = int(os.getenv("PORT", "5000"))
     app.run(
         host="0.0.0.0",
         port=port,
-        debug=app.config["DEBUG"]
+        debug=app.config["DEBUG"],
+        use_reloader=False,
+        threaded=True,
     )

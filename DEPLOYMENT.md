@@ -50,6 +50,12 @@ waitress-serve --listen=0.0.0.0:<PORT> wsgi:app
 
 Use the platform's documented Waitress command syntax and bind/port settings. Do not place credentials in the command line. HTTPS should be terminated by the verified reverse proxy or hosting platform, with `SESSION_COOKIE_SECURE=true` enabled.
 
+### Live-tracking database setup
+
+The production WSGI process does not run schema-changing setup during import. Before enabling live tracking on an existing deployment, verify that the service's existing `MYSQL_*` settings point to the same database used by the application, then run `python setup_tracking_db.py` once as a controlled deployment task. This creates the existing `vehicle_tracking_sessions`, `vehicle_live_locations`, and `vehicle_location_history` tables with `CREATE TABLE IF NOT EXISTS`; it does not create another database or replace existing records. Review the script and confirm that the deployment database user is allowed to create tables before running it. Do not use local fallback credentials or print secret values while verifying configuration.
+
+The Render start command must load the WSGI entry point `wsgi:app`. That entry point explicitly registers and verifies the booking-specific tracking route, so missing tracking imports fail startup instead of silently serving a site without tracking routes.
+
 ## 2.1. Hosting options
 
 ### Option A: Render or similar managed application hosting

@@ -18,6 +18,9 @@
     </a>
 
     <nav aria-label="Customer Navigation">
+        <a href="/dashboard">
+            📊 {{ t.get("dashboard", "Dashboard") }}
+        </a>
         <a href="/vehicles" class="active">
             🚚 {{ t.get("available_vehicles", "Available Vehicles") }}
         </a>
@@ -37,14 +40,28 @@
 <!-- =====================================================
      LANGUAGE BAR
 ===================================================== -->
-{% include "_language_selector.html" %}
+<div class="language-bar">
+    <span>🌐 {{ t.get("language", "Language") }}:</span>
+    <form method="POST" action="{{ url_for('change_language', language='en') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='te') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
+    </form>
+</div>
 
 <main class="container">
 
     <!-- WELCOME BANNER -->
     <div class="page-header">
         <h1>👋 {{ t.get("welcome", "Welcome") }}, {{ session.get("user_name") }}</h1>
-        <p>{{ t.get("available_vehicles", "Available Vehicles") }} — {{ t.get("transportation_message", "Book the right vehicle for your transportation needs.") }}</p>
+        <p>{{ t.get("available_vehicles", "Available Vehicles") }} — Select a route and book transparently with zero surge pricing.</p>
     </div>
 
     <!-- FLASH MESSAGES -->
@@ -52,7 +69,7 @@
         {% if messages %}
             {% for category, message in messages %}
                 <div class="message {{ category }}" role="alert">
-                    {{ t.get(message, message) }}
+                    {{ message }}
                 </div>
             {% endfor %}
         {% endif %}
@@ -64,14 +81,14 @@
             type="search"
             name="q"
             value="{{ filters.search or '' }}"
-            placeholder="🔍 {{ t.get('search_placeholder', 'Search name, route, or location') }}"
-            aria-label="{{ t.get('search', 'Search') }}"
+            placeholder="🔍 Search name, route, or location"
+            aria-label="Search vehicles"
         >
 
-        <select name="vehicle_type" aria-label="{{ t.get('vehicle_type', 'Vehicle Type') }}">
-            <option value="">{{ t.get('all_vehicle_types', 'All Vehicle Types') }}</option>
-            {% for vtype, vlabel in [("Tractor", t.get("tractor", "Tractor")), ("Mini Truck", t.get("mini_truck", "Mini Truck")), ("Pickup", t.get("pickup", "Pickup")), ("Lorry", t.get("lorry", "Lorry")), ("Goods Auto", t.get("goods_auto", "Goods Auto"))] %}
-                <option value="{{ vtype }}" {% if filters.vehicle_type == vtype %}selected{% endif %}>{{ vlabel }}</option>
+        <select name="vehicle_type" aria-label="Filter by vehicle type">
+            <option value="">All Vehicle Types</option>
+            {% for vtype in ["Tractor", "Mini Truck", "Pickup", "Lorry", "Tipper", "JCB", "Goods Auto", "Other"] %}
+                <option value="{{ vtype }}" {% if filters.vehicle_type == vtype %}selected{% endif %}>{{ vtype }}</option>
             {% endfor %}
         </select>
 
@@ -79,8 +96,8 @@
             type="text"
             name="location"
             value="{{ filters.location or '' }}"
-            placeholder="📍 {{ t.get('location_placeholder', 'Location or town') }}"
-            aria-label="{{ t.get('location', 'Location') }}"
+            placeholder="📍 Location or town"
+            aria-label="Filter by location"
         >
 
         <input
@@ -89,8 +106,8 @@
             value="{{ filters.minimum_rent or '' }}"
             min="0"
             step="50"
-            placeholder="{{ t.get('min_rent', 'Min Rent (₹)') }}"
-            aria-label="{{ t.get('min_rent', 'Min Rent') }}"
+            placeholder="Min Rent (₹)"
+            aria-label="Minimum Rent"
         >
 
         <input
@@ -99,16 +116,16 @@
             value="{{ filters.maximum_rent or '' }}"
             min="0"
             step="50"
-            placeholder="{{ t.get('max_rent', 'Max Rent (₹)') }}"
-            aria-label="{{ t.get('max_rent', 'Max Rent') }}"
+            placeholder="Max Rent (₹)"
+            aria-label="Maximum Rent"
         >
 
         <button type="submit" class="btn btn-primary filter-button">
-            {{ t.get('filter', 'Filter') }}
+            Filter
         </button>
 
         <a href="/vehicles" class="clear-filter">
-            {{ t.get('reset_filters', 'Reset') }}
+            Clear
         </a>
     </form>
 
@@ -131,7 +148,7 @@
                         </div>
                         <div class="vehicle-title-group">
                             <h2>{{ vehicle[1] }}</h2>
-                            <span class="vehicle-type-tag">{{ t.get(vehicle[2]|lower|replace(' ', '_'), vehicle[2]) }}</span>
+                            <span class="vehicle-type-tag">{{ vehicle[2] }}</span>
                         </div>
                     </div>
 
@@ -142,18 +159,38 @@
                         </div>
 
                         <div class="detail-row">
-                            <span class="detail-label">🛣️ {{ t.get("route_label", "Route") }}:</span>
+                            <span class="detail-label">👤 Owner:</span>
+                            <span class="detail-value">{{ vehicle[10] }}</span>
+                        </div>
+
+                        {% if vehicle[9] %}
+                        <div class="detail-row">
+                            <span class="detail-label">Availability:</span>
+                            <span class="detail-value">Available for booking</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🛣️ Route:</span>
                             <span class="detail-value route-highlight">
-                                {{ vehicle[6] or '—' }} → {{ vehicle[7] or '—' }}
+                                {{ vehicle[6] }} → {{ vehicle[7] }}
                             </span>
                         </div>
 
                         <div class="detail-row">
-                            <span class="detail-label">💰 {{ t.get("fixed_route_rent_label", "Fixed Route Rent") }}:</span>
+                            <span class="detail-label">💰 Fixed Route Rent:</span>
                             <span class="detail-value rent-pill">
                                 ₹{{ vehicle[8] }}
                             </span>
                         </div>
+                        {% else %}
+                        <div class="detail-row">
+                            <span class="detail-label">🛣️ Route:</span>
+                            <span class="detail-value">No routes configured</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Availability:</span>
+                            <span class="detail-value">Not bookable yet</span>
+                        </div>
+                        {% endif %}
 
                         <div class="detail-row">
                             <span class="detail-label">📞 {{ t.get("contact", "Contact") }}:</span>
@@ -163,11 +200,13 @@
 
                     <div class="vehicle-card-actions">
                         <a href="/vehicle/{{ vehicle[0] }}" class="btn btn-secondary btn-sm">
-                            ℹ️ {{ t.get("view_details", "View Details") }}
+                            ℹ️ View Details
                         </a>
+                        {% if vehicle[9] %}
                         <a href="/book/{{ vehicle[0] }}?route_id={{ vehicle[9] }}" class="btn btn-primary btn-sm">
                             🚛 {{ t.get("book_now", "Book Now") }}
                         </a>
+                        {% endif %}
                     </div>
                 </article>
             {% endfor %}
@@ -179,7 +218,7 @@
             <p>{{ t.get("no_vehicles_message", "There are currently no vehicles matching your search criteria.") }}</p>
             <div style="margin-top: 18px;">
                 <a href="/vehicles" class="btn btn-primary">
-                    {{ t.get("reset_filters", "Clear Filters & Show All Vehicles") }}
+                    Clear Filters & Show All Vehicles
                 </a>
             </div>
         </div>

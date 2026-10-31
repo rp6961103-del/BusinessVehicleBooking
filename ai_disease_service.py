@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import re
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image
@@ -17,10 +16,7 @@ ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
-DEFAULT_MODEL = "gemini-3.6-flash"
-DEFAULT_GEMINI_TIMEOUT = 30
-MAX_GEMINI_RETRIES = 2
-AI_UNAVAILABLE_MESSAGE = "AI disease detection is currently unavailable. Please try again."
+DEFAULT_MODEL = "gemini-2.5-flash"
 SYSTEM_INSTRUCTION = (
     "You are an agricultural crop-disease assistant. Analyze the uploaded plant leaf image. "
     "Identify the crop and provide the most likely visible disease or condition only when supported by visual evidence. "
@@ -139,18 +135,9 @@ def _clean_json_text(text: str) -> str:
     return text.strip()
 
 
-def _gemini_timeout() -> int:
-    """Return a bounded request timeout from the environment."""
-    try:
-        timeout = int(os.getenv("GEMINI_TIMEOUT", str(DEFAULT_GEMINI_TIMEOUT)))
-    except ValueError:
-        timeout = DEFAULT_GEMINI_TIMEOUT
-    return max(1, timeout)
-
-
 def _call_gemini_api(api_key: str, model: str, prompt: str, image_bytes: Optional[bytes] = None, mime_type: Optional[str] = None) -> str:
     """Call Google Gemini generateContent REST API."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     parts: List[Dict[str, Any]] = [{"text": prompt}]
 
     if image_bytes and mime_type:
@@ -170,59 +157,18 @@ def _call_gemini_api(api_key: str, model: str, prompt: str, image_bytes: Optiona
         }
     }
 
-    headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
-    timeout = _gemini_timeout()
-    for attempt in range(1, MAX_GEMINI_RETRIES + 2):
+    response = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+    if response.status_code != 200:
+        error_msg = f"Gemini API returned status {response.status_code}"
         try:
-            logger.info(
-                "Gemini image analysis request attempt=%s timeout=%ss",
-                attempt,
-                timeout,
-            )
-            response = requests.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=timeout,
-            )
-        except (requests.Timeout, requests.ConnectionError) as err:
-            if attempt <= MAX_GEMINI_RETRIES:
-                logger.warning(
-                    "Gemini request transient failure attempt=%s type=%s; retrying",
-                    attempt,
-                    type(err).__name__,
-                )
-                time.sleep(min(attempt, 2))
-                continue
-            logger.error(
-                "Gemini request failed after %s attempts type=%s",
-                attempt,
-                type(err).__name__,
-            )
-            raise RuntimeError("Gemini request failed after retries") from err
+            err_data = response.json()
+            if "error" in err_data and "message" in err_data["error"]:
+                error_msg += f": {err_data['error']['message']}"
+        except Exception:
+            pass
+        raise RuntimeError(error_msg)
 
-        if response.status_code == 200:
-            data = response.json()
-            break
-
-        retryable = response.status_code == 429 or 500 <= response.status_code <= 599
-        if retryable and attempt <= MAX_GEMINI_RETRIES:
-            logger.warning(
-                "Gemini API transient HTTP failure attempt=%s status=%s; retrying",
-                attempt,
-                response.status_code,
-            )
-            time.sleep(min(attempt, 2))
-            continue
-
-        logger.error(
-            "Gemini API request failed attempt=%s status=%s retryable=%s",
-            attempt,
-            response.status_code,
-            retryable,
-        )
-        raise RuntimeError(f"Gemini API returned status {response.status_code}")
-
+    data = response.json()
     try:
         candidates = data.get("candidates", [])
         if not candidates:
@@ -286,7 +232,7 @@ def analyze_crop_leaf(image_bytes: bytes, mime_type: str, language: str = "en") 
         return {
             "success": False,
             "configured": False,
-            "error": AI_UNAVAILABLE_MESSAGE,
+            "error": "AI analysis is not configured. Please configure the AI API key in the .env file.",
         }
 
     config = get_ai_config()
@@ -296,11 +242,6 @@ def analyze_crop_leaf(image_bytes: bytes, mime_type: str, language: str = "en") 
         language_instruction = (
             "IMPORTANT: Output all textual explanations (crop, possible_disease, symptoms, possible_causes, "
             "immediate_steps, management, prevention, expert_advice) in Telugu language (తెలుగు). Keep JSON keys in English."
-        )
-    elif language == "ta":
-        language_instruction = (
-            "IMPORTANT: Output all textual explanations (crop, possible_disease, symptoms, possible_causes, "
-            "immediate_steps, management, prevention, expert_advice) in Tamil language (தமிழ்). Keep JSON keys in English."
         )
     elif language == "hi":
         language_instruction = (
@@ -360,24 +301,21 @@ def analyze_crop_leaf(image_bytes: bytes, mime_type: str, language: str = "en") 
         return {
             "success": False,
             "configured": True,
-            "error": AI_UNAVAILABLE_MESSAGE,
+            "error": "The AI provided an unformatted response. Please try taking a clearer photo of the leaf.",
         }
     except requests.Timeout:
         logger.warning("AI API call timed out")
         return {
             "success": False,
             "configured": True,
-            "error": AI_UNAVAILABLE_MESSAGE,
+            "error": "The AI analysis service timed out. Please try again in a moment.",
         }
     except Exception as err:
         logger.exception("AI leaf analysis encountered an error")
-        safe_error = str(err).strip()
-        if len(safe_error) > 240:
-            safe_error = safe_error[:240] + "..."
         return {
             "success": False,
             "configured": True,
-            "error": AI_UNAVAILABLE_MESSAGE,
+            "error": "AI analysis could not be completed right now. Please try again with a clear leaf photo.",
         }
 
 
@@ -409,8 +347,6 @@ def chat_about_crop(
 
     if language == "te":
         context_prompt += "Respond in Telugu (తెలుగు) unless the user asks for another language.\n"
-    elif language == "ta":
-        context_prompt += "Respond in Tamil (தமிழ்) unless the user asks for another language.\n"
     elif language == "hi":
         context_prompt += "Respond in Hindi (हिन्दी) unless the user asks for another language.\n"
     else:
@@ -476,14 +412,8 @@ def chat_about_crop(
         }
     except Exception as err:
         logger.exception("Farmer chatbot error")
-        safe_error = str(err).strip()
-        if len(safe_error) > 240:
-            safe_error = safe_error[:240] + "..."
         return {
             "success": False,
             "configured": True,
-            "error": (
-                "The AI assistant could not respond right now. "
-                + (safe_error if safe_error else "Please try again.")
-            ),
+            "error": "The AI assistant could not respond right now. Please try again.",
         }

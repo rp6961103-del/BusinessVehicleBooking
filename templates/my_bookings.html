@@ -3,105 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ t.get("my_bookings", "My Bookings") }} | {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</title>
+    <title>My Bookings | Business Vehicle Booking</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <header>
-    <a href="/" class="logo">🚚 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</a>
+    <a href="/" class="logo">🚚 Business Vehicle Booking</a>
     <nav>
-        <a href="/vehicles">🚚 {{ t.get("available_vehicles", "Vehicles") }}</a>
-        <a href="/mybookings" class="active">📋 {{ t.get("my_bookings", "My Bookings") }}</a>
-        <a href="/farmer-ai" class="nav-highlight">🌿 {{ t.get("farmer_ai", "Farmer AI") }}</a>
+        <a href="/dashboard">📊 {{ t.get('dashboard', 'Dashboard') }}</a>
+        <a href="/vehicles">🚚 Vehicles</a>
+        <a href="/mybookings" class="active">📋 My Bookings</a>
+        <a href="/farmer-ai" class="nav-highlight">🌿 Farmer AI</a>
         <form method="POST" action="/logout" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">🚪 {{ t.get("logout", "Logout") }}</button>
+            <button type="submit">🚪 Logout</button>
         </form>
     </nav>
 </header>
 
-{% include "_language_selector.html" %}
+<div class="language-bar">
+    <span>🌐 {{ t.get('language', 'Language') }}:</span>
+    <form method="POST" action="{{ url_for('change_language', language='en') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='te') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
+    </form>
+</div>
 
 <main class="container">
     <div class="page-header">
-        <h1>📋 {{ t.get("my_bookings", "My Bookings") }}</h1>
-        <p>{{ t.get("track_bookings_desc", "Track every route booking and rate accepted services.") }}</p>
+        <h1>📋 My Bookings</h1>
+        <p>Track your bookings, check confirmation status, and view live vehicle locations.</p>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="message {{ category }}" role="alert">{{ t.get(message, message) }}</div>
+                <div class="message {{ category }}" role="alert">{{ message }}</div>
             {% endfor %}
         {% endif %}
     {% endwith %}
 
-    {% if bookings %}
+    {% if error_message %}
+        <div class="message error" role="alert">{{ error_message }}</div>
+    {% elif bookings %}
     <div class="table-container">
         <table>
             <thead>
                 <tr>
-                    <th>{{ t.get("booking_id", "Booking ID") }}</th>
-                    <th>{{ t.get("vehicles", "Vehicle") }}</th>
-                    <th>{{ t.get("route_label", "Route") }}</th>
-                    <th>{{ t.get("booking_date", "Booking Date") }}</th>
-                    <th>{{ t.get("rent", "Rent") }}</th>
-                    <th>{{ t.get("status", "Status") }}</th>
-                    <th>{{ t.get("rating", "Rating") }}</th>
+                    <th>Booking ID</th>
+                    <th>Vehicle</th>
+                    <th>Owner</th>
+                    <th>Pickup & Destination</th>
+                    <th>Booking Date</th>
+                    <th>Price / Rent</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for booking in bookings %}
-                <tr>
-                    <td>#{{ booking[0] }}</td>
+                <tr class="booking-summary-row">
+                    <td>
+                        <strong>#{{ booking[0] }}</strong>
+                    </td>
                     <td>
                         <strong>{{ booking[5] }}</strong><br>
-                        <small>{{ booking[6] }}</small>
+                        <small style="color: var(--muted);">{{ booking[6] }}</small>
                     </td>
-                    <td>{{ booking[7] or '—' }} → {{ booking[8] or '—' }}</td>
-                    <td>{{ booking[3] }}</td>
-                    <td>₹{{ booking[9] }}</td>
+                    <td>{{ booking[7] }}</td>
+                    <td>📍 {{ booking[8] }} → 🏁 {{ booking[9] }}</td>
+                    <td>📅 {{ booking[3] }}</td>
+                    <td><strong style="color: var(--brand);">₹{{ booking[10] }}</strong></td>
                     <td>
-                        {% if booking[4]|lower == 'accepted' %}
-                            <span class="status status-accepted">✅ {{ t.get("booking_confirmed_badge", "Booking Confirmed") }}</span>
-                        {% elif booking[4]|lower == 'rejected' %}
-                            <span class="status status-rejected">❌ {{ t.get("rejected", "Booking Rejected") }}</span>
+                        {% if booking[4]|lower|trim in ['confirmed', 'accepted'] %}
+                            <span class="status status-accepted status-confirmed">✅ Confirmed</span>
+                        {% elif booking[4]|lower|trim == 'rejected' %}
+                            <span class="status status-rejected">❌ Rejected</span>
                         {% else %}
-                            <span class="status status-pending">⏳ {{ t.get("waiting_owner_confirm", "Waiting for Owner Confirmation") }}</span>
+                            <span class="status status-pending">⏳ Pending</span>
                         {% endif %}
-                        {% if booking[4]|lower == 'accepted' %}
-                            <div style="margin-top:8px;">
-                                {% set payment_status = (booking[12] or 'Pending')|lower %}
-                                {% if payment_status == 'paid' %}
-                                    <span class="status status-accepted">✓ {{ t.get("paid", "Payment Completed") }}</span>
+                    </td>
+                    <td>
+                        {% if booking[4]|lower|trim in ['confirmed', 'accepted'] %}
+                            <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; flex-direction: column;">
+                                <a href="{{ url_for('live_tracking.booking_tracking_shortcut', booking_id=booking[0]) }}" class="btn btn-secondary btn-sm" title="View live tracking for booking #{{ booking[0] }}">
+                                    📍 View Live Tracking
+                                </a>
+                                <small style="color: var(--muted);">The map shows whether the driver has started sharing GPS.</small>
+                                {% if booking[11] %}
+                                    <span style="font-size: 0.8rem; color: #f59e0b;">⭐ {{ booking[11] }}/5</span>
                                 {% else %}
-                                    <span class="status status-pending">{{ t.get("status", "Payment Status") }}: {{ t.get("pending", "Pending") }}</span>
+                                    <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm">Rate</a>
                                 {% endif %}
                             </div>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if booking[4]|lower == 'accepted' %}
-                            {% set payment_status = (booking[12] or 'Pending')|lower %}
-                            {% if payment_status == 'paid' %}
-                                <div style="display:grid; gap:8px;">
-                                    <div>✓ {{ t.get("paid", "Paid") }}: ₹{{ booking[13] or booking[9] }}</div>
-                                    {% if booking[15] %}<small>Ref: {{ booking[15] }}</small>{% endif %}
-                                    <a href="/booking/{{ booking[0] }}/payment-success" class="btn btn-primary btn-sm">{{ t.get("view_receipt", "View Receipt") }}</a>
-                                </div>
-                            {% else %}
-                                <a href="/booking/{{ booking[0] }}/pay" class="btn btn-primary btn-sm">{{ t.get("pay_now", "Pay Now") }}</a>
-                            {% endif %}
+                        {% elif booking[4]|lower|trim == 'rejected' %}
+                            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                <span style="font-size: 0.8rem; color: var(--danger);">Rejected by owner</span>
+                            </div>
                         {% else %}
-                            —
-                        {% endif %}
-                        {% if booking[10] %}
-                            <div>⭐ {{ booking[10] }}/5</div>
-                            {% if booking[11] %}<small>{{ booking[11] }}</small>{% endif %}
-                        {% elif booking[4]|lower == 'accepted' and (booking[12] or 'Pending')|lower == 'paid' %}
-                            <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm" style="margin-top:8px;">⭐ {{ t.get("rate_service", "Rate Service") }}</a>
-                        {% elif booking[4]|lower == 'accepted' %}
-                            <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm">⭐ {{ t.get("rate_service", "Rate Service") }}</a>
+                            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                <span style="font-size: 0.8rem; color: var(--warning);">⏳ Awaiting Owner — live tracking becomes available after acceptance.</span>
+                            </div>
                         {% endif %}
                     </td>
                 </tr>
@@ -112,18 +122,18 @@
     {% else %}
     <div class="empty-box" style="text-align:center;">
         <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
-        <h2>{{ t.get("no_bookings", "No Bookings") }}</h2>
-        <p>{{ t.get("no_bookings_message", "You have not made any vehicle bookings yet.") }}</p>
+        <h2>No Bookings</h2>
+        <p>You have not made any vehicle bookings yet.</p>
         <div style="margin-top:18px;">
-            <a href="/vehicles" class="btn btn-primary">{{ t.get("browse_vehicles", "Browse Vehicles") }}</a>
+            <a href="/vehicles" class="btn btn-primary">Browse Vehicles</a>
         </div>
     </div>
     {% endif %}
 </main>
 
 <footer>
-    <p>© 2026 {{ t.get("vehicle_booking", "Business Vehicle Booking") }}</p>
-    <p>{{ t.get("footer_message", "Simple transportation service for everyone.") }}</p>
+    <p>© 2026 Business Vehicle Booking</p>
+    <p>Simple transportation service for everyone.</p>
 </footer>
 </body>
 </html>

@@ -1,6 +1,11 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from email_service import EmailConfigurationError, send_booking_notifications
+from email_service import (
+    _send,
+    email_configuration_status,
+    send_password_reset_email,
+    send_booking_notifications,
+)
 
 
 BOOKING = {
@@ -53,10 +58,11 @@ def test_missing_email_configuration_is_handled_without_exposing_secret(monkeypa
     configure_mail(monkeypatch)
     monkeypatch.delenv("MAIL_SERVER")
 
-    with patch("email_service.logger.exception") as log:
+    with patch("email_service.logger.error") as log:
         results = send_booking_notifications(BOOKING)
 
     assert results == {"customer": False, "owner": False}
+    assert log.call_count == 1
     assert all("MAIL_PASSWORD" not in str(call) for call in log.call_args_list)
 
 
@@ -68,168 +74,115 @@ def test_both_delivery_failures_return_without_raising(monkeypatch):
     assert results == {"customer": False, "owner": False}
 
 
-class MockResponse:
-    def __init__(self, status_code=200, json_data=None, text=""):
-        self.status_code = status_code
-        self._json_data = json_data
-        self.text = text
-        self.ok = 200 <= status_code < 300
-
-    def json(self):
-        if self._json_data is None:
-            raise ValueError("Invalid JSON")
-        return self._json_data
-
-
-def configure_google_script(monkeypatch):
-    monkeypatch.setenv("MAIL_ENABLED", "true")
-    monkeypatch.setenv("EMAIL_PROVIDER", "google_script")
-    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_URL", "https://script.google.com/macros/s/TEST_SCRIPT/exec")
-    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_TOKEN", "test-secret-token-123")
-
-
-def test_google_script_send_success(monkeypatch):
-    from app import app
-
-    configure_google_script(monkeypatch)
-
-    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
-        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
-        results = send_booking_notifications(BOOKING)
-
-    assert results == {"customer": True, "owner": True}
-    assert mock_post.call_count == 2
-    # Verify the first call (customer)
-    first_call = mock_post.call_args_list[0]
-    assert first_call.args[0] == "https://script.google.com/macros/s/TEST_SCRIPT/exec"
-    payload = first_call.kwargs["json"]
-    assert payload["token"] == "test-secret-token-123"
-    assert payload["to"] == "customer@test.example"
-    assert "Vehicle Booking Confirmation" in payload["subject"]
-    assert "Test Customer" in payload["html"]
-    assert first_call.kwargs["timeout"] == 10
-
-
-def test_google_script_send_http_failure(monkeypatch):
-    from app import app
-
-    configure_google_script(monkeypatch)
-
-    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
-        mock_post.return_value = MockResponse(status_code=500, text="Internal Server Error")
-        results = send_booking_notifications(BOOKING)
-
-    assert results == {"customer": False, "owner": False}
-
-
-def test_google_script_send_invalid_json(monkeypatch):
-    from app import app
-
-    configure_google_script(monkeypatch)
-
-    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
-        mock_post.return_value = MockResponse(status_code=200, json_data=None, text="not json")
-        results = send_booking_notifications(BOOKING)
-
-    assert results == {"customer": False, "owner": False}
-
-
-def test_google_script_send_missing_success_true(monkeypatch):
-    from app import app
-
-    configure_google_script(monkeypatch)
-
-    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
-        mock_post.return_value = MockResponse(status_code=200, json_data={"success": False, "error": "Invalid token"})
-        results = send_booking_notifications(BOOKING)
-
-    assert results == {"customer": False, "owner": False}
-
-
-def test_google_script_send_timeout_handled(monkeypatch):
-    import requests
-    from app import app
-
-    configure_google_script(monkeypatch)
-
-    with app.test_request_context(), patch("email_service.requests.post", side_effect=requests.exceptions.Timeout("Connection timed out")):
-        results = send_booking_notifications(BOOKING)
-
-    assert results == {"customer": False, "owner": False}
-
-
-def test_google_script_missing_credentials(monkeypatch):
-    from app import app
-
-    configure_google_script(monkeypatch)
-    monkeypatch.delenv("GOOGLE_EMAIL_WEBHOOK_URL")
-
-    with app.test_request_context():
-        results = send_booking_notifications(BOOKING)
-    assert results == {"customer": False, "owner": False}
-
-
-def test_google_script_is_mail_configured(monkeypatch):
-    from email_service import is_mail_configured
-
-    configure_google_script(monkeypatch)
-    assert is_mail_configured() is True
-
-    monkeypatch.delenv("GOOGLE_EMAIL_WEBHOOK_TOKEN")
-    assert is_mail_configured() is False
-
-    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_TOKEN", "token")
+def test_configuration_status_reports_disabled_and_missing_settings(monkeypatch):
     monkeypatch.setenv("MAIL_ENABLED", "false")
-    assert is_mail_configured() is False
+    disabled = email_configuration_status()
+    assert disabled["message"].startswith(
+        "Email notifications are disabled. Set MAIL_ENABLED=true to enable them."
+    )
+    assert all(name in disabled["message"] for name in ("MAIL_SERVER", "MAIL_PORT", "MAIL_DEFAULT_SENDER"))
+
+    monkeypatch.setenv("MAIL_ENABLED", "true")
+    for name in ("MAIL_SERVER", "MAIL_PORT", "MAIL_DEFAULT_SENDER"):
+        monkeypatch.delenv(name, raising=False)
+    status = email_configuration_status()
+    assert status["configured"] is False
+    assert all(name in status["message"] for name in ("MAIL_SERVER", "MAIL_PORT", "MAIL_DEFAULT_SENDER"))
 
 
-def test_google_script_decision_email(monkeypatch):
-    from app import app
-    from email_service import send_booking_decision_email
+def test_configuration_rejects_invalid_port_tls_and_auth_pair(monkeypatch):
+    configure_mail(monkeypatch)
+    monkeypatch.setenv("MAIL_PORT", "not-a-port")
+    assert "MAIL_PORT" in email_configuration_status()["message"]
 
-    configure_google_script(monkeypatch)
-    decision_booking = dict(BOOKING, status="Accepted")
+    monkeypatch.setenv("MAIL_PORT", "587")
+    monkeypatch.setenv("MAIL_USE_SSL", "true")
+    assert "not both" in email_configuration_status()["message"]
 
-    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
-        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
-        result = send_booking_decision_email(decision_booking)
-
-    assert result is True
-    payload = mock_post.call_args.kwargs["json"]
-    assert payload["to"] == "customer@test.example"
-    assert "Accepted" in payload["subject"]
+    monkeypatch.setenv("MAIL_USE_SSL", "false")
+    monkeypatch.setenv("MAIL_USERNAME", "test-user")
+    monkeypatch.delenv("MAIL_PASSWORD", raising=False)
+    assert "MAIL_USERNAME and MAIL_PASSWORD" in email_configuration_status()["message"]
 
 
-def test_google_script_password_reset_email(monkeypatch):
-    from app import app
-    from email_service import send_password_reset_email
+def test_smtp_submission_uses_starttls_and_reports_smtp_acceptance(monkeypatch):
+    configure_mail(monkeypatch)
+    monkeypatch.setenv("MAIL_USERNAME", "smtp-user")
+    monkeypatch.setenv("MAIL_PASSWORD", "smtp-secret")
+    smtp = MagicMock()
+    smtp.__enter__.return_value = smtp
+    smtp.send_message.return_value = {}
 
-    configure_google_script(monkeypatch)
+    with patch("email_service.smtplib.SMTP", return_value=smtp) as smtp_factory:
+        with patch("email_service.render_template", return_value="Booking details"):
+            accepted = _send(
+                "customer@test.example",
+                "Booking confirmation",
+                "emails/booking_confirmation.txt",
+                {"booking": BOOKING},
+            )
 
-    with app.test_request_context(), patch("email_service.requests.post") as mock_post:
-        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
-        result = send_password_reset_email("customer@test.example", "http://test.example/reset-password/abc123token")
-
-    assert result is True
-    payload = mock_post.call_args.kwargs["json"]
-    assert payload["to"] == "customer@test.example"
-    assert "Password Reset" in payload["subject"]
-    assert "abc123token" in payload["html"]
+    assert accepted is True
+    smtp_factory.assert_called_once_with("smtp.test.example", 587, timeout=10)
+    smtp.starttls.assert_called_once()
+    smtp.login.assert_called_once_with("smtp-user", "smtp-secret")
+    smtp.send_message.assert_called_once()
 
 
-def test_google_script_logging_never_logs_token_and_masks_email(monkeypatch):
-    from app import app
+def test_smtp_ssl_mode_and_refused_recipient(monkeypatch):
+    configure_mail(monkeypatch)
+    monkeypatch.setenv("MAIL_PORT", "465")
+    monkeypatch.setenv("MAIL_USE_TLS", "false")
+    monkeypatch.setenv("MAIL_USE_SSL", "true")
+    smtp = MagicMock()
+    smtp.__enter__.return_value = smtp
+    smtp.send_message.return_value = {"customer@test.example": (550, b"rejected")}
 
-    configure_google_script(monkeypatch)
+    with patch("email_service.smtplib.SMTP_SSL", return_value=smtp) as smtp_factory:
+        with patch("email_service.render_template", return_value="Booking details"):
+            accepted = _send(
+                "customer@test.example",
+                "Booking confirmation",
+                "emails/booking_confirmation.txt",
+                {"booking": BOOKING},
+            )
 
-    with app.test_request_context(), patch("email_service.requests.post") as mock_post, patch("email_service.logger.info") as mock_info:
-        mock_post.return_value = MockResponse(status_code=200, json_data={"success": True})
-        send_booking_notifications(BOOKING)
+    assert accepted is False
+    assert smtp_factory.call_args.args[:2] == ("smtp.test.example", 465)
+    smtp.starttls.assert_not_called()
 
-    for call in mock_info.call_args_list:
-        log_str = str(call)
-        assert "test-secret-token-123" not in log_str
-        # Recipient should be masked like cu***r@test.example
-        if "recipient=" in log_str:
-            assert "cu***r@test.example" in log_str or "ow***r@test.example" in log_str
 
+def test_password_reset_email_uses_existing_mail_sender_without_logging_token(monkeypatch):
+    configure_mail(monkeypatch)
+    reset_link = "https://booking.example/reset-password/customer#one-time-secret-token"
+
+    with patch("email_service._send", return_value=True) as send:
+        accepted = send_password_reset_email(
+            "customer@test.example",
+            reset_link,
+            "customer",
+        )
+
+    assert accepted is True
+    assert send.call_args.args[:3] == (
+        "customer@test.example",
+        "Business Vehicle Booking - Password Reset",
+        "emails/password_reset.txt",
+    )
+    assert send.call_args.args[3] == {
+        "reset_url": reset_link,
+        "account_type": "customer",
+    }
+
+
+def test_password_reset_email_respects_disabled_mail_configuration(monkeypatch):
+    monkeypatch.setenv("MAIL_ENABLED", "false")
+    with patch("email_service._send") as send:
+        accepted = send_password_reset_email(
+            "customer@test.example",
+            "https://booking.example/reset",
+            "customer",
+        )
+
+    assert accepted is False
+    send.assert_not_called()

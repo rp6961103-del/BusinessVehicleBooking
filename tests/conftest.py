@@ -75,13 +75,23 @@ def management_schema_statements():
         "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
         "ALTER TABLE owners ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
         "ALTER TABLE vehicles ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE bookings ADD COLUMN created_at DATETIME NULL DEFAULT NULL",
     )
 
 
 def clear_test_data(connection):
     cursor = connection.cursor()
     try:
-        for table in ("payments", "bookings", "vehicle_routes", "vehicles", "password_reset_tokens", "owners", "users", "admins"):
+        for table in (
+            "password_reset_attempts",
+            "password_reset_tokens",
+            "bookings",
+            "vehicle_routes",
+            "vehicles",
+            "owners",
+            "users",
+            "admins",
+        ):
             cursor.execute(f"DELETE FROM {table}")
         connection.commit()
     finally:
@@ -170,13 +180,19 @@ def seeded_data(test_db):
             "VALUES (%s, %s, %s, %s)",
             (vehicle_id, "Test Town", "Test City", "2500.00"),
         )
+        route_id = cursor.lastrowid
         test_db.commit()
-        return {"owner_id": owner_id, "customer_id": customer_id, "vehicle_id": vehicle_id}
+        return {
+            "owner_id": owner_id,
+            "customer_id": customer_id,
+            "vehicle_id": vehicle_id,
+            "route_id": route_id,
+        }
     finally:
         cursor.close()
 
 
-def csrf_token(client, path="/login"):
+def csrf_token(client, path="/register"):
     response = client.get(path)
     assert response.status_code == 200
     with client.session_transaction() as session:

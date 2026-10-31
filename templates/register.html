@@ -15,27 +15,37 @@
     </a>
     <nav>
         <a href="/">{{ t.get("back_home", "Back to Home") }}</a>
-        <a href="/login">{{ t.get("customer_login", "Customer Login") }}</a>
         <a href="/farmer-ai">🌿 {{ t.get("farmer_ai", "Farmer AI") }}</a>
+        <a href="/login">🔐 {{ t.get("login", "Login") }}</a>
     </nav>
 </header>
 
-{% include "_language_selector.html" %}
+<div class="language-bar">
+    <span>🌐 {{ t.get("language", "Language") }}:</span>
+    <form method="POST" action="{{ url_for('change_language', language='en') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='te') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
+    </form>
+</div>
 
 <main class="container container-narrow">
     <div class="form-card">
         <h1>👤 {{ t.get("customer_registration", "Customer Registration") }}</h1>
-        <p class="subtitle">{{ t.get("customer_desc", "Create your customer account to book vehicles easily.") }}</p>
-
-        {% if error %}
-            <div class="message error" role="alert">{{ t.get(error, error) }}</div>
-        {% endif %}
+        <p class="subtitle">Create an account to browse and book vehicles with transparent route rents.</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="message {{ category }}" role="alert">
-                        {{ t.get(message, message) }}
+                        {{ message }}
                     </div>
                 {% endfor %}
             {% endif %}
@@ -46,35 +56,72 @@
 
             <div class="form-group">
                 <label for="name">👤 {{ t.get("customer_name", "Customer Name") }}</label>
-                <input type="text" id="name" name="name" maxlength="100" placeholder="{{ t.get('customer_name', 'Full Name') }}" required autocomplete="name">
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Enter your full name"
+                    maxlength="100"
+                    required
+                    autocomplete="name"
+                >
             </div>
 
             <div class="form-group">
                 <label for="phone">📱 {{ t.get("mobile_number", "Mobile Number") }}</label>
-                <input type="tel" id="phone" name="phone" pattern="[0-9]{10}" maxlength="10" placeholder="{{ t.get('enter_phone_placeholder', 'Enter 10-digit mobile number') }}" required autocomplete="tel">
+                <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    placeholder="10-digit number, optionally with +91"
+                    maxlength="20"
+                    required
+                    autocomplete="tel"
+                >
             </div>
 
             <div class="form-group">
-                <label for="email">📧 {{ t.get("email_address", "Email Address") }}</label>
-                <input type="email" id="email" name="email" maxlength="255" placeholder="user@example.com" autocomplete="email">
+                <label for="email">📧 Email Address (optional)</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="name@example.com (for booking receipts)"
+                    maxlength="100"
+                    autocomplete="email"
+                >
             </div>
 
             <div class="form-group">
-                <label for="password">🔑 {{ t.get("password", "Password") }}</label>
-                <input type="password" id="password" name="password" minlength="8" maxlength="128" placeholder="{{ t.get('enter_password_placeholder', 'Enter your password (min 8 characters)') }}" required autocomplete="new-password">
+                <label for="password">🔑 Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="At least 8 characters"
+                    minlength="8"
+                    maxlength="128"
+                    required
+                    autocomplete="new-password"
+                >
             </div>
 
-            <div class="form-group">
-                <label for="confirm_password">🔑 {{ t.get("confirm_password", "Confirm Password") }}</label>
-                <input type="password" id="confirm_password" name="confirm_password" minlength="8" maxlength="128" placeholder="{{ t.get('enter_password_placeholder', 'Enter your password (min 8 characters)') }}" required autocomplete="new-password">
-            </div>
-
-            <button type="submit" class="btn btn-primary full-btn">{{ t.get("register_as_customer", "Register as Customer") }}</button>
+            <button type="submit" class="btn btn-primary full-btn" style="margin-top: 10px;">
+                ✅ {{ t.get("register", "Register") }}
+            </button>
         </form>
 
-        <p style="margin-top: 18px; text-align: center;">
-            {{ t.get("already_have_account", "Already have an account?") }} <a href="/login">{{ t.get("customer_sign_in", "Customer Sign In") }}</a>
-        </p>
+        <div style="margin-top: 24px; text-align: center; border-top: 1px solid var(--line); padding-top: 18px;">
+            <p style="margin-bottom: 10px; font-size: 0.9rem; color: var(--muted);">Already registered?</p>
+            <a href="/login" class="btn btn-secondary full-btn">
+                🔐 {{ t.get("customer_login", "Customer Login") }}
+            </a>
+            <div style="margin-top: 14px;">
+                <a href="/ownerregister" style="font-size: 0.88rem; font-weight: 600;">
+                    🚚 Register as a Commercial Vehicle Owner →
+                </a>
+            </div>
+        </div>
     </div>
 </main>
 

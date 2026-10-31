@@ -37,6 +37,11 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
+        {% if error_message %}
+            <div class="message error" role="alert">
+                {{ error_message }}
+            </div>
+        {% endif %}
 
         <form method="POST" action="{{ url_for('ownerlogin') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -67,6 +72,7 @@
                     required
                     autocomplete="current-password"
                 >
+                <a class="forgot-password-link" href="{{ url_for('forgot_password', account_type='owner') }}">Forgot Password?</a>
             </div>
 
             <button type="submit" class="btn btn-accent full-btn" style="margin-top: 10px;">

@@ -4523,8 +4523,8 @@ def book_vehicle(vehicle_id):
             return render_template("booking.html", vehicle=vehicle, today=date.today().isoformat()), 409
 
         insert_sql = """
-        INSERT INTO bookings (vehicle_id, route_id, customer_name, phone, booking_date, status, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, UTC_TIMESTAMP())
+        INSERT INTO bookings (vehicle_id, route_id, customer_name, phone, booking_date, status)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """
         try:
             cursor.execute(insert_sql, (vehicle_id, route_id, customer_name, phone, booking_date, "Pending"))

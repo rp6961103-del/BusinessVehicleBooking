@@ -174,5 +174,167 @@ class OwnerLoginIdentifierTests(unittest.TestCase):
             self.assertIsNone(session.get("owner_id"))
 
 
+
+    def test_owner_login_with_country_code_phone_normalized(self):
+        """Test 7: Phone number with +91 country code prefix is normalized and authenticates."""
+        password_hash = generate_password_hash("owner-secure-password")
+        fake_cursor = FakeCursor([
+            (10, "Test Fleet Owner", "7993347143", "owner@business.example", password_hash, True)
+        ])
+        token = self.csrf_token()
+
+        with patch.object(app_module, "cursor", fake_cursor):
+            response = self.client.post(
+                "/ownerlogin",
+                data={
+                    "csrf_token": token,
+                    "identifier": "+917993347143",
+                    "password": "owner-secure-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/owner_dashboard")
+        self.assertEqual(fake_cursor.executed[0][1], ("7993347143", "7993347143"))
+        with self.client.session_transaction() as session:
+            self.assertEqual(session.get("owner_id"), 10)
+
+    def test_owner_login_email_case_insensitive(self):
+        """Test 8: Mixed-case or uppercase email is normalized to lowercase."""
+        password_hash = generate_password_hash("owner-secure-password")
+        fake_cursor = FakeCursor([
+            (10, "Test Fleet Owner", "7993347143", "owner@business.example", password_hash, True)
+        ])
+        token = self.csrf_token()
+
+        with patch.object(app_module, "cursor", fake_cursor):
+            response = self.client.post(
+                "/ownerlogin",
+                data={
+                    "csrf_token": token,
+                    "identifier": "OWNER@BUSINESS.EXAMPLE",
+                    "password": "owner-secure-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/owner_dashboard")
+        self.assertEqual(fake_cursor.executed[0][1], ("owner@business.example", "owner@business.example"))
+        with self.client.session_transaction() as session:
+            self.assertEqual(session.get("owner_id"), 10)
+
+    def test_owner_login_empty_identifier_or_password(self):
+        """Test 9: Blank identifier or password fails validation without querying DB."""
+        fake_cursor = FakeCursor()
+        token = self.csrf_token()
+
+        with patch.object(app_module, "cursor", fake_cursor):
+            response = self.client.post(
+                "/ownerlogin",
+                data={
+                    "csrf_token": token,
+                    "identifier": "",
+                    "password": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"required", response.data.lower())
+        self.assertEqual(len(fake_cursor.executed), 0)
+
+    def test_owner_login_database_error_returns_503(self):
+        """Test 10: Database Error returns 503 instead of wrong password."""
+        token = self.csrf_token()
+
+        class FailingCursor:
+            def execute(self, sql, values=None):
+                from mysql.connector import Error as MySQLError
+                raise MySQLError("OperationalError 2006: MySQL server has gone away")
+
+        with patch.object(app_module, "cursor", FailingCursor()):
+            response = self.client.post(
+                "/ownerlogin",
+                data={
+                    "csrf_token": token,
+                    "identifier": "owner@business.example",
+                    "password": "owner-secure-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn(b"temporarily unavailable", response.data.lower())
+        self.assertNotIn(b"password is incorrect", response.data.lower())
+        with self.client.session_transaction() as session:
+            self.assertIsNone(session.get("owner_id"))
+
+    def test_owner_login_cursor_none_returns_503(self):
+        """Test 11: Uninitialized database cursor returns 503."""
+        token = self.csrf_token()
+
+        with patch.object(app_module, "cursor", None), patch.object(app_module, "ensure_db_connection", lambda: None):
+            response = self.client.post(
+                "/ownerlogin",
+                data={
+                    "csrf_token": token,
+                    "identifier": "owner@business.example",
+                    "password": "owner-secure-password",
+                },
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn(b"temporarily unavailable", response.data.lower())
+        with self.client.session_transaction() as session:
+            self.assertIsNone(session.get("owner_id"))
+
+    def test_post_login_redirect_to_owner_dashboard(self):
+        """Test 12: Successful owner login follows redirect to owner dashboard cleanly."""
+        password_hash = generate_password_hash("owner-secure-password")
+        token = self.csrf_token()
+
+        # Mock cursor for owner login then owner dashboard queries:
+        # 1. ownerlogin: fetchone -> owner record
+        # 2. owner_dashboard bookings query: fetchall -> bookings
+        # 3. total bookings count: fetchone -> (1,)
+        # 4. pending bookings count: fetchone -> (1,)
+        # 5. accepted bookings count: fetchone -> (0,)
+        # 6. rejected bookings count: fetchone -> (0,)
+        # 7. vehicle count: fetchone -> (2,)
+        # 8. active vehicle count: fetchone -> (1,)
+        from datetime import date
+        fake_cursor = FakeCursor(
+            rows=[
+                (10, "Test Fleet Owner", "7993347143", "owner@business.example", password_hash, True),
+                (1,),
+                (1,),
+                (0,),
+                (0,),
+                (2,),
+                (1,),
+            ],
+            all_rows=[
+                (1, "Customer Ram", "9866862006", date(2026, 11, 2), "Pending", "Truck A", "Truck", "FromA", "ToB", 1500, None)
+            ]
+        )
+
+        with patch.object(app_module, "cursor", fake_cursor):
+            response = self.client.post(
+                "/ownerlogin",
+                data={
+                    "csrf_token": token,
+                    "identifier": "owner@business.example",
+                    "password": "owner-secure-password",
+                },
+                follow_redirects=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Test Fleet Owner", response.data)
+        self.assertIn(b"Truck A", response.data)
+        with self.client.session_transaction() as session:
+            self.assertEqual(session.get("owner_id"), 10)
+            self.assertEqual(session.get("user_role"), "owner")
+            self.assertTrue(session.get("logged_in"))
+
+
 if __name__ == "__main__":
     unittest.main()

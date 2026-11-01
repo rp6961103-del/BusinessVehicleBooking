@@ -3126,6 +3126,34 @@ def ownerlogin():
             identifier=identifier,
         ), 200
 
+    if cursor is None:
+        ensure_db_connection()
+    if cursor is None:
+        logger.error(
+            "Owner login unavailable: MySQL cursor is not initialized. Target DB host=%s, port=%s, database=%s",
+            db_config.get("host"),
+            db_config.get("port"),
+            db_config.get("database"),
+        )
+        return render_template(
+            "owner_login.html",
+            error_message="Owner login is temporarily unavailable due to a database connection issue. Please try again shortly.",
+            identifier=identifier,
+        ), 503
+
+    clean_identifier = identifier
+    is_email = "@" in clean_identifier
+    if not is_email:
+        digits = re.sub(r"\D", "", clean_identifier)
+        if len(digits) == 12 and digits.startswith("91"):
+            clean_identifier = digits[2:]
+        elif len(digits) == 11 and digits.startswith("0"):
+            clean_identifier = digits[1:]
+        elif len(digits) == 10:
+            clean_identifier = digits
+    else:
+        clean_identifier = clean_identifier.lower()
+
     sql = """
     SELECT id, owner_name, phone, email, password_hash
     FROM owners
@@ -3133,16 +3161,71 @@ def ownerlogin():
     AND is_active = TRUE
     """
 
-    cursor.execute(
-        sql,
-        (identifier, identifier)
-    )
+    owner = None
+    try:
+        cursor.execute(
+            sql,
+            (clean_identifier, clean_identifier)
+        )
+        owner = cursor.fetchone()
 
-    owner = cursor.fetchone()
+        if not owner and not is_email:
+            digits = re.sub(r"\D", "", identifier)
+            phone_10 = digits[-10:] if len(digits) >= 10 else digits
+            fallback_candidates = [identifier, f"+91{phone_10}", f"91{phone_10}", f"0{phone_10}"]
+            for candidate in fallback_candidates:
+                if candidate != clean_identifier:
+                    cursor.execute(sql, (candidate, candidate))
+                    owner = cursor.fetchone()
+                    if owner:
+                        break
 
-    valid_owner = bool(owner and owner[4] and check_password_hash(owner[4], password))
+    except Error as error:
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+        logger.exception(
+            "Database exception during owner login for identifier_type=%s, len=%d, database=%s: %s",
+            "email" if is_email else "phone",
+            len(identifier),
+            db_config.get("database"),
+            error,
+        )
+        return render_template(
+            "owner_login.html",
+            error_message="Owner login is temporarily unavailable due to a database error. Please try again shortly.",
+            identifier=identifier,
+        ), 503
+    except Exception as error:
+        logger.exception(
+            "Unexpected error during owner login for identifier_type=%s, len=%d: %s",
+            "email" if is_email else "phone",
+            len(identifier),
+            error,
+        )
+        return render_template(
+            "owner_login.html",
+            error_message="Owner login is temporarily unavailable. Please try again shortly.",
+            identifier=identifier,
+        ), 500
+
+    valid_owner = False
+    if owner and owner[4]:
+        try:
+            valid_owner = bool(check_password_hash(owner[4], password))
+        except (TypeError, ValueError) as hash_err:
+            logger.error("Owner account id=%s has an invalid password hash: %s", owner[0], hash_err)
+            valid_owner = False
 
     if owner and valid_owner:
+        logger.info(
+            "Owner login successful for owner_id=%s (identifier_type=%s, len=%d)",
+            owner[0],
+            "email" if is_email else "phone",
+            len(identifier),
+        )
         saved_lang = session.get("language", "en")
         session.clear()
         csrf_token()
@@ -3157,12 +3240,17 @@ def ownerlogin():
 
         return redirect("/owner_dashboard")
     else:
+        logger.warning(
+            "Owner login failed: invalid credentials for identifier_type=%s, len=%d, account_found=%s",
+            "email" if is_email else "phone",
+            len(identifier),
+            bool(owner),
+        )
         return render_template(
             "owner_login.html",
             error_message="Invalid Owner Login: Email, phone number, or password is incorrect.",
             identifier=identifier,
         ), 200
-
 
 @app.route("/adminlogin", methods=["GET", "POST"])
 def adminlogin():
@@ -4700,6 +4788,11 @@ def rate_booking(booking_id):
 def owner_dashboard():
     owner_id = session["owner_id"]
 
+    if cursor is None:
+        ensure_db_connection()
+    if cursor is None:
+        logger.error("Owner dashboard unavailable: MySQL cursor not initialized")
+        return "Database is temporarily unavailable. Please try again shortly.", 503
 
     # =====================================================
     # GET CUSTOMER BOOKINGS
@@ -4736,142 +4829,169 @@ def owner_dashboard():
     ORDER BY b.id DESC
     """
 
-    cursor.execute(
-        sql,
-        (owner_id,)
-    )
+    try:
+        try:
+            cursor.execute(
+                sql,
+                (owner_id,)
+            )
+        except Error as col_err:
+            if (
+                getattr(col_err, "errno", None) == 1054
+                and "Unknown column 'b.created_at'" in str(col_err)
+            ):
+                logger.warning(
+                    "bookings.created_at column not found in database '%s'. "
+                    "Falling back to NULL for created_at.",
+                    db_config.get("database"),
+                )
+                sql_fallback = sql.replace(
+                    "b.created_at", "NULL as created_at"
+                )
+                cursor.execute(sql_fallback, (owner_id,))
+            else:
+                raise
 
-    bookings = [
-        booking + (format_booking_created_at(booking[10]),)
-        for booking in cursor.fetchall()
-    ]
+        bookings = [
+            booking + (format_booking_created_at(booking[10]),)
+            for booking in cursor.fetchall()
+        ]
 
+        # =====================================================
+        # TOTAL BOOKINGS
+        # =====================================================
 
-    # =====================================================
-    # TOTAL BOOKINGS
-    # =====================================================
+        total_sql = """
+        SELECT COUNT(*)
+        FROM bookings b
 
-    total_sql = """
-    SELECT COUNT(*)
-    FROM bookings b
+        INNER JOIN vehicles v
+            ON b.vehicle_id = v.id
 
-    INNER JOIN vehicles v
-        ON b.vehicle_id = v.id
+        INNER JOIN owners o
+            ON o.id = v.owner_id
 
-    INNER JOIN owners o
-        ON o.id = v.owner_id
+        WHERE o.id = %s
+        """
 
-    WHERE o.id = %s
-    """
+        cursor.execute(
+            total_sql,
+            (owner_id,)
+        )
 
-    cursor.execute(
-        total_sql,
-        (owner_id,)
-    )
-
-    total_bookings = cursor.fetchone()[0]
-
-
-    # =====================================================
-    # PENDING BOOKINGS
-    # =====================================================
-
-    pending_sql = """
-    SELECT COUNT(*)
-    FROM bookings b
-
-    INNER JOIN vehicles v
-        ON b.vehicle_id = v.id
-
-    INNER JOIN owners o
-        ON o.id = v.owner_id
-
-    WHERE o.id = %s
-    AND LOWER(TRIM(b.status)) = 'pending'
-    """
-
-    cursor.execute(
-        pending_sql,
-        (owner_id,)
-    )
-
-    pending_bookings = cursor.fetchone()[0]
+        total_bookings = cursor.fetchone()[0]
 
 
-    # =====================================================
-    # ACCEPTED BOOKINGS
-    # =====================================================
+        # =====================================================
+        # PENDING BOOKINGS
+        # =====================================================
 
-    accepted_sql = """
-    SELECT COUNT(*)
-    FROM bookings b
+        pending_sql = """
+        SELECT COUNT(*)
+        FROM bookings b
 
-    INNER JOIN vehicles v
-        ON b.vehicle_id = v.id
+        INNER JOIN vehicles v
+            ON b.vehicle_id = v.id
 
-    INNER JOIN owners o
-        ON o.id = v.owner_id
+        INNER JOIN owners o
+            ON o.id = v.owner_id
 
-    WHERE o.id = %s
-    AND LOWER(TRIM(b.status)) = 'accepted'
-    """
+        WHERE o.id = %s
+        AND LOWER(TRIM(b.status)) = 'pending'
+        """
 
-    cursor.execute(
-        accepted_sql,
-        (owner_id,)
-    )
+        cursor.execute(
+            pending_sql,
+            (owner_id,)
+        )
 
-    accepted_bookings = cursor.fetchone()[0]
+        pending_bookings = cursor.fetchone()[0]
 
 
-    # =====================================================
-    # REJECTED BOOKINGS
-    # =====================================================
+        # =====================================================
+        # ACCEPTED BOOKINGS
+        # =====================================================
 
-    rejected_sql = """
-    SELECT COUNT(*)
-    FROM bookings b
+        accepted_sql = """
+        SELECT COUNT(*)
+        FROM bookings b
 
-    INNER JOIN vehicles v
-        ON b.vehicle_id = v.id
+        INNER JOIN vehicles v
+            ON b.vehicle_id = v.id
 
-    INNER JOIN owners o
-        ON o.id = v.owner_id
+        INNER JOIN owners o
+            ON o.id = v.owner_id
 
-    WHERE o.id = %s
-    AND LOWER(TRIM(b.status)) = 'rejected'
-    """
+        WHERE o.id = %s
+        AND LOWER(TRIM(b.status)) = 'accepted'
+        """
 
-    cursor.execute(
-        rejected_sql,
-        (owner_id,)
-    )
+        cursor.execute(
+            accepted_sql,
+            (owner_id,)
+        )
 
-    rejected_bookings = cursor.fetchone()[0]
+        accepted_bookings = cursor.fetchone()[0]
 
-    vehicle_count_sql = """
-    SELECT COUNT(*)
-    FROM vehicles
-    WHERE owner_id = %s
-    """
 
-    cursor.execute(vehicle_count_sql, (owner_id,))
-    vehicle_count = cursor.fetchone()[0]
+        # =====================================================
+        # REJECTED BOOKINGS
+        # =====================================================
 
-    active_vehicle_sql = """
-    SELECT COUNT(*)
-    FROM vehicles v
-    WHERE v.owner_id = %s
-    AND EXISTS (
-        SELECT 1
-        FROM vehicle_routes vr
-        WHERE vr.vehicle_id = v.id
-    )
-    """
+        rejected_sql = """
+        SELECT COUNT(*)
+        FROM bookings b
 
-    cursor.execute(active_vehicle_sql, (owner_id,))
-    active_vehicles = cursor.fetchone()[0]
+        INNER JOIN vehicles v
+            ON b.vehicle_id = v.id
 
+        INNER JOIN owners o
+            ON o.id = v.owner_id
+
+        WHERE o.id = %s
+        AND LOWER(TRIM(b.status)) = 'rejected'
+        """
+
+        cursor.execute(
+            rejected_sql,
+            (owner_id,)
+        )
+
+        rejected_bookings = cursor.fetchone()[0]
+
+        vehicle_count_sql = """
+        SELECT COUNT(*)
+        FROM vehicles
+        WHERE owner_id = %s
+        """
+
+        cursor.execute(vehicle_count_sql, (owner_id,))
+        vehicle_count = cursor.fetchone()[0]
+
+        active_vehicle_sql = """
+        SELECT COUNT(*)
+        FROM vehicles v
+        WHERE v.owner_id = %s
+        AND EXISTS (
+            SELECT 1
+            FROM vehicle_routes vr
+            WHERE vr.vehicle_id = v.id
+        )
+        """
+
+        cursor.execute(active_vehicle_sql, (owner_id,))
+        active_vehicles = cursor.fetchone()[0]
+
+    except Error as error:
+        logger.exception("Database error loading owner_dashboard for owner_id=%s: %s", owner_id, error)
+        flash("Some dashboard information could not be loaded due to a database error.", "error")
+        bookings = []
+        total_bookings = 0
+        pending_bookings = 0
+        accepted_bookings = 0
+        rejected_bookings = 0
+        vehicle_count = 0
+        active_vehicles = 0
 
     # =====================================================
     # SEND DATA TO OWNER DASHBOARD
@@ -4887,8 +5007,6 @@ def owner_dashboard():
         vehicle_count=vehicle_count,
         active_vehicles=active_vehicles,
     )
-
-
 # =========================================================
 # UPDATE BOOKING STATUS
 # =========================================================

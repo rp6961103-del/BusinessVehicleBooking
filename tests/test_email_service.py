@@ -27,10 +27,30 @@ BOOKING = {
 
 def configure_mail(monkeypatch):
     monkeypatch.setenv("MAIL_ENABLED", "true")
+    monkeypatch.setenv("EMAIL_PROVIDER", "smtp")
     monkeypatch.setenv("MAIL_SERVER", "smtp.test.example")
     monkeypatch.setenv("MAIL_PORT", "587")
     monkeypatch.setenv("MAIL_USE_TLS", "true")
     monkeypatch.setenv("MAIL_DEFAULT_SENDER", "BusinessVehicleBooking <no-reply@test.example>")
+
+
+def configure_google_script(monkeypatch):
+    monkeypatch.setenv("MAIL_ENABLED", "true")
+    monkeypatch.setenv("EMAIL_PROVIDER", "google_script")
+    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_URL", "https://script.google.com/macros/s/test/exec")
+    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_TOKEN", "test-webhook-token")
+
+
+class MockWebhookResponse:
+    def __init__(self, status_code, json_data=None):
+        self.status_code = status_code
+        self.ok = 200 <= status_code < 400
+        self._json_data = json_data
+
+    def json(self):
+        if self._json_data is None:
+            raise ValueError("Invalid JSON")
+        return self._json_data
 
 
 def test_service_sends_both_notifications_with_booking_details(monkeypatch):
@@ -118,6 +138,67 @@ def test_configuration_rejects_invalid_port_tls_and_auth_pair(monkeypatch):
     monkeypatch.setenv("MAIL_USERNAME", "test-user")
     monkeypatch.delenv("MAIL_PASSWORD", raising=False)
     assert "MAIL_USERNAME and MAIL_PASSWORD" in email_configuration_status()["message"]
+
+
+def test_google_script_configuration_does_not_require_smtp(monkeypatch):
+    configure_google_script(monkeypatch)
+    for name in (
+        "MAIL_SERVER",
+        "MAIL_PORT",
+        "MAIL_DEFAULT_SENDER",
+        "MAIL_USERNAME",
+        "MAIL_PASSWORD",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    assert email_configuration_status() == {
+        "enabled": True,
+        "configured": True,
+        "message": "",
+    }
+
+
+def test_google_script_sends_customer_and_owner_notifications_over_https(monkeypatch):
+    configure_google_script(monkeypatch)
+    with patch("email_service.requests.post") as post:
+        post.return_value = MockWebhookResponse(200, {"success": True})
+        with patch("email_service.render_template", return_value="<p>Booking details</p>"):
+            results = send_booking_notifications(BOOKING)
+
+    assert results == {"customer": True, "owner": True}
+    assert post.call_count == 2
+    assert post.call_args_list[0].args[0] == "https://script.google.com/macros/s/test/exec"
+    assert post.call_args_list[0].kwargs["json"] == {
+        "token": "test-webhook-token",
+        "to": "customer@test.example",
+        "subject": "Vehicle Booking Confirmation - Booking #17",
+        "html": "<p>Booking details</p>",
+    }
+    assert post.call_args_list[1].kwargs["json"]["to"] == "owner@test.example"
+    assert all(call.kwargs["timeout"] == 10 for call in post.call_args_list)
+
+
+def test_google_script_rejects_failed_http_response_and_invalid_success(monkeypatch):
+    configure_google_script(monkeypatch)
+    with patch("email_service.requests.post", side_effect=[
+        MockWebhookResponse(503, {"success": False}),
+        MockWebhookResponse(200, {"success": False}),
+    ]):
+        with patch("email_service.render_template", return_value="Booking details"):
+            results = send_booking_notifications(BOOKING)
+
+    assert results == {"customer": False, "owner": False}
+
+
+def test_google_script_configuration_requires_https_and_credentials(monkeypatch):
+    configure_google_script(monkeypatch)
+    monkeypatch.setenv("GOOGLE_EMAIL_WEBHOOK_URL", "http://script.google.com/macros/s/test/exec")
+    assert email_configuration_status()["message"] == (
+        "GOOGLE_EMAIL_WEBHOOK_URL must be an HTTPS URL."
+    )
+
+    monkeypatch.delenv("GOOGLE_EMAIL_WEBHOOK_TOKEN")
+    assert "GOOGLE_EMAIL_WEBHOOK_TOKEN" in email_configuration_status()["message"]
 
 
 def test_smtp_submission_uses_starttls_and_reports_smtp_acceptance(monkeypatch):

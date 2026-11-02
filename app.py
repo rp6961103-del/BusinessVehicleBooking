@@ -19,6 +19,7 @@ from email_service import (
     email_configuration_status,
     send_password_reset_email,
     send_booking_notifications,
+    send_booking_decision_to_customer,
 )
 from ai_disease_service import is_ai_configured, validate_image_file, analyze_crop_leaf, chat_about_crop
 
@@ -71,6 +72,7 @@ def validate_production_configuration():
         "MYSQL_DATABASE",
         "MYSQL_USER",
         "MYSQL_PASSWORD",
+        "MYSQL_SSL_CA",
         "SESSION_COOKIE_SECURE",
     )
     missing_variables = [
@@ -2554,6 +2556,12 @@ db_config = {
     "password": os.getenv("MYSQL_PASSWORD"),
     "database": os.getenv("MYSQL_DATABASE") or "vehicle_booking"
 }
+if os.getenv("MYSQL_SSL_CA", "").strip():
+    db_config.update(
+        ssl_ca=os.environ["MYSQL_SSL_CA"].strip(),
+        ssl_verify_cert=True,
+        ssl_verify_identity=True,
+    )
 
 def ensure_db_connection():
     """Ensure database and cursor are connected and healthy, auto-reconnecting if dropped."""
@@ -2602,6 +2610,18 @@ def verify_db_connectivity():
 def home():
 
     return render_template("index.html")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return redirect("/static/favicon.svg")
+
+
+@app.route("/healthz")
+def health_check():
+    if db is None or not db.is_connected():
+        return jsonify({"status": "unavailable"}), 503
+    return jsonify({"status": "ok"})
 
 
 # =========================================================
@@ -5028,7 +5048,20 @@ def update_booking(booking_id, status):
     # =====================================================
 
     check_sql = """
-    SELECT b.id
+    SELECT
+        b.id,
+        b.customer_name,
+        b.phone,
+        u.email,
+        b.booking_date,
+        v.vehicle_name,
+        v.vehicle_type,
+        o.owner_name,
+        o.email,
+        COALESCE(v.contact_number, o.phone),
+        vr.from_location,
+        vr.to_location,
+        vr.rent
     FROM bookings b
 
     INNER JOIN vehicles v
@@ -5036,6 +5069,13 @@ def update_booking(booking_id, status):
 
     INNER JOIN owners o
         ON o.id = v.owner_id
+
+    LEFT JOIN users u
+        ON u.phone = b.phone
+
+    LEFT JOIN vehicle_routes vr
+        ON vr.id = b.route_id
+        AND vr.vehicle_id = b.vehicle_id
 
     WHERE b.id = %s
     AND o.id = %s
@@ -5087,6 +5127,23 @@ def update_booking(booking_id, status):
 
     db.commit()
 
+    notification_booking = {
+        "booking_id": booking[0],
+        "customer_name": booking[1],
+        "customer_phone": booking[2],
+        "customer_email": booking[3],
+        "booking_date": booking[4],
+        "vehicle_name": booking[5],
+        "vehicle_type": booking[6],
+        "owner_name": booking[7],
+        "owner_email": booking[8],
+        "owner_phone": booking[9],
+        "from_location": booking[10],
+        "to_location": booking[11],
+        "rent": booking[12],
+        "status": status,
+    }
+    send_booking_decision_to_customer(notification_booking)
 
     return redirect("/owner_dashboard")
 

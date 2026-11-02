@@ -5,6 +5,7 @@ from email_service import (
     email_configuration_status,
     send_password_reset_email,
     send_booking_notifications,
+    send_booking_decision_to_customer,
 )
 
 
@@ -43,6 +44,20 @@ def test_service_sends_both_notifications_with_booking_details(monkeypatch):
     assert send.call_args_list[1].args[0] == "owner@test.example"
     assert "Test Customer" in send.call_args_list[0].args[3]["booking"]["customer_name"]
     assert send.call_args_list[0].args[3]["booking"]["booking_id"] == 17
+
+
+def test_booking_decision_notifications_can_be_sent_repeatedly(monkeypatch):
+    configure_mail(monkeypatch)
+    with patch("email_service._send", return_value=True) as send:
+        results = [
+            send_booking_decision_to_customer({**BOOKING, "status": "Accepted"})
+            for _ in range(3)
+        ]
+
+    assert results == [True, True, True]
+    assert send.call_count == 3
+    assert all(call.args[0] == "customer@test.example" for call in send.call_args_list)
+    assert all(call.args[1] == "BusinessVehicleBooking - Booking #17 Accepted" for call in send.call_args_list)
 
 
 def test_disabled_email_does_not_require_smtp_configuration(monkeypatch):

@@ -463,17 +463,37 @@ class SecurityTests(unittest.TestCase):
     def test_owner_can_update_own_booking_status(self):
         for status in ("Accepted", "Rejected"):
             with self.subTest(status=status):
-                fake_cursor = FakeCursor([(1,)])
+                fake_cursor = FakeCursor([(
+                    1,
+                    "Test Customer",
+                    "9000000002",
+                    "customer@test.example",
+                    "2099-01-01",
+                    "Test Truck",
+                    "Pickup",
+                    "Test Owner",
+                    "owner@test.example",
+                    "9000000001",
+                    "Test Town",
+                    "Test City",
+                    "2500.00",
+                )])
                 token = self.csrf_token()
                 with self.client.session_transaction() as session:
                     session["owner_id"] = 9
-                with patch.object(app_module, "cursor", fake_cursor):
+                with (
+                    patch.object(app_module, "cursor", fake_cursor),
+                    patch.object(app_module, "send_booking_decision_to_customer") as send_email,
+                ):
                     response = self.client.post(
                         f"/update_booking/1/{status}",
                         data={"csrf_token": token},
                     )
 
                 self.assertEqual(response.status_code, 302)
+                send_email.assert_called_once()
+                self.assertEqual(send_email.call_args.args[0]["customer_email"], "customer@test.example")
+                self.assertEqual(send_email.call_args.args[0]["status"], status)
                 ownership_query, ownership_params = fake_cursor.executed[0]
                 self.assertIn("INNER JOIN owners o", ownership_query)
                 self.assertIn("AND o.id = %s", ownership_query)
@@ -481,6 +501,25 @@ class SecurityTests(unittest.TestCase):
                 update_query, update_params = fake_cursor.executed[1]
                 self.assertIn("UPDATE bookings", update_query)
                 self.assertEqual(update_params, (status, 1))
+
+    def test_favicon_redirects_to_svg_asset(self):
+        response = self.client.get("/favicon.ico")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/static/favicon.svg")
+        favicon = self.client.get(response.location)
+        self.assertEqual(favicon.status_code, 200)
+        self.assertEqual(favicon.mimetype, "image/svg+xml")
+
+    def test_health_check_requires_database_connection(self):
+        with (
+            patch.object(app_module, "ensure_db_connection", return_value=None),
+            patch.object(app_module, "db", None),
+        ):
+            response = self.client.get("/healthz")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json, {"status": "unavailable"})
 
     def test_invalid_booking_date_is_rejected_server_side(self):
         fake_cursor = FakeCursor([

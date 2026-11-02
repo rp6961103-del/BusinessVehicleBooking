@@ -3,8 +3,8 @@ services:
     name: business-vehicle-booking
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
-    healthCheckPath: /
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
     envVars:
       - key: APP_ENV
         value: production
@@ -15,13 +15,7 @@ services:
       - key: TRUSTED_PROXY_HOPS
         value: "0"
       - key: MAIL_ENABLED
-        value: "false"
-      - key: EMAIL_PROVIDER
-        value: google_script
-      - key: GOOGLE_EMAIL_WEBHOOK_URL
-        sync: false
-      - key: GOOGLE_EMAIL_WEBHOOK_TOKEN
-        sync: false
+        value: "true"
       - key: SECRET_KEY
         sync: false
       - key: MYSQL_HOST
@@ -45,14 +39,16 @@ services:
       - key: GEMINI_TIMEOUT
         value: "30"
       - key: MAIL_SERVER
-        sync: false
+        value: smtp.gmail.com
       - key: MAIL_PORT
-        sync: false
+        value: "587"
       - key: MAIL_USE_TLS
-        sync: false
+        value: "true"
+      - key: MAIL_USE_SSL
+        value: "false"
       - key: MAIL_USERNAME
-        sync: false
+        value: ramprasadpujari343@gmail.com
       - key: MAIL_PASSWORD
         sync: false
       - key: MAIL_DEFAULT_SENDER
-        sync: false
+        value: BusinessVehicleBooking <ramprasadpujari343@gmail.com>

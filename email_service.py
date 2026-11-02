@@ -172,6 +172,49 @@ def send_new_booking_notification_to_owner(booking):
     )
 
 
+def send_booking_decision_to_customer(booking):
+    configuration = email_configuration_status()
+    if not configuration["enabled"]:
+        return False
+    if not configuration["configured"]:
+        logger.error("Booking decision email unavailable: %s", configuration["message"])
+        return False
+
+    recipient = booking.get("customer_email")
+    if not recipient:
+        logger.warning("Booking decision email skipped: customer email is missing")
+        return False
+
+    booking_id = booking.get("booking_id")
+    status = booking.get("status", "updated")
+    subject = (
+        f"BusinessVehicleBooking - Booking #{booking_id} {status}"
+        if booking_id
+        else f"BusinessVehicleBooking - Booking {status}"
+    )
+    try:
+        accepted = _send(
+            recipient,
+            subject,
+            "emails/booking_decision.txt",
+            {"booking": booking},
+            html_template_name="emails/booking_decision.html",
+        )
+    except Exception as error:
+        smtp_code = getattr(error, "smtp_code", None)
+        error_number = getattr(error, "errno", None)
+        logger.error(
+            "Booking decision email submission failed (%s, code=%s)",
+            type(error).__name__,
+            smtp_code or error_number or "unavailable",
+        )
+        return False
+
+    if not accepted:
+        logger.warning("Booking decision email was not accepted by the configured SMTP server")
+    return accepted
+
+
 def send_password_reset_email(recipient, reset_url, account_type):
     if not _enabled():
         return False

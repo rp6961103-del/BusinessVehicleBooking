@@ -11,6 +11,7 @@ Required in production:
 - `MYSQL_DATABASE`: production database name.
 - `MYSQL_USER`: least-privileged production database user.
 - `MYSQL_PASSWORD`: production database password.
+- `MYSQL_SSL_CA`: path to the Aiven CA certificate; the application verifies the server certificate and hostname when this is set.
 - `SESSION_COOKIE_SECURE=true`: required when serving over HTTPS.
 - `TRUSTED_PROXY_HOPS=0`: leave at zero unless a known reverse proxy is directly in front of the app. Set it to the exact trusted proxy hop count only after deployment topology is verified.
 - `MAIL_ENABLED=false`: keep disabled unless SMTP settings are configured.
@@ -18,7 +19,13 @@ Required in production:
 - `MAIL_USERNAME` and `MAIL_PASSWORD`: optional when the SMTP relay does not require authentication; configure both together when authentication is required. `MAIL_PASSWORD` is secret.
 - `PASSWORD_RESET_BASE_URL`: optional public HTTPS origin used in password-reset links, for example `https://your-service.onrender.com`. If unset, Render's `RENDER_EXTERNAL_URL` is used. In production, reset mail is not sent unless one of these resolves to a valid HTTPS origin.
 
-Email submission is independent from booking persistence. A successful SMTP submission means the SMTP server accepted the message, not that it reached the recipient's inbox. The booking confirmation page reports customer and owner submissions separately and shows missing SMTP setting names when configuration is incomplete.
+Email submission is independent from booking persistence. Customers receive a booking confirmation and a status message each time an owner accepts or rejects a booking; the application does not impose a notification count limit. SMTP providers may enforce their own quotas. A successful SMTP submission means the SMTP server accepted the message, not that it reached the recipient's inbox.
+
+The Render blueprint enables Gmail SMTP with STARTTLS. Enter a Google App Password in Render's `MAIL_PASSWORD` environment setting; never commit it. The sending account must have 2-Step Verification enabled.
+
+For Aiven MySQL, download the service CA certificate and add it to the Render service as a secret file. Set `MYSQL_SSL_CA` to that file's path (for example, `/etc/secrets/aiven-ca.pem`) along with the Aiven host, port, database, user, and password. Do not copy the CA certificate or database credentials into source code.
+
+Render's blueprint starts `gunicorn wsgi:app` and binds it to the assigned `$PORT`. Use the blueprint from the GitHub repository, enter the Aiven values and a generated `SECRET_KEY` in Render, and deploy. Flask serves the HTML frontend and backend from the same web service.
 
 Optional:
 

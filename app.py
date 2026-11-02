@@ -72,7 +72,6 @@ def validate_production_configuration():
         "MYSQL_DATABASE",
         "MYSQL_USER",
         "MYSQL_PASSWORD",
-        "MYSQL_SSL_CA",
         "SESSION_COOKIE_SECURE",
     )
     missing_variables = [
@@ -2554,7 +2553,8 @@ db_config = {
     "port": int(os.getenv("MYSQL_PORT") or "3306"),
     "user": os.getenv("MYSQL_USER") or "root",
     "password": os.getenv("MYSQL_PASSWORD"),
-    "database": os.getenv("MYSQL_DATABASE") or "vehicle_booking"
+    "database": os.getenv("MYSQL_DATABASE") or "vehicle_booking",
+    "ssl_disabled": False,
 }
 if os.getenv("MYSQL_SSL_CA", "").strip():
     db_config.update(

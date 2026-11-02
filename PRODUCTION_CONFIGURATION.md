@@ -11,7 +11,7 @@ Required in production:
 - `MYSQL_DATABASE`: production database name.
 - `MYSQL_USER`: least-privileged production database user.
 - `MYSQL_PASSWORD`: production database password.
-- `MYSQL_SSL_CA`: path to the Aiven CA certificate; the application verifies the server certificate and hostname when this is set.
+- `MYSQL_SSL_CA` (recommended): path to the Aiven CA certificate; the application verifies the server certificate and hostname when this is set. TLS encryption remains enabled when the CA file is not configured, but the server certificate is not verified.
 - `SESSION_COOKIE_SECURE=true`: required when serving over HTTPS.
 - `TRUSTED_PROXY_HOPS=0`: leave at zero unless a known reverse proxy is directly in front of the app. Set it to the exact trusted proxy hop count only after deployment topology is verified.
 - `MAIL_ENABLED=false`: keep disabled unless SMTP settings are configured.
@@ -23,7 +23,7 @@ Email submission is independent from booking persistence. Customers receive a bo
 
 The Render blueprint enables Gmail SMTP with STARTTLS. Enter a Google App Password in Render's `MAIL_PASSWORD` environment setting; never commit it. The sending account must have 2-Step Verification enabled.
 
-For Aiven MySQL, download the service CA certificate and add it to the Render service as a secret file. Set `MYSQL_SSL_CA` to that file's path (for example, `/etc/secrets/aiven-ca.pem`) along with the Aiven host, port, database, user, and password. Do not copy the CA certificate or database credentials into source code.
+For Aiven MySQL, download the service CA certificate and add it to the Render service as a secret file. Set `MYSQL_SSL_CA` to that file's path (for example, `/etc/secrets/aiven-ca.pem`) to verify the server certificate and hostname. TLS encryption is enabled even if the CA file is not configured, but certificate verification is strongly recommended. Do not copy the CA certificate or database credentials into source code.
 
 Render's blueprint starts `gunicorn wsgi:app` and binds it to the assigned `$PORT`. Use the blueprint from the GitHub repository, enter the Aiven values and a generated `SECRET_KEY` in Render, and deploy. Flask serves the HTML frontend and backend from the same web service.
 

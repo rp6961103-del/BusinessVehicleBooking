@@ -30,6 +30,20 @@ class SecurityTests(unittest.TestCase):
         app_module.app.config.update(TESTING=True)
         self.client = app_module.app.test_client()
 
+    def test_production_configuration_allows_tls_without_a_ca_file(self):
+        variables = {
+            "SECRET_KEY": "test-secret",
+            "MYSQL_HOST": "db.example",
+            "MYSQL_PORT": "3306",
+            "MYSQL_DATABASE": "booking",
+            "MYSQL_USER": "booking-user",
+            "MYSQL_PASSWORD": "test-password",
+            "SESSION_COOKIE_SECURE": "true",
+        }
+        with patch.object(app_module, "APP_ENV", "production"):
+            with patch.dict("os.environ", variables, clear=True):
+                app_module.validate_production_configuration()
+
     def csrf_token(self):
         response = self.client.get("/register")
         self.assertEqual(response.status_code, 200)

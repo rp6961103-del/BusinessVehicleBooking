@@ -53,6 +53,49 @@ CREATE TABLE IF NOT EXISTS admins (
 	UNIQUE KEY uq_admins_username (username)
 ) ENGINE = InnoDB;
 
+CREATE TABLE IF NOT EXISTS app_settings (
+	setting_key VARCHAR(100) NOT NULL,
+	setting_value TEXT NOT NULL,
+	updated_by INT UNSIGNED NULL,
+	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	PRIMARY KEY (setting_key),
+	KEY idx_app_settings_updated_by (updated_by),
+	CONSTRAINT fk_app_settings_admin
+		FOREIGN KEY (updated_by) REFERENCES admins (id)
+		ON UPDATE CASCADE
+		ON DELETE SET NULL
+) ENGINE = InnoDB;
+
+CREATE TABLE IF NOT EXISTS subscription_requests (
+	id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	request_id CHAR(36) NOT NULL,
+	owner_id INT UNSIGNED NOT NULL,
+	plan_code VARCHAR(20) NOT NULL,
+	amount DECIMAL(8, 2) NOT NULL,
+	duration_months SMALLINT UNSIGNED NOT NULL,
+	status VARCHAR(30) NOT NULL DEFAULT 'pending_verification',
+	payment_reference VARCHAR(100) NULL,
+	requested_at DATETIME NOT NULL,
+	starts_at DATETIME NULL,
+	expires_at DATETIME NULL,
+	verified_by INT UNSIGNED NULL,
+	verified_at DATETIME NULL,
+	verification_reason VARCHAR(500) NULL,
+	PRIMARY KEY (id),
+	UNIQUE KEY uq_subscription_requests_request_id (request_id),
+	UNIQUE KEY uq_subscription_requests_payment_reference (payment_reference),
+	KEY idx_subscription_requests_owner_status (owner_id, status, expires_at),
+	KEY idx_subscription_requests_status_requested (status, requested_at),
+	CONSTRAINT fk_subscription_requests_owner
+		FOREIGN KEY (owner_id) REFERENCES owners (id)
+		ON UPDATE CASCADE
+		ON DELETE RESTRICT,
+	CONSTRAINT fk_subscription_requests_admin
+		FOREIGN KEY (verified_by) REFERENCES admins (id)
+		ON UPDATE CASCADE
+		ON DELETE SET NULL
+) ENGINE = InnoDB;
+
 CREATE TABLE IF NOT EXISTS vehicles (
 	id INT UNSIGNED NOT NULL AUTO_INCREMENT,
 	vehicle_name VARCHAR(100) NOT NULL,

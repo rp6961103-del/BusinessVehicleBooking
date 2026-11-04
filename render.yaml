@@ -3,7 +3,7 @@ services:
     name: business-vehicle-booking
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    startCommand: python migrate_subscriptions.py && gunicorn wsgi:app --bind 0.0.0.0:$PORT
     healthCheckPath: /healthz
     envVars:
       - key: APP_ENV

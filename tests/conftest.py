@@ -85,6 +85,8 @@ def clear_test_data(connection):
         for table in (
             "password_reset_attempts",
             "password_reset_tokens",
+            "subscription_requests",
+            "app_settings",
             "bookings",
             "vehicle_routes",
             "vehicles",

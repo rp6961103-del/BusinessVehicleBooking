@@ -25,6 +25,9 @@
 		.admin-status-active { color: #1d5b38; background: #e4f4e9; }
 		.admin-status-inactive { color: #7e241e; background: #fbe8e6; }
 		.admin-action { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+		.admin-subscription-form { display: grid; gap: .35rem; min-width: 230px; white-space: normal; }
+		.admin-subscription-form textarea { min-height: 3rem; }
+		.admin-instructions { width: 100%; min-height: 7rem; }
 		@media (max-width: 640px) { .admin-shell { padding: 1rem; } .admin-nav form { margin-left: 0; } }
 	</style>
 </head>
@@ -37,6 +40,7 @@
 		<a href="{{ url_for('admin_owners') }}">Owners</a>
 		<a href="{{ url_for('admin_vehicles') }}">Vehicles</a>
 		<a href="{{ url_for('admin_bookings') }}">Bookings</a>
+		<a href="{{ url_for('admin_subscriptions') }}">Subscriptions</a>
 		<form method="POST" action="{{ url_for('admin_logout') }}">
 			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 			<button type="submit">Log out</button>
@@ -50,14 +54,48 @@
 
 	{% if page == "dashboard" %}
 		<h1>Admin Dashboard</h1>
-		<p>Signed in as {{ session["admin_username"] }}. This dashboard is read-only.</p>
+		<p>Signed in as {{ session["admin_username"] }}. Review platform activity and verify owner subscription payments.</p>
 		<section class="admin-grid" aria-label="Platform totals">
 			<div class="admin-card">Customers<strong>{{ total_customers }}</strong></div>
 			<div class="admin-card">Owners<strong>{{ total_owners }}</strong></div>
 			<div class="admin-card">Vehicles<strong>{{ total_vehicles }}</strong></div>
 			<div class="admin-card">Bookings<strong>{{ total_bookings }}</strong></div>
 			<div class="admin-card">Pending bookings<strong>{{ pending_bookings }}</strong></div>
+			<div class="admin-card">Pending subscription payments<strong>{{ pending_subscriptions }}</strong></div>
 			<div class="admin-card">Active vehicles<strong>{{ active_vehicles }}</strong></div>
+		</section>
+		<section class="admin-panel">
+			<h2>Pending subscription payment requests</h2>
+			<p>A transaction reference is not proof of receipt. Approve only after independently verifying payment.</p>
+			<table class="admin-table">
+				<thead><tr><th>Request ID</th><th>Owner</th><th>Plan</th><th>Amount</th><th>Payment reference</th><th>Requested</th><th>Verification</th></tr></thead>
+				<tbody>
+				{% for record in pending_subscription_requests %}
+					<tr>
+						<td>{{ record[1] }}</td>
+						<td>{{ record[2] }}<br><small>{{ record[3] }}</small></td>
+						<td>{{ record[4]|replace("_", " ")|title }}</td>
+						<td>{{ record[5]|inr }}</td>
+						<td>{{ record[6] or "Not submitted" }}</td>
+						<td>{{ record[7]|subscription_date }}</td>
+						<td>
+							<form class="admin-subscription-form" method="POST" action="{{ url_for('admin_verify_subscription', subscription_id=record[0]) }}">
+								<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+								<label><input type="checkbox" name="payment_received" value="yes"> I verified the payment was received</label>
+								<textarea name="reason" maxlength="500" placeholder="Optional verification/rejection reason"></textarea>
+								<div class="admin-action">
+									<button type="submit" name="decision" value="approve">Approve</button>
+									<button type="submit" name="decision" value="reject">Reject</button>
+								</div>
+							</form>
+						</td>
+					</tr>
+				{% else %}
+					<tr><td colspan="7">No pending subscription requests.</td></tr>
+				{% endfor %}
+				</tbody>
+			</table>
+			<p><a href="{{ url_for('admin_subscriptions') }}">Manage requests and payment instructions</a></p>
 		</section>
 		<section class="admin-panel">
 			<h2>Recent bookings</h2>
@@ -74,6 +112,53 @@
 		</section>
 	{% else %}
 		<h1>{{ page|capitalize }}</h1>
+		{% if page == "subscriptions" %}
+			<p>Review owner payment requests and manage the instructions shown to owners.</p>
+			<section class="admin-panel">
+				<h2>Payment instructions for owners</h2>
+				<p>Enter only instructions approved for sharing with vehicle owners. Do not enter credentials or account details that are not intended to be public.</p>
+				<form method="POST" action="{{ url_for('admin_subscription_payment_instructions') }}">
+					<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+					<textarea class="admin-instructions" name="payment_instructions" maxlength="2000" aria-label="Payment instructions" placeholder="No payment instructions are configured.">{{ payment_instructions or "" }}</textarea>
+					<p><button type="submit">Save payment instructions</button></p>
+				</form>
+			</section>
+			<section class="admin-panel">
+				<h2>Payment requests and subscription history</h2>
+				<p>Only requests awaiting verification can be processed. An approval requires the admin to confirm receipt; processed requests cannot be changed.</p>
+				<table class="admin-table">
+					<thead><tr><th>Request ID</th><th>Owner</th><th>Plan / Amount</th><th>Payment reference</th><th>Status</th><th>Period</th><th>Verified by / Reason</th><th>Action</th></tr></thead>
+					<tbody>
+					{% for record in records %}
+						<tr>
+							<td>{{ record[1] }}<br><small>Requested {{ record[9]|subscription_date }}</small></td>
+							<td>{{ record[2] }}<br><small>{{ record[3] }}</small></td>
+							<td>{{ record[4]|replace("_", " ")|title }} ({{ record[6] }} month{% if record[6] != 1 %}s{% endif %})<br>{{ record[5]|inr }}</td>
+							<td>{{ record[7] or "Not submitted" }}</td>
+							<td>{{ record[8]|replace("_", " ")|title }}</td>
+							<td>{% if record[10] %}{{ record[10]|subscription_date }} – {{ record[11]|subscription_date }}{% else %}—{% endif %}</td>
+							<td>{{ record[12] or "—" }}{% if record[13] %}<br>{{ record[13]|subscription_date }}{% endif %}{% if record[14] %}<br>{{ record[14] }}{% endif %}</td>
+							<td>
+								{% if record[8] == "pending_verification" %}
+									<form class="admin-subscription-form" method="POST" action="{{ url_for('admin_verify_subscription', subscription_id=record[0]) }}">
+										<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+										<label><input type="checkbox" name="payment_received" value="yes"> Payment received</label>
+										<textarea name="reason" maxlength="500" placeholder="Optional reason"></textarea>
+										<div class="admin-action">
+											<button type="submit" name="decision" value="approve">Approve</button>
+											<button type="submit" name="decision" value="reject">Reject</button>
+										</div>
+									</form>
+								{% else %}—{% endif %}
+							</td>
+						</tr>
+					{% else %}
+						<tr><td colspan="8">No subscription requests found.</td></tr>
+					{% endfor %}
+					</tbody>
+				</table>
+			</section>
+		{% else %}
 		<p>Read-only administrative view.</p>
 		<section class="admin-panel">
 			<form class="admin-filter" method="GET">
@@ -128,6 +213,7 @@
 				</tbody>
 			</table>
 		</section>
+		{% endif %}
 	{% endif %}
 </main>
 </body>

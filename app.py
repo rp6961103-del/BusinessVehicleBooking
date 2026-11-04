@@ -4,10 +4,12 @@ import secrets
 import logging
 import hashlib
 import hmac
+import calendar
 from urllib.parse import urlsplit
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from functools import wraps
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, session, flash, jsonify, url_for
@@ -42,6 +44,42 @@ LANGUAGE_NAMES = {
     "hi": "हिन्दी",
 }
 IST = timezone(timedelta(hours=5, minutes=30))
+SUBSCRIPTION_PLANS = (
+    {"code": "monthly", "name": "Monthly", "amount": Decimal("299.00"), "duration_months": 1},
+    {"code": "six_month", "name": "Six-month", "amount": Decimal("1499.00"), "duration_months": 6},
+    {"code": "annual", "name": "Annual", "amount": Decimal("2499.00"), "duration_months": 12},
+)
+SUBSCRIPTION_PLAN_BY_CODE = {plan["code"]: plan for plan in SUBSCRIPTION_PLANS}
+
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
+
+
+def add_subscription_months(value, months):
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
+def format_subscription_date(value):
+    if not value:
+        return "—"
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return "—"
+    if not isinstance(value, datetime):
+        return "—"
+    utc_value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return utc_value.astimezone(IST).strftime("%d %b %Y")
+
+
+def format_inr(value):
+    return f"₹{Decimal(value):,.0f}"
 
 
 def format_booking_created_at(value):
@@ -139,6 +177,8 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     SESSION_REFRESH_EACH_REQUEST=False,
 )
+app.jinja_env.filters["subscription_date"] = format_subscription_date
+app.jinja_env.filters["inr"] = format_inr
 
 trusted_proxy_hops = int(os.getenv("TRUSTED_PROXY_HOPS", "0"))
 if trusted_proxy_hops < 0:
@@ -2563,6 +2603,13 @@ if os.getenv("MYSQL_SSL_CA", "").strip():
         ssl_verify_identity=True,
     )
 
+
+def subscription_transaction_connection():
+    if app.config.get("TESTING") and db is not None:
+        return db, False
+    return mysql.connector.connect(**db_config), True
+
+
 def ensure_db_connection():
     """Ensure database and cursor are connected and healthy, auto-reconnecting if dropped."""
     global db, cursor
@@ -3334,6 +3381,10 @@ def admin_dashboard():
     pending_bookings = admin_count(
         "SELECT COUNT(*) FROM bookings WHERE LOWER(TRIM(status)) = 'pending'"
     )
+    pending_subscriptions = admin_count(
+        "SELECT COUNT(*) FROM subscription_requests "
+        "WHERE status = 'pending_verification'"
+    )
     active_vehicles = admin_count(
         "SELECT COUNT(*) FROM vehicles v "
         "INNER JOIN owners o ON o.id = v.owner_id "
@@ -3348,6 +3399,15 @@ def admin_dashboard():
         "ORDER BY b.id DESC LIMIT 10"
     )
     recent_bookings = cursor.fetchall()
+    cursor.execute(
+        "SELECT sr.id, sr.request_id, o.owner_name, o.email, sr.plan_code, "
+        "sr.amount, sr.payment_reference, sr.requested_at "
+        "FROM subscription_requests sr "
+        "INNER JOIN owners o ON o.id = sr.owner_id "
+        "WHERE sr.status = 'pending_verification' "
+        "ORDER BY sr.requested_at ASC, sr.id ASC"
+    )
+    pending_subscription_requests = cursor.fetchall()
 
     return render_template(
         "admin.html",
@@ -3357,8 +3417,10 @@ def admin_dashboard():
         total_vehicles=total_vehicles,
         total_bookings=total_bookings,
         pending_bookings=pending_bookings,
+        pending_subscriptions=pending_subscriptions,
         active_vehicles=active_vehicles,
         recent_bookings=recent_bookings,
+        pending_subscription_requests=pending_subscription_requests,
     )
 
 
@@ -3731,6 +3793,192 @@ def admin_bookings():
         status=status,
         records=cursor.fetchall(),
     )
+
+
+@app.route("/admin/subscriptions")
+@admin_required
+def admin_subscriptions():
+    cursor.execute(
+        "SELECT sr.id, sr.request_id, o.owner_name, o.email, sr.plan_code, "
+        "sr.amount, sr.duration_months, sr.payment_reference, sr.status, "
+        "sr.requested_at, sr.starts_at, sr.expires_at, a.username, "
+        "sr.verified_at, sr.verification_reason "
+        "FROM subscription_requests sr "
+        "INNER JOIN owners o ON o.id = sr.owner_id "
+        "LEFT JOIN admins a ON a.id = sr.verified_by "
+        "ORDER BY CASE WHEN sr.status = 'pending_verification' THEN 0 ELSE 1 END, "
+        "sr.requested_at DESC, sr.id DESC"
+    )
+    records = cursor.fetchall()
+    cursor.execute(
+        "SELECT setting_value FROM app_settings "
+        "WHERE setting_key = 'subscription_payment_instructions'"
+    )
+    setting = cursor.fetchone()
+    return render_template(
+        "admin.html",
+        page="subscriptions",
+        records=records,
+        payment_instructions=setting[0] if setting else "",
+    )
+
+
+@app.route("/admin/subscriptions/payment-instructions", methods=["POST"])
+@admin_required
+def admin_subscription_payment_instructions():
+    instructions = (request.form.get("payment_instructions") or "").strip()
+    if len(instructions) > 2000:
+        flash("Payment instructions must be 2,000 characters or fewer.", "error")
+        return redirect(url_for("admin_subscriptions"))
+
+    connection = None
+    close_connection = False
+    try:
+        connection, close_connection = subscription_transaction_connection()
+        if connection is None:
+            raise Error("Database connection is unavailable")
+        settings_cursor = connection.cursor()
+        try:
+            settings_cursor.execute(
+                "INSERT INTO app_settings (setting_key, setting_value, updated_by) "
+                "VALUES ('subscription_payment_instructions', %s, %s) "
+                "ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), "
+                "updated_by = VALUES(updated_by)",
+                (instructions, session["admin_id"]),
+            )
+            connection.commit()
+        finally:
+            settings_cursor.close()
+    except Error as error:
+        if connection is not None:
+            connection.rollback()
+        logger.error(
+            "Subscription payment instruction update failed: %s (errno=%s)",
+            type(error).__name__,
+            getattr(error, "errno", None),
+        )
+        flash("Payment instructions could not be saved.", "error")
+    else:
+        flash("Payment instructions saved.", "success")
+    finally:
+        if close_connection and connection is not None:
+            connection.close()
+    return redirect(url_for("admin_subscriptions"))
+
+
+@app.route("/admin/subscriptions/<int:subscription_id>/verify", methods=["POST"])
+@admin_required
+def admin_verify_subscription(subscription_id):
+    decision = (request.form.get("decision") or "").strip().lower()
+    reason = (request.form.get("reason") or "").strip()
+    if decision not in {"approve", "reject"} or len(reason) > 500:
+        return "Invalid subscription verification details", 400
+    if decision == "approve" and request.form.get("payment_received") != "yes":
+        flash("Confirm that payment was received before approving.", "error")
+        return redirect(url_for("admin_subscriptions"))
+
+    connection = None
+    close_connection = False
+    try:
+        connection, close_connection = subscription_transaction_connection()
+        if connection is None:
+            raise Error("Database connection is unavailable")
+        verification_cursor = connection.cursor()
+        try:
+            verification_cursor.execute(
+                "SELECT owner_id, duration_months, status, payment_reference "
+                "FROM subscription_requests WHERE id = %s FOR UPDATE",
+                (subscription_id,),
+            )
+            subscription = verification_cursor.fetchone()
+            if subscription is None:
+                connection.rollback()
+                flash("Subscription request was not found.", "error")
+                return redirect(url_for("admin_subscriptions"))
+
+            owner_id, duration_months, current_status, payment_reference = subscription
+            if current_status != "pending_verification":
+                connection.rollback()
+                flash("This subscription request has already been processed.", "error")
+                return redirect(url_for("admin_subscriptions"))
+            if decision == "approve" and not payment_reference:
+                connection.rollback()
+                flash("The owner must submit a payment reference before approval.", "error")
+                return redirect(url_for("admin_subscriptions"))
+
+            verified_at = utc_now()
+            if decision == "approve":
+                verification_cursor.execute(
+                    "SELECT id FROM owners WHERE id = %s FOR UPDATE",
+                    (owner_id,),
+                )
+                if verification_cursor.fetchone() is None:
+                    connection.rollback()
+                    flash("The owner account was not found.", "error")
+                    return redirect(url_for("admin_subscriptions"))
+                verification_cursor.execute(
+                    "SELECT MAX(expires_at) FROM subscription_requests "
+                    "WHERE owner_id = %s AND status = 'approved' AND expires_at > %s",
+                    (owner_id, verified_at),
+                )
+                previous_expiry = verification_cursor.fetchone()[0]
+                starts_at = max(verified_at, previous_expiry) if previous_expiry else verified_at
+                expires_at = add_subscription_months(starts_at, int(duration_months))
+                verification_cursor.execute(
+                    "UPDATE subscription_requests SET status = 'approved', "
+                    "starts_at = %s, expires_at = %s, verified_by = %s, "
+                    "verified_at = %s, verification_reason = %s "
+                    "WHERE id = %s AND status = 'pending_verification' "
+                    "AND payment_reference IS NOT NULL",
+                    (
+                        starts_at,
+                        expires_at,
+                        session["admin_id"],
+                        verified_at,
+                        reason or None,
+                        subscription_id,
+                    ),
+                )
+            else:
+                verification_cursor.execute(
+                    "UPDATE subscription_requests SET status = 'rejected', "
+                    "verified_by = %s, verified_at = %s, verification_reason = %s "
+                    "WHERE id = %s AND status = 'pending_verification'",
+                    (
+                        session["admin_id"],
+                        verified_at,
+                        reason or None,
+                        subscription_id,
+                    ),
+                )
+
+            if verification_cursor.rowcount != 1:
+                connection.rollback()
+                flash("This subscription request has already been processed.", "error")
+                return redirect(url_for("admin_subscriptions"))
+            connection.commit()
+        finally:
+            verification_cursor.close()
+    except Error as error:
+        if connection is not None:
+            connection.rollback()
+        logger.error(
+            "Subscription verification failed: %s (errno=%s)",
+            type(error).__name__,
+            getattr(error, "errno", None),
+        )
+        flash("Subscription verification could not be completed.", "error")
+    else:
+        flash(
+            "Subscription payment approved and premium activated."
+            if decision == "approve"
+            else "Subscription request rejected.",
+            "success",
+        )
+    finally:
+        if close_connection and connection is not None:
+            connection.close()
+    return redirect(url_for("admin_subscriptions"))
 
 
 def admin_status_value(value):
@@ -4799,6 +5047,226 @@ def rate_booking(booking_id):
     return render_template("rate_booking.html", booking=booking)
 
 
+def load_owner_subscription_context(owner_id):
+    cursor.execute(
+        "SELECT id, request_id, plan_code, amount, duration_months, status, "
+        "payment_reference, requested_at, starts_at, expires_at, verified_at, "
+        "verification_reason FROM subscription_requests WHERE owner_id = %s "
+        "ORDER BY requested_at DESC, id DESC",
+        (owner_id,),
+    )
+    rows = cursor.fetchall()
+    now = utc_now()
+    history = []
+    active_subscription = None
+    has_pending_request = False
+
+    for row in rows:
+        (
+            subscription_id, request_id, plan_code, amount, duration_months,
+            status, payment_reference, requested_at, starts_at, expires_at,
+            verified_at, verification_reason,
+        ) = row
+        display_status = status.replace("_", " ").title()
+        if status == "pending_verification":
+            has_pending_request = True
+        elif status == "approved":
+            if starts_at and expires_at and starts_at <= now < expires_at:
+                display_status = "Active"
+                if active_subscription is None or expires_at > active_subscription["expires_at"]:
+                    active_subscription = {
+                        "plan_name": SUBSCRIPTION_PLAN_BY_CODE.get(
+                            plan_code, {"name": plan_code}
+                        )["name"],
+                        "starts_at": starts_at,
+                        "expires_at": expires_at,
+                    }
+            elif expires_at and expires_at <= now:
+                display_status = "Expired"
+            else:
+                display_status = "Scheduled"
+        history.append(
+            {
+                "id": subscription_id,
+                "request_id": request_id,
+                "plan_name": SUBSCRIPTION_PLAN_BY_CODE.get(
+                    plan_code, {"name": plan_code}
+                )["name"],
+                "amount": amount,
+                "duration_months": duration_months,
+                "status": display_status,
+                "payment_reference": payment_reference,
+                "requested_at": requested_at,
+                "starts_at": starts_at,
+                "expires_at": expires_at,
+                "verified_at": verified_at,
+                "verification_reason": verification_reason,
+            }
+        )
+
+    cursor.execute(
+        "SELECT setting_value FROM app_settings "
+        "WHERE setting_key = 'subscription_payment_instructions'"
+    )
+    setting = cursor.fetchone()
+    has_approved_subscription = any(
+        item["status"] in {"Active", "Expired", "Scheduled"} for item in history
+    )
+    subscription_status = (
+        "Active"
+        if active_subscription
+        else "Pending verification"
+        if has_pending_request
+        else next(
+            (
+                item["status"] for item in history
+                if item["status"] in {"Expired", "Scheduled"}
+            ),
+            history[0]["status"] if history else "Not subscribed",
+        )
+    )
+    return {
+        "subscription_history": history,
+        "active_subscription": active_subscription,
+        "has_pending_subscription_request": has_pending_request,
+        "has_approved_subscription": has_approved_subscription,
+        "subscription_status": subscription_status,
+        "subscription_payment_instructions": setting[0] if setting else "",
+    }
+
+
+@app.route("/owner/subscriptions/request", methods=["POST"])
+@login_required("owner")
+def owner_request_subscription():
+    plan = SUBSCRIPTION_PLAN_BY_CODE.get(
+        (request.form.get("plan_code") or "").strip()
+    )
+    if plan is None:
+        return "Invalid subscription plan", 400
+
+    connection = None
+    close_connection = False
+    try:
+        connection, close_connection = subscription_transaction_connection()
+        if connection is None:
+            raise Error("Database connection is unavailable")
+        request_cursor = connection.cursor()
+        try:
+            request_cursor.execute(
+                "SELECT id FROM owners WHERE id = %s FOR UPDATE",
+                (session["owner_id"],),
+            )
+            if request_cursor.fetchone() is None:
+                connection.rollback()
+                return "Owner account was not found", 404
+            request_cursor.execute(
+                "SELECT id FROM subscription_requests "
+                "WHERE owner_id = %s AND status = 'pending_verification' LIMIT 1",
+                (session["owner_id"],),
+            )
+            if request_cursor.fetchone() is not None:
+                connection.rollback()
+                flash(
+                    "Submit the payment reference for your pending request before choosing another plan.",
+                    "error",
+                )
+                return redirect(url_for("owner_dashboard"))
+            request_cursor.execute(
+                "INSERT INTO subscription_requests "
+                "(request_id, owner_id, plan_code, amount, duration_months, status, requested_at) "
+                "VALUES (%s, %s, %s, %s, %s, 'pending_verification', %s)",
+                (
+                    str(uuid4()), session["owner_id"], plan["code"], plan["amount"],
+                    plan["duration_months"], utc_now(),
+                ),
+            )
+            connection.commit()
+        finally:
+            request_cursor.close()
+    except Error as error:
+        if connection is not None:
+            connection.rollback()
+        logger.error(
+            "Owner subscription request failed for owner_id=%s: %s (errno=%s)",
+            session["owner_id"], type(error).__name__, getattr(error, "errno", None),
+        )
+        flash("The subscription request could not be created.", "error")
+    finally:
+        if close_connection and connection is not None:
+            connection.close()
+    return redirect(url_for("owner_dashboard"))
+
+
+@app.route(
+    "/owner/subscriptions/<int:subscription_id>/payment-reference",
+    methods=["POST"],
+)
+@login_required("owner")
+def owner_submit_payment_reference(subscription_id):
+    payment_reference = (request.form.get("payment_reference") or "").strip()
+    if (
+        not payment_reference
+        or len(payment_reference) > 100
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,99}", payment_reference) is None
+    ):
+        return "Enter a valid payment reference or transaction ID", 400
+
+    connection = None
+    close_connection = False
+    try:
+        connection, close_connection = subscription_transaction_connection()
+        if connection is None:
+            raise Error("Database connection is unavailable")
+        reference_cursor = connection.cursor()
+        try:
+            reference_cursor.execute(
+                "UPDATE subscription_requests SET payment_reference = %s "
+                "WHERE id = %s AND owner_id = %s "
+                "AND status = 'pending_verification' AND payment_reference IS NULL",
+                (payment_reference, subscription_id, session["owner_id"]),
+            )
+            if reference_cursor.rowcount != 1:
+                connection.rollback()
+                reference_cursor.execute(
+                    "SELECT status, payment_reference FROM subscription_requests "
+                    "WHERE id = %s AND owner_id = %s",
+                    (subscription_id, session["owner_id"]),
+                )
+                if reference_cursor.fetchone() is None:
+                    return "Subscription request was not found", 404
+                flash(
+                    "This request has already received a payment reference or was processed.",
+                    "error",
+                )
+                return redirect(url_for("owner_dashboard"))
+            connection.commit()
+        finally:
+            reference_cursor.close()
+    except mysql.connector.IntegrityError as error:
+        if connection is not None:
+            connection.rollback()
+        if getattr(error, "errno", None) == 1062:
+            flash("That payment reference is already associated with another request.", "error")
+        else:
+            logger.error(
+                "Payment reference save failed for owner_id=%s: %s (errno=%s)",
+                session["owner_id"], type(error).__name__, getattr(error, "errno", None),
+            )
+            flash("The payment reference could not be saved.", "error")
+    except Error as error:
+        if connection is not None:
+            connection.rollback()
+        logger.error(
+            "Payment reference save failed for owner_id=%s: %s (errno=%s)",
+            session["owner_id"], type(error).__name__, getattr(error, "errno", None),
+        )
+        flash("The payment reference could not be saved.", "error")
+    finally:
+        if close_connection and connection is not None:
+            connection.close()
+    return redirect(url_for("owner_dashboard"))
+
+
 # =========================================================
 # OWNER DASHBOARD
 # =========================================================
@@ -5013,6 +5481,28 @@ def owner_dashboard():
         vehicle_count = 0
         active_vehicles = 0
 
+    subscription_context = {
+        "subscription_history": [],
+        "active_subscription": None,
+        "has_pending_subscription_request": False,
+        "has_approved_subscription": False,
+        "subscription_status": "Not subscribed",
+        "subscription_payment_instructions": "",
+    }
+    try:
+        if cursor is None:
+            raise Error("Database cursor is unavailable")
+        subscription_context = load_owner_subscription_context(owner_id)
+    except Error as error:
+        logger.error(
+            "Subscription details could not be loaded for owner_id=%s: %s (errno=%s)",
+            owner_id, type(error).__name__, getattr(error, "errno", None),
+        )
+        flash(
+            "Premium subscription details are unavailable. If this is an existing installation, run migrate_subscriptions.py.",
+            "error",
+        )
+
     # =====================================================
     # SEND DATA TO OWNER DASHBOARD
     # =====================================================
@@ -5026,6 +5516,8 @@ def owner_dashboard():
         rejected_bookings=rejected_bookings,
         vehicle_count=vehicle_count,
         active_vehicles=active_vehicles,
+        subscription_plans=SUBSCRIPTION_PLANS,
+        **subscription_context,
     )
 # =========================================================
 # UPDATE BOOKING STATUS

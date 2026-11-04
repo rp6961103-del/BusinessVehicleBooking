@@ -278,6 +278,40 @@
             color: #dc3545;
         }
 
+        .subscription-panel {
+            background: white;
+            border: 1px solid #e3e7ea;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 18px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .subscription-plans {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
+            margin: 14px 0;
+        }
+
+        .subscription-plan {
+            border: 1px solid #dce2e7;
+            border-radius: 7px;
+            padding: 14px;
+        }
+
+        .subscription-plan h3 { margin: 0 0 8px; color: #1f4e79; }
+        .subscription-plan strong { font-size: 20px; }
+        .subscription-panel form { margin-top: 8px; }
+        .subscription-panel input,
+        .subscription-panel button { padding: 8px; }
+        .subscription-history { width: 100%; border-collapse: collapse; min-width: 700px; }
+        .subscription-history th,
+        .subscription-history td { padding: 9px; border-bottom: 1px solid #eee; text-align: left; }
+        .subscription-history-wrapper { overflow-x: auto; }
+        .payment-instructions { white-space: pre-wrap; overflow-wrap: anywhere; }
+        .subscription-notice { padding: 10px; background: #fff8df; border-left: 4px solid #d88900; }
+
 
         /* =================================================
            BOOKINGS SECTION
@@ -735,6 +769,80 @@
 
 
     </div>
+
+    <section class="subscription-panel" aria-labelledby="subscription-heading">
+        <h2 id="subscription-heading">Owner Premium Subscription</h2>
+        <p>Status: <strong>{{ subscription_status }}</strong></p>
+        {% if active_subscription %}
+            <p>
+                Current plan: {{ active_subscription.plan_name }}.
+                Start date: {{ active_subscription.starts_at|subscription_date }}.
+                Expiry date: {{ active_subscription.expires_at|subscription_date }}.
+            </p>
+        {% endif %}
+        <p class="subscription-notice">
+            Premium-only platform features have not been designated yet. Your existing basic account, vehicle, booking, and other features remain available regardless of subscription status.
+        </p>
+        <p><strong>Manual payment verification:</strong> payment references are not proof of receipt. Premium activates only after an administrator verifies the payment.</p>
+        <h3>Payment instructions</h3>
+        {% if subscription_payment_instructions %}
+            <div class="payment-instructions">{{ subscription_payment_instructions }}</div>
+        {% else %}
+            <p class="subscription-notice">Payment instructions are not configured. Do not make a payment until the platform administrator provides verified instructions.</p>
+        {% endif %}
+        <h3>Plans</h3>
+        <div class="subscription-plans">
+            {% for plan in subscription_plans %}
+                <article class="subscription-plan">
+                    <h3>{{ plan.name }}</h3>
+                    <p><strong>{{ plan.amount|inr }}</strong></p>
+                    <p>{{ plan.duration_months }} month{% if plan.duration_months != 1 %}s{% endif %}</p>
+                    <p>Features: premium feature access is not yet designated; this plan records your verified premium term.</p>
+                    {% if has_pending_subscription_request %}
+                        <button type="button" disabled>Complete pending payment request first</button>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('owner_request_subscription') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="plan_code" value="{{ plan.code }}">
+                            <button type="submit">{% if has_approved_subscription %}Renew with this plan{% else %}Choose this plan{% endif %}</button>
+                        </form>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+        <h3>Subscription history</h3>
+        <div class="subscription-history-wrapper">
+            <table class="subscription-history">
+                <thead><tr><th>Request ID</th><th>Plan</th><th>Amount</th><th>Status</th><th>Start</th><th>Expiry</th><th>Payment reference</th><th>Admin note</th></tr></thead>
+                <tbody>
+                {% for item in subscription_history %}
+                    <tr>
+                        <td>{{ item.request_id }}</td>
+                        <td>{{ item.plan_name }} ({{ item.duration_months }} month{% if item.duration_months != 1 %}s{% endif %})</td>
+                        <td>{{ item.amount|inr }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>{{ item.starts_at|subscription_date }}</td>
+                        <td>{{ item.expires_at|subscription_date }}</td>
+                        <td>
+                            {% if item.payment_reference %}{{ item.payment_reference }}
+                            {% elif item.status == "Pending Verification" %}
+                                <form method="POST" action="{{ url_for('owner_submit_payment_reference', subscription_id=item.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <label for="payment-reference-{{ item.id }}">Transaction ID</label>
+                                    <input id="payment-reference-{{ item.id }}" name="payment_reference" type="text" maxlength="100" required>
+                                    <button type="submit">Submit reference</button>
+                                </form>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ item.verification_reason or "—" }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8">No subscription history yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
 
 

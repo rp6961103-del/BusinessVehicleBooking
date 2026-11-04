@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Owner — Live GPS Broadcaster</title>
+    <!-- Core App CSS & Dedicated Tracking CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='live_tracking.css') }}">
+    <!-- Leaflet.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+</head>
+<body>
+
+<div class="tracking-page-container">
+
+    <!-- Header Navigation -->
+    <header class="tracking-header-bar">
+        <div class="tracking-title-group">
+            <h1>📡 Vehicle Owner Live GPS Broadcaster</h1>
+            <p class="tracking-subtitle">
+                {% if is_authenticated %}
+                    Broadcasting as: <strong>{{ owner_name }}</strong> (Owner #{{ owner_id }})
+                {% else %}
+                    Live location sharing portal for vehicle owners
+                {% endif %}
+            </p>
+        </div>
+        <div class="tracking-nav-links">
+            <a href="/live-tracking/" class="track-btn-secondary">🛰️ Tracking Hub</a>
+            {% if is_authenticated %}
+                <a href="/owner_dashboard" class="track-btn-secondary">📊 Owner Dashboard</a>
+            {% else %}
+                <a href="/ownerlogin" class="track-btn-secondary">🔐 Owner Login</a>
+            {% endif %}
+            <a href="/" class="track-btn-secondary">🏠 Home</a>
+        </div>
+    </header>
+
+    {% if not is_authenticated %}
+        <!-- Unauthenticated Prompt -->
+        <div class="track-card" style="text-align: center; max-width: 540px; margin: 40px auto; padding: 36px 24px;">
+            <div style="font-size: 3rem; margin-bottom: 12px;">🔐</div>
+            <h2 style="margin-bottom: 8px; color: var(--track-text);">Owner Login Required</h2>
+            <p style="color: var(--track-muted); font-size: 0.95rem; margin-bottom: 24px;">
+                You must be logged in as an active vehicle owner to broadcast your vehicle's live GPS coordinates.
+            </p>
+            <a href="/ownerlogin" class="btn-track-start" style="text-decoration: none; justify-content: center;">
+                Log In to Owner Account
+            </a>
+            <div style="margin-top: 16px;">
+                <a href="/live-tracking/" style="color: var(--track-primary); font-size: 0.9rem;">Back to Tracking Hub</a>
+            </div>
+        </div>
+    {% else %}
+
+        <!-- Main Tracking Workspace -->
+        <div class="tracking-grid">
+
+            <!-- Left: Interactive Leaflet Map -->
+            <div class="tracking-map-card">
+                <!-- Map Toolbar -->
+                <div class="map-toolbar">
+                    <div id="statusPill" class="map-status-pill pill-stopped">
+                        <span id="statusDot" class="pulsing-dot dot-stopped"></span>
+                        <span id="statusText">TRACKING OFFLINE</span>
+                    </div>
+                    <div class="map-actions">
+                        <button type="button" id="btnToggleFollow" class="map-btn-icon btn-follow-active" title="Toggle camera following your vehicle position">
+                            <span id="followIndicator">🟢</span> <span id="followText">Following (Click to Stop)</span>
+                        </button>
+                        <button type="button" id="btnRecenterMap" class="map-btn-icon" title="Center map on your vehicle position">
+                            🎯 Center Vehicle
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Alert / Guidance Banner Over Map -->
+                <div id="alertBanner" class="map-alert-banner" style="display: none;">
+                    <span style="font-size: 1.2rem;">⚠️</span>
+                    <p id="alertMessage"></p>
+                </div>
+
+                <!-- Leaflet Canvas -->
+                <div class="map-canvas-container">
+                    <div id="trackingMap"></div>
+                </div>
+
+                <!-- Live Telemetry Readout -->
+                <div class="telemetry-bar">
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">Latitude</span>
+                        <span id="telemetryLat" class="telemetry-value">--.-----</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">Longitude</span>
+                        <span id="telemetryLng" class="telemetry-value">--.-----</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">GPS Accuracy</span>
+                        <span id="telemetryAccuracy" class="telemetry-value">-- m</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">Est. Speed</span>
+                        <span id="telemetrySpeed" class="telemetry-value">0 km/h</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">GPS Updates</span>
+                        <span id="telemetryUpdates" class="telemetry-value">0</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-label">Last Sent</span>
+                        <span id="telemetryLastSent" class="telemetry-value">--:--:--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Broadcaster Controls Panel -->
+            <div class="tracking-sidebar">
+
+                <!-- Vehicle & Trip Selector Card -->
+                <div class="track-card">
+                    <div class="track-card-header">
+                        <h3>⚙️ Broadcaster Setup</h3>
+                    </div>
+
+                    {% if vehicles %}
+                        <div class="track-form-group">
+                            <label for="vehicleSelect">Select Vehicle *</label>
+                            <select id="vehicleSelect" class="track-select">
+                                {% for v in vehicles %}
+                                    <option value="{{ v.id }}">
+                                        {{ v.vehicle_name }} ({{ v.vehicle_type }}) — #{{ v.id }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="track-form-group">
+                            <label for="bookingSelect">Link to Active Booking (Optional)</label>
+                            <select id="bookingSelect" class="track-select">
+                                <option value="">-- General Trip (No Booking) --</option>
+                                {% for b in bookings %}
+                                    <option value="{{ b.booking_id }}" data-vehicle-id="{{ b.vehicle_id }}">
+                                        Booking #{{ b.booking_id }} — {{ b.customer_name }} ({{ b.booking_date }})
+                                        {% if b.from_location %} [{{ b.from_location }} ➔ {{ b.to_location }}]{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="track-form-group">
+                            <label for="regNumberInput">Vehicle Registration Number</label>
+                            <input type="text" id="regNumberInput" class="track-input" placeholder="e.g. AP 02 AB 1234" maxlength="40">
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div style="margin-top: 20px;">
+                            <button type="button" id="btnStartTracking" class="btn-track-start">
+                                🛰️ Start Live Tracking
+                            </button>
+                            <button type="button" id="btnStopTracking" class="btn-track-stop" style="display: none;">
+                                ⏹️ Stop Live Tracking
+                            </button>
+                        </div>
+
+                        <!-- Shareable Customer Link Container -->
+                        <div id="shareLinkBox" class="share-link-box" style="display: none;">
+                            <div style="font-size: 0.85rem; font-weight: 700; color: var(--track-primary);">
+                                🔗 Share Live Tracking Link with Customer:
+                            </div>
+                            <div class="share-link-input-group">
+                                <input type="text" id="shareLinkInput" class="share-link-input" readonly>
+                                <button type="button" id="btnCopyLink" class="btn-copy">Copy Link</button>
+                            </div>
+                            <div style="font-size: 0.78rem; color: var(--track-muted); margin-top: 6px;">
+                                Anyone with this link can view the vehicle's live position in real time.
+                            </div>
+                        </div>
+
+                    {% else %}
+                        <div style="text-align: center; padding: 20px 0;">
+                            <p style="color: var(--track-muted); font-size: 0.92rem; margin-bottom: 14px;">
+                                You have not registered any vehicles yet.
+                            </p>
+                            <a href="/add_vehicle" class="track-btn-secondary">➕ Add a Vehicle</a>
+                        </div>
+                    {% endif %}
+
+                </div>
+
+                <!-- GPS & Device Status Card -->
+                <div class="track-card">
+                    <div class="track-card-header">
+                        <h3>📡 GPS & Device Security</h3>
+                    </div>
+                    <div class="track-detail-list">
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">GPS Permission:</span>
+                            <span id="valGpsPermission" class="track-detail-value" style="font-weight: 700; color: var(--track-primary);">
+                                Checking...
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Context Security:</span>
+                            <span id="valSecureContext" class="track-detail-value">
+                                Checking...
+                            </span>
+                        </div>
+                        <div class="track-detail-row">
+                            <span class="track-detail-label">Satellite Lock:</span>
+                            <span id="valGpsLock" class="track-detail-value">
+                                Offline
+                            </span>
+                        </div>
+                    </div>
+                    <div id="insecureContextAlert" style="display: none; margin-top: 12px; padding: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 0.8rem; color: #92400e; line-height: 1.4;">
+                        <strong>⚠️ Insecure Context Detected (HTTP Remote IP):</strong><br>
+                        Mobile browsers require HTTPS to grant GPS access. On mobile, either use localhost development on your computer or refer to the HTTPS setup instructions.
+                    </div>
+                </div>
+
+                <!-- GPS Instructions Card -->
+                <div class="track-card">
+                    <div class="track-card-header">
+                        <h3>📱 How It Works</h3>
+                    </div>
+                    <ol style="font-size: 0.86rem; color: var(--track-muted); padding-left: 20px; line-height: 1.6;">
+                        <li>Select your vehicle and optional booking above.</li>
+                        <li>Click <strong>Start Live Tracking</strong>.</li>
+                        <li>Tap <strong>Allow</strong> when your mobile browser prompts for GPS location access.</li>
+                        <li>Keep this browser tab open while driving to broadcast continuous real-time updates.</li>
+                        <li>Click <strong>Stop Live Tracking</strong> once your trip is completed.</li>
+                    </ol>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Hidden Data Element for Resuming Server Session -->
+        {% if active_session %}
+            <div id="serverActiveSession" data-session='{{ active_session | tojson | safe }}' style="display: none;"></div>
+        {% endif %}
+
+    {% endif %}
+
+</div>
+
+<!-- Notification Toast -->
+<div id="trackingToast" class="tracking-toast"></div>
+
+<!-- Leaflet.js JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Dedicated Owner Broadcaster Script -->
+<script src="{{ url_for('static', filename='owner_tracking.js') }}"></script>
+
+</body>
+</html>

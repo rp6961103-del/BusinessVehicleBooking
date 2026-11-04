@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+{% if current_language == 'en' %}
+<html lang="en">
+{% else %}
+<html lang="{{ current_language }}">
+{% endif %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#146b5b">
+    <title>Live Location — Booking #{{ booking_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='live_tracking.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='customer_tracking_fullscreen.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'">
+    <style>
+        html, body.fullscreen-tracking-page { width: 100%; height: 100%; min-height: 100%; margin: 0; overflow: hidden; }
+        .fullscreen-tracking-shell, .fullscreen-map { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; }
+        .fullscreen-map { z-index: 0; min-height: 100vh; min-height: 100dvh; background: #e8eeec; }
+    </style>
+</head>
+<body class="fullscreen-tracking-page">
+    {% if error_message %}
+        <main class="fullscreen-tracking-error" role="alert">
+            <h1>Live location unavailable</h1>
+            <p>{{ error_message }}</p>
+            <a class="fullscreen-control" href="/mybookings">← Back to My Bookings</a>
+        </main>
+    {% else %}
+        <main class="fullscreen-tracking-shell" aria-label="Live vehicle location">
+            <div class="fullscreen-map" id="trackingMap" aria-label="Map showing the vehicle's latest reported location"></div>
+            <div class="fullscreen-map-load-status" id="mapLoadStatus" role="status" aria-live="polite">
+                Loading interactive map…
+            </div>
+            <div class="fullscreen-overlay">
+                <a class="fullscreen-control" href="/mybookings">← Back to My Bookings</a>
+                <div class="fullscreen-booking-label">
+                    <strong>Booking #{{ booking_id }}</strong>
+                    <span id="valVehicleName">{{ initial_data.vehicle.name or 'Vehicle' }}</span>
+                    <span id="valRegNumber">{{ initial_data.vehicle.registration_number or 'Vehicle number unavailable' }}</span>
+                    <span>Booking status: <b id="valBookingStatus">{{ initial_data.booking.status or 'Unavailable' }}</b></span>
+                    <div id="fullscreenRoute">
+                        <span>Pickup: <b id="valPickup">{{ initial_data.booking.pickup or 'Not specified' }}</b></span>
+                        <span>Destination: <b id="valDestination">{{ initial_data.booking.destination or 'Not specified' }}</b></span>
+                    </div>
+                </div>
+                <div class="fullscreen-status-card" aria-live="polite">
+                    <div id="statusPill" class="map-status-pill pill-waiting">
+                        <span id="statusDot" class="pulsing-dot dot-waiting"></span>
+                        <span id="statusText">
+                            {% if initial_data.tracking_state == 'NOT_STARTED' %}
+                                WAITING FOR DRIVER LOCATION
+                            {% elif initial_data.tracking_state == 'STOPPED' %}
+                                TRIP ENDED / STOPPED
+                            {% elif initial_data.tracking_state == 'LIVE' %}
+                                LIVE • ON TRIP
+                            {% elif initial_data.tracking_state == 'OUTDATED' %}
+                                LOCATION OUTDATED
+                            {% else %}
+                                WAITING FOR DRIVER LOCATION
+                            {% endif %}
+                        </span>
+                    </div>
+                    <p id="telemetryLastUpdated">
+                        {% if initial_data.last_updated %}
+                            Last updated: {{ initial_data.last_updated }}
+                        {% else %}
+                            Waiting for driver location.
+                        {% endif %}
+                    </p>
+                    <p>Latest vehicle GPS: <span id="telemetryCoords">
+                        {% if initial_data.location %}
+                            {{ "%.6f"|format(initial_data.location.latitude) }}, {{ "%.6f"|format(initial_data.location.longitude) }}
+                        {% else %}
+                            Waiting for driver location.
+                        {% endif %}
+                    </span></p>
+                    <p><strong id="routeDistanceLabel">Booked road distance</strong>: <strong id="valRemainingDistance">Route distance temporarily unavailable</strong></p>
+                    <p>Estimated driving time: <strong id="valEstDuration">--</strong></p>
+                    <p id="routeMessage" role="status"></p>
+                    <p id="routeBasis" hidden>The vehicle marker is the last reported position; the booked route is unchanged.</p>
+                </div>
+            </div>
+            <div class="fullscreen-controls">
+                <button type="button" class="fullscreen-control" id="btnRecenterMap">◎ Recenter Vehicle</button>
+                <button type="button" class="fullscreen-control" id="btnFullscreen" aria-pressed="false">⛶ Full Screen</button>
+            </div>
+            <div id="alertBanner" class="map-alert-banner" role="status" style="display: none;">
+                <span id="alertIcon" aria-hidden="true">ℹ️</span>
+                <p id="alertMessage"></p>
+            </div>
+            <div id="trackingMeta" data-booking-id="{{ booking_id }}" style="display: none;"></div>
+            <div id="initialTrackingData" data-json='{{ initial_data | tojson | safe }}' style="display: none;"></div>
+        </main>
+    {% endif %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'"></script>
+    {% if not error_message %}
+        <script src="{{ url_for('static', filename='customer_tracking.js') }}"></script>
+    {% endif %}
+</body>
+</html>

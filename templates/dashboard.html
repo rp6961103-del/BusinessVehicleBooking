@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.get('dashboard', 'Customer Dashboard') }} | {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .dashboard-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin: 20px 0 28px 0;
+        }
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+        .stat-card:hover {
+            box-shadow: var(--shadow);
+            transform: translateY(-2px);
+        }
+        .stat-icon {
+            font-size: 2rem;
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            border-radius: var(--radius-sm);
+            background: var(--brand-soft);
+        }
+        .stat-meta h3 {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .stat-meta strong {
+            font-size: 1.6rem;
+            color: var(--ink);
+            display: block;
+            margin-top: 4px;
+        }
+        .stat-card.confirmed .stat-icon { background: var(--success-bg); }
+        .stat-card.confirmed strong { color: var(--success); }
+        .stat-card.pending .stat-icon { background: var(--warning-bg); }
+        .stat-card.pending strong { color: var(--warning); }
+        
+        .quick-actions-bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+        .quick-actions-bar a {
+            text-decoration: none;
+            padding: 9px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
+            font-weight: 600;
+            border: 1px solid var(--line);
+            background: #ffffff;
+            color: var(--brand);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+        }
+        .quick-actions-bar a:hover {
+            background: var(--brand-soft);
+            border-color: var(--brand-light);
+        }
+        .quick-actions-bar a.primary-action {
+            background: var(--brand);
+            color: #ffffff;
+            border-color: var(--brand);
+        }
+        .quick-actions-bar a.primary-action:hover {
+            background: var(--brand-dark);
+        }
+
+        .booking-section {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            padding: 24px;
+            margin-bottom: 30px;
+        }
+        .booking-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .booking-section-header h2 {
+            margin: 0;
+            font-size: 1.3rem;
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <a href="/" class="logo">🚚 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</a>
+    <nav aria-label="Customer Navigation">
+        <a href="/dashboard" class="active">📊 {{ t.get('dashboard', 'Dashboard') }}</a>
+        <a href="/vehicles">🚚 {{ t.get('available_vehicles', 'Available Vehicles') }}</a>
+        <a href="{{ url_for('mybookings') }}">📋 {{ t.get('my_bookings', 'My Bookings') }}</a>
+        <a href="/farmer-ai" class="nav-highlight">🌿 {{ t.get('farmer_ai', 'Farmer AI') }}</a>
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 {{ t.get('logout', 'Logout') }}</button>
+        </form>
+    </nav>
+</header>
+
+<div class="language-bar">
+    <span>🌐 {{ t.get('language', 'Language') }}:</span>
+    <form method="POST" action="{{ url_for('change_language', language='en') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='te') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
+    </form>
+</div>
+
+<main class="container">
+    <div class="page-header">
+        <h1>👋 {{ t.get('welcome', 'Welcome') }}, {{ session.get('user_name') }}</h1>
+        <p>
+            Customer Dashboard • Account ID: <strong>#{{ customer_id }}</strong> • 
+            Phone: <strong>{{ session.get('user_phone') }}</strong>
+        </p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Summary Stats -->
+    <div class="dashboard-stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-meta">
+                <h3>Total Bookings</h3>
+                <strong>{{ total_bookings }}</strong>
+            </div>
+        </div>
+        <div class="stat-card confirmed">
+            <div class="stat-icon">✅</div>
+            <div class="stat-meta">
+                <h3>Confirmed</h3>
+                <strong>{{ confirmed_bookings }}</strong>
+            </div>
+        </div>
+        <div class="stat-card pending">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-meta">
+                <h3>Pending Confirmation</h3>
+                <strong>{{ pending_bookings }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions-bar">
+        <a href="/vehicles" class="primary-action">🚚 Browse & Book Vehicles</a>
+        <a href="/live-tracking/">🛰️ Live GPS Tracking Hub</a>
+        <a href="/farmer-ai">🌿 Farmer AI Crop Advisor</a>
+    </div>
+
+    <!-- My Bookings Section -->
+    <section id="my-bookings" class="booking-section">
+        <div class="booking-section-header">
+            <h2>📋 {{ t.get('my_bookings', 'My Bookings') }}</h2>
+            <span style="font-size: 0.85rem; color: var(--muted);">
+                Showing {{ bookings|length }} booking(s) for your account
+            </span>
+        </div>
+
+        {% if bookings %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Booking ID</th>
+                        <th>Vehicle</th>
+                        <th>Owner</th>
+                        <th>Pickup Location</th>
+                        <th>Destination</th>
+                        <th>Booking Date</th>
+                        <th>Price / Rent</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for booking in bookings %}
+                    <tr>
+                        <td>
+                            <a href="/live-tracking/booking/{{ booking[0] }}" style="font-weight: 700; color: var(--brand); text-decoration: underline;" title="Open Booking #{{ booking[0] }} Details & Live Tracking">
+                                #{{ booking[0] }}
+                            </a>
+                        </td>
+                        <td>
+                            <strong>{{ booking[5] }}</strong><br>
+                            <small style="color: var(--muted);">{{ booking[6] }}</small>
+                        </td>
+                        <td>{{ booking[7] }}</td>
+                        <td>📍 {{ booking[8] }}</td>
+                        <td>🏁 {{ booking[9] }}</td>
+                        <td>📅 {{ booking[3] }}</td>
+                        <td><strong style="color: var(--brand);">₹{{ booking[10] }}</strong></td>
+                        <td>
+                            {% if booking[4]|lower|trim in ['confirmed', 'accepted'] %}
+                                <span class="status status-accepted status-confirmed">✅ Confirmed</span>
+                            {% elif booking[4]|lower|trim == 'rejected' %}
+                                <span class="status status-rejected">❌ Rejected</span>
+                            {% else %}
+                                <span class="status status-pending">⏳ Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if booking[4]|lower|trim in ['confirmed', 'accepted'] %}
+                                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                    <a href="/live-tracking/booking/{{ booking[0] }}" class="btn btn-secondary btn-sm" title="Open booking details & live tracking">
+                                        🗺️ Open Booking & Track
+                                    </a>
+                                    {% if booking[11] %}
+                                        <span style="font-size: 0.8rem; color: #f59e0b;">⭐ {{ booking[11] }}/5</span>
+                                    {% else %}
+                                        <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm">Rate</a>
+                                    {% endif %}
+                                </div>
+                            {% elif booking[4]|lower|trim == 'rejected' %}
+                                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                    <a href="/live-tracking/booking/{{ booking[0] }}" class="btn btn-secondary btn-sm" title="View booking details">
+                                        📋 View Details
+                                    </a>
+                                    <span style="font-size: 0.8rem; color: var(--danger);">Rejected</span>
+                                </div>
+                            {% else %}
+                                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                    <a href="/live-tracking/booking/{{ booking[0] }}" class="btn btn-secondary btn-sm" title="View booking details & live tracking">
+                                        🗺️ Open Booking
+                                    </a>
+                                    <span style="font-size: 0.8rem; color: var(--warning);">⏳ Awaiting Owner</span>
+                                </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box" style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
+            <h2>{{ t.get('no_bookings', 'No Bookings Found') }}</h2>
+            <p>{{ t.get('no_bookings_message', 'You have not made any vehicle bookings yet. Browse our verified vehicles to book your next trip.') }}</p>
+            <div style="margin-top: 18px;">
+                <a href="/vehicles" class="btn btn-primary">🚚 Browse Vehicles</a>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+</main>
+
+<footer>
+    <p>© 2026 {{ t.get('vehicle_booking', 'Business Vehicle Booking') }}</p>
+    <p>{{ t.get('footer_message', 'Simple transportation service for everyone.') }}</p>
+</footer>
+</body>
+</html>

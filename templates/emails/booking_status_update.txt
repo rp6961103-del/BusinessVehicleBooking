@@ -1,0 +1,18 @@
+BusinessVehicleBooking - Booking Status Update
+
+Hello {{ booking.customer_name }},
+
+The status of your vehicle booking has been updated.
+
+Booking ID: {{ booking.booking_id }}
+Vehicle Name: {{ booking.vehicle_name }}
+Booking Date: {{ booking.booking_date }}
+Status: {{ booking.status }}
+{% if booking.from_location %}From: {{ booking.from_location }}
+{% endif %}{% if booking.to_location %}To: {{ booking.to_location }}
+{% endif %}
+{% if booking.status|lower == "accepted" %}Your booking has been accepted by the vehicle owner.
+{% elif booking.status|lower == "rejected" %}The vehicle owner was unable to accept your booking. Please contact them if you need more information.
+{% endif %}
+
+BusinessVehicleBooking

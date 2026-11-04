@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings | Business Vehicle Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+    <a href="/" class="logo">🚚 Business Vehicle Booking</a>
+    <nav>
+        <a href="/dashboard">📊 {{ t.get('dashboard', 'Dashboard') }}</a>
+        <a href="/vehicles">🚚 Vehicles</a>
+        <a href="/mybookings" class="active">📋 My Bookings</a>
+        <a href="/farmer-ai" class="nav-highlight">🌿 Farmer AI</a>
+        <form method="POST" action="/logout" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">🚪 Logout</button>
+        </form>
+    </nav>
+</header>
+
+<div class="language-bar">
+    <span>🌐 {{ t.get('language', 'Language') }}:</span>
+    <form method="POST" action="{{ url_for('change_language', language='en') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'en' %}active{% endif %}">🇬🇧 English</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='te') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'te' %}active{% endif %}">🇮🇳 తెలుగు</button>
+    </form>
+    <form method="POST" action="{{ url_for('change_language', language='hi') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="lang-btn {% if current_language == 'hi' %}active{% endif %}">🇮🇳 हिन्दी</button>
+    </form>
+</div>
+
+<main class="container">
+    <div class="page-header">
+        <h1>📋 My Bookings</h1>
+        <p>Track your bookings, check confirmation status, and view live vehicle locations.</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if error_message %}
+        <div class="message error" role="alert">{{ error_message }}</div>
+    {% elif bookings %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Booking ID</th>
+                    <th>Vehicle</th>
+                    <th>Owner</th>
+                    <th>Pickup & Destination</th>
+                    <th>Booking Date</th>
+                    <th>Price / Rent</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr class="booking-summary-row">
+                    <td>
+                        <strong>#{{ booking[0] }}</strong>
+                    </td>
+                    <td>
+                        <strong>{{ booking[5] }}</strong><br>
+                        <small style="color: var(--muted);">{{ booking[6] }}</small>
+                    </td>
+                    <td>{{ booking[7] }}</td>
+                    <td>📍 {{ booking[8] }} → 🏁 {{ booking[9] }}</td>
+                    <td>📅 {{ booking[3] }}</td>
+                    <td><strong style="color: var(--brand);">₹{{ booking[10] }}</strong></td>
+                    <td>
+                        {% if booking[4]|lower|trim in ['confirmed', 'accepted'] %}
+                            <span class="status status-accepted status-confirmed">✅ Confirmed</span>
+                        {% elif booking[4]|lower|trim == 'rejected' %}
+                            <span class="status status-rejected">❌ Rejected</span>
+                        {% else %}
+                            <span class="status status-pending">⏳ Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if booking[4]|lower|trim in ['confirmed', 'accepted'] %}
+                            <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; flex-direction: column;">
+                                <a href="{{ url_for('live_tracking.booking_tracking_shortcut', booking_id=booking[0]) }}" class="btn btn-secondary btn-sm" title="View live tracking for booking #{{ booking[0] }}">
+                                    📍 View Live Tracking
+                                </a>
+                                <small style="color: var(--muted);">The map shows whether the driver has started sharing GPS.</small>
+                                {% if booking[11] %}
+                                    <span style="font-size: 0.8rem; color: #f59e0b;">⭐ {{ booking[11] }}/5</span>
+                                {% else %}
+                                    <a href="/rate/{{ booking[0] }}" class="btn btn-primary btn-sm">Rate</a>
+                                {% endif %}
+                            </div>
+                        {% elif booking[4]|lower|trim == 'rejected' %}
+                            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                <span style="font-size: 0.8rem; color: var(--danger);">Rejected by owner</span>
+                            </div>
+                        {% else %}
+                            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                <span style="font-size: 0.8rem; color: var(--warning);">⏳ Awaiting Owner — live tracking becomes available after acceptance.</span>
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-box" style="text-align:center;">
+        <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
+        <h2>No Bookings</h2>
+        <p>You have not made any vehicle bookings yet.</p>
+        <div style="margin-top:18px;">
+            <a href="/vehicles" class="btn btn-primary">Browse Vehicles</a>
+        </div>
+    </div>
+    {% endif %}
+</main>
+
+<footer>
+    <p>© 2026 Business Vehicle Booking</p>
+    <p>Simple transportation service for everyone.</p>
+</footer>
+</body>
+</html>

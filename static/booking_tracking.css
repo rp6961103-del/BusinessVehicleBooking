@@ -1,0 +1,49 @@
+.booking-tracking-row > td {
+    padding: 0.75rem 1rem 1rem;
+    background: #f7faf9;
+}
+
+.booking-tracking-panel {
+    border: 1px solid var(--border, #d8e4e0);
+    border-radius: 10px;
+    padding: 16px;
+    background: #fff;
+}
+
+.booking-tracking-panel h3 {
+    margin: 0 0 10px;
+}
+
+.booking-tracking-status {
+    margin: 0 0 6px;
+    font-weight: 700;
+}
+
+.booking-tracking-updated,
+.booking-tracking-position,
+.booking-tracking-map-placeholder {
+    margin: 0 0 10px;
+    color: var(--muted, #5e726d);
+}
+
+.booking-tracking-map {
+    height: 320px;
+    width: 100%;
+    border-radius: 8px;
+    background: #e8eeec;
+}
+
+.booking-tracking-toggle[aria-expanded="true"] {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+}
+
+@media (max-width: 640px) {
+    .booking-tracking-row > td {
+        padding: 0.5rem;
+    }
+
+    .booking-tracking-map {
+        height: 260px;
+    }
+}

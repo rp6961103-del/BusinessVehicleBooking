@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<body style="margin:0;padding:24px;background:#f4f7f5;font-family:Arial,sans-serif;color:#18302b">
+    <main style="max-width:560px;margin:0 auto;padding:28px;background:#fff;border:1px solid #d8e4e0;border-radius:12px">
+        <h1 style="font-size:22px;color:#0b4d42">Booking status update</h1>
+        <p>Hello {{ booking.customer_name }},</p>
+        <p>The status of your vehicle booking has been updated.</p>
+        <p>
+            <strong>Booking ID:</strong> {{ booking.booking_id }}<br>
+            <strong>Vehicle:</strong> {{ booking.vehicle_name }}<br>
+            <strong>Booking date:</strong> {{ booking.booking_date }}<br>
+            <strong>Status:</strong> {{ booking.status }}
+        </p>
+        {% if booking.from_location or booking.to_location %}
+        <p>
+            {% if booking.from_location %}<strong>From:</strong> {{ booking.from_location }}<br>{% endif %}
+            {% if booking.to_location %}<strong>To:</strong> {{ booking.to_location }}{% endif %}
+        </p>
+        {% endif %}
+        {% if booking.status|lower == "accepted" %}
+        <p>Your booking has been accepted by the vehicle owner.</p>
+        {% elif booking.status|lower == "rejected" %}
+        <p>The vehicle owner was unable to accept your booking. Please contact them if you need more information.</p>
+        {% endif %}
+        <p style="font-size:13px;color:#5e726d">BusinessVehicleBooking</p>
+    </main>
+</body>
+</html>

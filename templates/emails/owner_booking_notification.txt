@@ -1,0 +1,18 @@
+BusinessVehicleBooking - New Vehicle Booking
+
+A new booking has been created for your vehicle.
+
+Booking ID: {{ booking.booking_id }}
+Customer: {{ booking.customer_name }}
+Customer Contact: {{ booking.customer_phone }}
+Vehicle: {{ booking.vehicle_name }}
+{% if booking.vehicle_type %}Vehicle Type: {{ booking.vehicle_type }}
+{% endif %}From: {{ booking.from_location }}
+To: {{ booking.to_location }}
+Booking Date: {{ booking.booking_date }}
+Rent: ₹{{ booking.rent }}
+Status: {{ booking.status }}
+
+Please sign in to BusinessVehicleBooking to review and manage this booking.
+
+BusinessVehicleBooking

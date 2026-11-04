@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="{{ current_language or 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI-assisted crop leaf disease analysis and farmer support.">
+    <title>{{ t.get('farmer_ai_assistant', 'Farmer AI Crop Disease Assistant') }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .ai-page { width:min(1180px,94%); margin:28px auto 60px; }
+        .ai-hero { display:grid; grid-template-columns:1.4fr .8fr; gap:24px; align-items:center; background:linear-gradient(135deg,#0b4d42,#146b5b); color:#fff; padding:34px; border-radius:18px; box-shadow:0 18px 45px rgba(11,77,66,.18); }
+        .ai-hero h1 { margin:0 0 10px; font-size:clamp(28px,4vw,42px); }
+        .ai-hero p { margin:0; max-width:680px; opacity:.92; }
+        .hero-points { display:grid; gap:10px; }
+        .hero-point { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18); padding:12px 14px; border-radius:10px; }
+        .ai-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; margin-top:22px; }
+        .ai-card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:24px; box-shadow:var(--shadow); }
+        .ai-card h2 { margin:0 0 6px; color:var(--ink); font-size:21px; }
+        .sub { color:var(--muted); margin:0 0 18px; font-size:14px; }
+        .dropzone { border:2px dashed #9ab7ad; border-radius:14px; padding:34px 20px; text-align:center; background:#f7fbf9; cursor:pointer; transition:.18s; }
+        .dropzone:hover,.dropzone.dragging { border-color:var(--brand); background:var(--brand-soft); }
+        .drop-icon { font-size:48px; }
+        .dropzone strong { display:block; margin:8px 0 4px; font-size:17px; }
+        .dropzone small { color:var(--muted); }
+        #leafInput { display:none; }
+        .preview { display:none; margin-top:18px; text-align:center; }
+        .preview img { width:100%; max-height:300px; object-fit:contain; border-radius:12px; border:1px solid var(--line); background:#f7f9f8; }
+        .actions { display:flex; gap:10px; margin-top:16px; }
+        .actions button { flex:1; border:0; padding:12px 16px; cursor:pointer; }
+        .results { display:none; margin-top:22px; }
+        .overview { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:18px 0; }
+        .overview-box { background:#f7fbf9; border:1px solid var(--line); border-radius:12px; padding:15px; }
+        .overview-label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+        .overview-value { margin-top:4px; font-weight:800; font-size:17px; color:var(--brand-dark); }
+        .confidence { display:inline-block; padding:5px 9px; border-radius:999px; background:var(--brand-soft); color:var(--brand-dark); }
+        .detail { padding:16px 0; border-top:1px solid var(--line); }
+        .detail-title { font-weight:800; margin-bottom:6px; }
+        .detail-content { color:#455650; white-space:pre-line; }
+        .safety { margin-top:18px; padding:15px; border-radius:12px; background:#fff7e8; border:1px solid #f0d7a4; color:#684d1d; font-size:13px; }
+        .chat-card { grid-column:1/-1; }
+        .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+        .chip { border:1px solid var(--line); background:#f7fbf9; color:var(--brand-dark); border-radius:999px; padding:7px 11px; cursor:pointer; font-size:12px; }
+        .chat-history { height:320px; overflow-y:auto; padding:14px; background:#f7f9f8; border:1px solid var(--line); border-radius:12px; }
+        .chat-msg { max-width:82%; padding:10px 13px; margin:8px 0; border-radius:13px; white-space:pre-wrap; word-break:break-word; font-size:14px; }
+        .msg-ai { background:#e7f3ef; color:#173c35; border-bottom-left-radius:4px; }
+        .msg-farmer { background:#146b5b; color:#fff; margin-left:auto; border-bottom-right-radius:4px; }
+        .chat-input-row { display:flex; gap:10px; margin-top:12px; }
+        .chat-input { flex:1; margin:0 !important; }
+        .btn-send { border:0; padding:0 20px; background:var(--brand); color:#fff; cursor:pointer; }
+        .btn-send:disabled { opacity:.55; cursor:not-allowed; }
+        .error { display:none; margin-top:14px; padding:12px 14px; border-radius:10px; background:#fde8e6; border:1px solid #f1c2bd; color:#842f2a; }
+        .status-note { margin-top:10px; color:var(--muted); font-size:12px; text-align:center; }
+        .topbar { width:min(1180px,94%); margin:16px auto 0; display:flex; justify-content:space-between; align-items:center; gap:15px; }
+        .topbar a { color:var(--brand-dark); text-decoration:none; font-weight:700; }
+        @media(max-width:820px){ .ai-hero,.ai-grid{grid-template-columns:1fr}.chat-card{grid-column:auto}.overview{grid-template-columns:1fr}.topbar{flex-wrap:wrap}.chat-input-row{flex-direction:column}.btn-send{min-height:44px}.actions{flex-direction:column} }
+    </style>
+</head>
+<body>
+<header>
+    <a class="logo" href="/">🚚 {{ t.get('vehicle_booking','Business Vehicle Booking') }}</a>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/vehicles">🚚 {{ t.get('available_vehicles','Available Vehicles') }}</a>
+        {% if session.get('user_id') %}<a href="/mybookings">📋 {{ t.get('my_bookings','My Bookings') }}</a>{% endif %}
+        <a href="/farmer-ai" class="active">🌿 {{ t.get('farmer_ai','Farmer AI') }}</a>
+    </nav>
+</header>
+
+<div class="topbar">
+    <span>🌐 {{ t.get('language','Language') }}</span>
+    <div>
+        {% for code,label in [('en','English'),('te','తెలుగు'),('hi','हिन्दी')] %}
+        <form method="POST" action="{{ url_for('change_language', language=code) }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer">{{ label }}</button>
+        </form>
+        {% endfor %}
+    </div>
+</div>
+
+<main class="ai-page">
+    <section class="ai-hero">
+        <div>
+            <div style="font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px;opacity:.8">SMART FARMING</div>
+            <h1>🌿 {{ t.get('farmer_ai_assistant','Farmer AI Crop Disease Assistant') }}</h1>
+            <p>Upload a clear crop-leaf photo and get an AI-assisted explanation of possible disease, visible symptoms, safe management steps and prevention guidance.</p>
+        </div>
+        <div class="hero-points">
+            <div class="hero-point">📷 Image-based analysis</div>
+            <div class="hero-point">💬 Ask follow-up questions</div>
+            <div class="hero-point">🌐 English • Telugu • Hindi</div>
+        </div>
+    </section>
+
+    {% if not is_configured %}
+    <div class="error" style="display:block;margin-top:22px">⚙️ AI service is not configured yet. Add <strong>AI_API_KEY</strong> and the provider settings to your <code>.env</code> file, then restart Flask.</div>
+    {% endif %}
+
+    <div id="errorAlert" class="error" role="alert"><span id="errorMessage"></span></div>
+
+    <section class="ai-grid">
+        <div class="ai-card">
+            <h2>📸 {{ t.get('upload_leaf_image','Upload Leaf Image') }}</h2>
+            <p class="sub">For best results, photograph one leaf in good daylight with the affected area clearly visible.</p>
+            <div class="dropzone" id="dropzone" role="button" tabindex="0">
+                <div class="drop-icon">🌱</div>
+                <strong>Choose or drag a leaf photo here</strong>
+                <small>JPG, JPEG, PNG or WEBP • Maximum 10 MB</small>
+                <input id="leafInput" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+            </div>
+            <div class="preview" id="previewContainer">
+                <img id="imagePreview" alt="Selected crop leaf preview">
+            </div>
+            <div class="actions">
+                <button class="btn-primary" id="analyzeBtn" disabled><span id="analyzeBtnText">🔍 {{ t.get('analyze_leaf','Analyze Leaf') }}</span></button>
+                <button class="btn-secondary" id="changeImageBtn" type="button">↻ {{ t.get('upload_another_image','Upload another image') }}</button>
+            </div>
+            <div class="status-note">Your image is analyzed only to provide the requested AI assistance. Do not use the result as a guaranteed diagnosis.</div>
+        </div>
+
+        <div class="ai-card results" id="resultsCard">
+            <h2>📊 Analysis Result</h2>
+            <p class="sub">AI-assisted result based on the uploaded image.</p>
+            <div class="overview">
+                <div class="overview-box"><div class="overview-label">🌾 Crop</div><div class="overview-value" id="resCrop">-</div></div>
+                <div class="overview-box"><div class="overview-label">🦠 Possible Disease</div><div class="overview-value" id="resDisease">-</div></div>
+                <div class="overview-box"><div class="overview-label">📈 Confidence</div><div class="overview-value"><span class="confidence" id="resConfidence">-</span></div></div>
+            </div>
+            {% for id,title,icon in [('resSymptoms','Symptoms & Visual Explanation','🔍'),('resCauses','Possible Causes','💡'),('resImmediate','Immediate Steps','⚡'),('resManagement','Treatment / Management','🧑‍🌾'),('resPrevention','Prevention','🛡️'),('resExpert','When to Contact an Expert','👨‍🌾')] %}
+            <div class="detail"><div class="detail-title">{{ icon }} {{ title }}</div><div class="detail-content" id="{{ id }}">-</div></div>
+            {% endfor %}
+            <div class="safety"><strong>⚠️ Safety notice</strong><br>AI identification is an estimate. Before purchasing or applying pesticides, fungicides or other agricultural chemicals, verify the product, crop suitability, concentration and label directions with a qualified agricultural officer or local agriculture department.</div>
+        </div>
+
+        <div class="ai-card chat-card">
+            <h2>💬 {{ t.get('ask_ai_assistant','Ask AI Assistant') }}</h2>
+            <p class="sub">Ask about the analyzed leaf, symptoms, prevention or general crop care. The current analysis is kept in this session for follow-up questions.</p>
+            <div class="chips">
+                <button class="chip" type="button" data-query="What disease could this leaf have?">What disease is this?</button>
+                <button class="chip" type="button" data-query="What should I do now?">What should I do now?</button>
+                <button class="chip" type="button" data-query="How can I prevent this problem from spreading?">How can I prevent it?</button>
+                <button class="chip" type="button" data-query="Explain this in Telugu.">Explain in Telugu</button>
+            </div>
+            <div class="chat-history" id="chatHistory">
+                <div class="chat-msg msg-ai">👋 Hello! Upload a leaf image above, then ask me questions about the result.</div>
+                {% for msg in chat_history %}<div class="chat-msg {{ 'msg-farmer' if msg.role == 'user' else 'msg-ai' }}">{{ msg.content }}</div>{% endfor %}
+            </div>
+            <form id="chatForm" class="chat-input-row">
+                <input type="text" id="chatInput" class="chat-input" maxlength="1000" placeholder="Type your farming question here..." autocomplete="off">
+                <button type="submit" class="btn-send" id="chatSendBtn">Send</button>
+            </form>
+        </div>
+    </section>
+</main>
+
+<footer class="footer"><p>© 2026 {{ t.get('vehicle_booking','Business Vehicle Booking') }} • Farmer AI Assistant</p><p>AI results are informational and should be verified with agricultural professionals.</p></footer>
+
+<input type="hidden" id="csrfToken" value="{{ csrf_token() }}">
+<script>
+(() => {
+    const $ = id => document.getElementById(id);
+    const dropzone=$('dropzone'), leafInput=$('leafInput'), previewContainer=$('previewContainer'), imagePreview=$('imagePreview');
+    const analyzeBtn=$('analyzeBtn'), analyzeBtnText=$('analyzeBtnText'), changeImageBtn=$('changeImageBtn');
+    const errorAlert=$('errorAlert'), errorMessage=$('errorMessage'), csrfToken=$('csrfToken').value;
+    const resultsCard=$('resultsCard'), chatForm=$('chatForm'), chatInput=$('chatInput'), chatSendBtn=$('chatSendBtn'), chatHistory=$('chatHistory');
+    let selectedFile=null;
+    const setError = msg => { errorMessage.textContent=msg; errorAlert.style.display='block'; errorAlert.scrollIntoView({behavior:'smooth',block:'center'}); };
+    const clearError = () => { errorAlert.style.display='none'; errorMessage.textContent=''; };
+    const handleFile = file => {
+        clearError();
+        if (!file) return;
+        const ok=['image/jpeg','image/png','image/webp'].includes((file.type||'').toLowerCase()) || /\.(jpg|jpeg|png|webp)$/i.test(file.name||'');
+        if(!ok){setError('Please upload a valid JPG, PNG or WEBP image.');return;}
+        if(file.size>10*1024*1024){setError('Image is too large. Maximum size is 10 MB.');return;}
+        selectedFile=file;
+        const reader=new FileReader(); reader.onload=e=>{imagePreview.src=e.target.result;previewContainer.style.display='block';dropzone.style.display='none';analyzeBtn.disabled=false;}; reader.readAsDataURL(file);
+    };
+    dropzone.addEventListener('click',()=>leafInput.click()); dropzone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();leafInput.click();}});
+    leafInput.addEventListener('change',e=>handleFile(e.target.files[0]));
+    ['dragover','dragenter'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.add('dragging');}));
+    ['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.remove('dragging');}));
+    dropzone.addEventListener('drop',e=>handleFile(e.dataTransfer.files[0]));
+    changeImageBtn.addEventListener('click',()=>{selectedFile=null;leafInput.value='';previewContainer.style.display='none';dropzone.style.display='block';analyzeBtn.disabled=true;clearError();});
+
+    analyzeBtn.addEventListener('click',async()=>{
+        if(!selectedFile)return; clearError(); analyzeBtn.disabled=true; analyzeBtnText.textContent='⏳ Analyzing...';
+        const fd=new FormData(); fd.append('leaf_image',selectedFile); fd.append('csrf_token',csrfToken);
+        try{
+            const res=await fetch('/farmer-ai/analyze',{method:'POST',body:fd,headers:{'X-CSRFToken':csrfToken}}); const data=await res.json();
+            if(!data.success){setError(data.error||'Leaf analysis failed.');return;}
+            const a=(data.analysis&&data.analysis.crop)?data.analysis:data; [['resCrop',a.crop],['resDisease',a.possible_disease],['resConfidence',a.confidence],['resSymptoms',a.symptoms],['resCauses',a.possible_causes],['resImmediate',a.immediate_steps],['resManagement',a.management],['resPrevention',a.prevention],['resExpert',a.expert_advice]].forEach(([id,v])=>$(id).textContent=v||'-');
+            resultsCard.style.display='block'; resultsCard.scrollIntoView({behavior:'smooth',block:'start'});
+            appendChatMessage('ai',`I analyzed the leaf. Possible crop: ${a.crop||'unclear'}. Possible condition: ${a.possible_disease||'unclear'} (${a.confidence||'AI estimate'}). Ask me a follow-up question.`);
+        }catch(e){setError('Could not connect to the AI service. Check your connection and try again.');}
+        finally{analyzeBtn.disabled=!selectedFile;analyzeBtnText.textContent='🔍 {{ t.get("analyze_leaf","Analyze Leaf") }}';}
+    });
+    chatForm.addEventListener('submit',e=>{e.preventDefault();const text=chatInput.value.trim();if(text)sendMessage(text);});
+    document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>sendMessage(c.dataset.query)));
+    async function sendMessage(text){
+        appendChatMessage('farmer',text); chatInput.value=''; chatSendBtn.disabled=true; const loading='loading-'+Date.now(); appendChatMessage('ai','⏳ Thinking...',loading);
+        try{const res=await fetch('/farmer-ai/chat',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrfToken},body:JSON.stringify({message:text,csrf_token:csrfToken})});const data=await res.json();removeChatMessage(loading);appendChatMessage('ai',data.success?data.reply:'⚠️ '+(data.error||'Unable to get an answer.'));}
+        catch(e){removeChatMessage(loading);appendChatMessage('ai','⚠️ Network error. Please try again.');} finally{chatSendBtn.disabled=false;chatInput.focus();}
+    }
+    function appendChatMessage(role,text,id){const m=document.createElement('div');m.className='chat-msg '+(role==='farmer'?'msg-farmer':'msg-ai');if(id)m.id=id;m.textContent=text;chatHistory.appendChild(m);chatHistory.scrollTop=chatHistory.scrollHeight;}
+    function removeChatMessage(id){const el=$(id);if(el)el.remove();}
+    {% if previous_analysis %}
+    const prev={{ previous_analysis|tojson }}; if(prev&&prev.crop){[['resCrop',prev.crop],['resDisease',prev.possible_disease],['resConfidence',prev.confidence],['resSymptoms',prev.symptoms],['resCauses',prev.possible_causes],['resImmediate',prev.immediate_steps],['resManagement',prev.management],['resPrevention',prev.prevention],['resExpert',prev.expert_advice]].forEach(([id,v])=>$(id).textContent=v||'-');resultsCard.style.display='block';}
+    {% endif %}
+})();
+</script>
+</body>
+</html>

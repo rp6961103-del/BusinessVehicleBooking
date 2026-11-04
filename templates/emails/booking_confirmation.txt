@@ -1,0 +1,23 @@
+BusinessVehicleBooking - Booking Confirmation
+
+Hello {{ booking.customer_name }},
+
+Your vehicle booking request has been received and saved in our system.
+
+Booking ID: {{ booking.booking_id }}
+Vehicle Name: {{ booking.vehicle_name }}
+Vehicle Type: {{ booking.vehicle_type or 'Commercial' }}
+Owner: {{ booking.owner_name or 'Registered Owner' }}
+{% if booking.owner_phone %}Owner Contact: {{ booking.owner_phone }}
+{% endif %}From: {{ booking.from_location }}
+To: {{ booking.to_location }}
+Booking Date: {{ booking.booking_date }}
+Rent: ₹{{ booking.rent }}
+Status: {{ booking.status }}
+
+Thank you for choosing BusinessVehicleBooking for your transportation needs!
+
+Please keep your booking ID and contact the vehicle owner through the registered booking details if you need assistance.
+
+Thank you,
+BusinessVehicleBooking

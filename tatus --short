@@ -1,0 +1,183 @@
+warning: in the working copy of 'app.py', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/app.py b/app.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..710226d[m
+[1m--- /dev/null[m
+[1m+++ b/app.py[m
+[36m@@ -0,0 +1,2648 @@[m
+[32m+[m[32mimport os[m
+[32m+[m[32mimport re[m
+[32m+[m[32mimport secrets[m
+[32m+[m[32mimport logging[m
+[32m+[m[32mfrom datetime import date, timedelta[m
+[32m+[m[32mfrom decimal import Decimal, InvalidOperation[m
+[32m+[m[32mfrom functools import wraps[m
+[32m+[m
+[32m+[m[32mfrom dotenv import load_dotenv[m
+[32m+[m[32mfrom flask import Flask, render_template, request, redirect, session, flash, jsonify[m
+[32m+[m[32mimport mysql.connector[m
+[32m+[m[32mfrom mysql.connector import Error[m
+[32m+[m[32mfrom werkzeug.security import check_password_hash, generate_password_hash[m
+[32m+[m[32mfrom werkzeug.middleware.proxy_fix import ProxyFix[m
+[32m+[m[32mfrom email_service import ([m
+[32m+[m[32m    email_configuration_status,[m
+[32m+[m[32m    send_booking_notifications,[m
+[32m+[m[32m)[m
+[32m+[m[32mfrom ai_disease_service import is_ai_configured, validate_image_file, analyze_crop_leaf, chat_about_crop[m
+[32m+[m
+[32m+[m
+[32m+[m[32mload_dotenv()[m
+[32m+[m
+[32m+[m[32mlogger = logging.getLogger(__name__)[m
+[32m+[m[32mlogging.basicConfig([m
+[32m+[m[32m    level=logging.INFO if os.getenv("APP_ENV", "development").lower() in {"production", "prod"} else logging.WARNING,[m
+[32m+[m[32m    format="%(asctime)s %(levelname)s %(name)s %(message)s",[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m[32mAPP_ENV = os.getenv("APP_ENV", "development").strip().lower()[m
+[32m+[m[32mPRODUCTION_ENVIRONMENTS = {"production", "prod"}[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef validate_production_configuration():[m
+[32m+[m[32m    if APP_ENV not in PRODUCTION_ENVIRONMENTS:[m
+[32m+[m[32m        return[m
+[32m+[m
+[32m+[m[32m    required_variables = ([m
+[32m+[m[32m        "SECRET_KEY",[m
+[32m+[m[32m        "MYSQL_HOST",[m
+[32m+[m[32m        "MYSQL_PORT",[m
+[32m+[m[32m        "MYSQL_DATABASE",[m
+[32m+[m[32m        "MYSQL_USER",[m
+[32m+[m[32m        "MYSQL_PASSWORD",[m
+[32m+[m[32m        "SESSION_COOKIE_SECURE",[m
+[32m+[m[32m    )[m
+[32m+[m[32m    missing_variables = [[m
+[32m+[m[32m        name for name in required_variables if not os.getenv(name)[m
+[32m+[m[32m    ][m
+[32m+[m[32m    if missing_variables:[m
+[32m+[m[32m        raise RuntimeError([m
+[32m+[m[32m            "Missing required production environment variable(s): "[m
+[32m+[m[32m            + ", ".join(missing_variables)[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m    if os.getenv("FLASK_DEBUG", "0") == "1":[m
+[32m+[m[32m        raise RuntimeError("FLASK_DEBUG must be 0 in production")[m
+[32m+[m
+[32m+[m[32m    if os.getenv("SESSION_COOKIE_SECURE", "").strip().lower() not in {[m
+[32m+[m[32m        "1",[m
+[32m+[m[32m        "true",[m
+[32m+[m[32m        "yes",[m
+[32m+[m[32m        "on",[m
+[32m+[m[32m    }:[m
+[32m+[m[32m        raise RuntimeError("SESSION_COOKIE_SECURE must be enabled in production")[m
+[32m+[m
+[32m+[m
+[32m+[m[32mvalidate_production_configuration()[m
+[32m+[m
+[32m+[m[32mapp = Flask(__name__)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef load_development_secret_key(instance_path):[m
+[32m+[m[32m    os.makedirs(instance_path, exist_ok=True)[m
+[32m+[m[32m    secret_path = os.path.join(instance_path, "flask_secret_key")[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        with open(secret_path, "x", encoding="ascii") as secret_file:[m
+[32m+[m[32m            secret_key = secrets.token_urlsafe(48)[m
+[32m+[m[32m            secret_file.write(secret_key)[m
+[32m+[m[32m            secret_file.flush()[m
+[32m+[m[32m    except FileExistsError:[m
+[32m+[m[32m        with open(secret_path, "r", encoding="ascii") as secret_file:[m
+[32m+[m[32m            secret_key = secret_file.read().strip()[m
+[32m+[m
+[32m+[m[32m    if not secret_key:[m
+[32m+[m[32m        raise RuntimeError(f"Development session secret is empty: {secret_path}")[m
+[32m+[m
+[32m+[m[32m    return secret_key[m
+[32m+[m
+[32m+[m
+[32m+[m[32mapp.secret_key = os.getenv("SECRET_KEY") or os.getenv("FLASK_SECRET_KEY")[m
+[32m+[m[32mif not app.secret_key:[m
+[32m+[m[32m    if APP_ENV in PRODUCTION_ENVIRONMENTS:[m
+[32m+[m[32m        raise RuntimeError("SECRET_KEY must be configured in production")[m
+[32m+[m[32m    app.secret_key = load_development_secret_key(app.instance_path)[m
+[32m+[m
+[32m+[m[32mapp.config.update([m
+[32m+[m[32m    ENVIRONMENT=APP_ENV,[m
+[32m+[m[32m    DEBUG=os.getenv("FLASK_DEBUG", "0") == "1" and APP_ENV not in PRODUCTION_ENVIRONMENTS,[m
+[32m+[m[32m    SESSION_COOKIE_HTTPONLY=True,[m
+[32m+[m[32m    SESSION_COOKIE_SAMESITE="Lax",[m
+[32m+[m[32m    SESSION_COOKIE_SECURE=([m
+[32m+[m[32m        os.getenv("SESSION_COOKIE_SECURE", os.getenv("FLASK_SESSION_COOKIE_SECURE", "0"))[m
+[32m+[m[32m        .strip()[m
+[32m+[m[32m        .lower()[m
+[32m+[m[32m        in {"1", "true", "yes", "on"}[m
+[32m+[m[32m    ),[m
+[32m+[m[32m    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),[m
+[32m+[m[32m    SESSION_REFRESH_EACH_REQUEST=False,[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m[32mtrusted_proxy_hops = int(os.getenv("TRUSTED_PROXY_HOPS", "0"))[m
+[32m+[m[32mif trusted_proxy_hops < 0:[m
+[32m+[m[32m    raise RuntimeError("TRUSTED_PROXY_HOPS must be zero or greater")[m
+[32m+[m[32mif trusted_proxy_hops:[m
+[32m+[m[32m    app.wsgi_app = ProxyFix([m
+[32m+[m[32m        app.wsgi_app,[m
+[32m+[m[32m        x_for=trusted_proxy_hops,[m
+[32m+[m[32m        x_proto=trusted_proxy_hops,[m
+[32m+[m[32m        x_host=trusted_proxy_hops,[m
+[32m+[m[32m        x_port=trusted_proxy_hops,[m
+[32m+[m[32m        x_prefix=trusted_proxy_hops,[m
+[32m+[m[32m    )[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.errorhandler(400)[m
+[32m+[m[32mdef handle_bad_request(error):[m
+[32m+[m[32m    return "The request could not be understood.", 400[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.errorhandler(403)[m
+[32m+[m[32mdef handle_forbidden(error):[m
+[32m+[m[32m    return "You are not authorized to access this resource.", 403[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.errorhandler(404)[m
+[32m+[m[32mdef handle_not_found(error):[m
+[32m+[m[32m    return "The requested page was not found.", 404[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.errorhandler(500)[m
+[32m+[m[32mdef handle_server_error(error):[m
+[32m+[m[32m    logger.exception("Unhandled application error")[m
+[32m+[m[32m    return "An unexpected error occurred. Please try again later.", 500[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef csrf_token():[m
+[32m+[m[32m    token = session.get("csrf_token")[m
+[32m+[m[32m    if token is None:[m
+[32m+[m[32m        token = secrets.token_urlsafe(32)[m
+[32m+[m[32m        session["csrf_token"] = token[m
+[32m+[m[32m    return token[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.context_processor[m
+[32m+[m[32mdef inject_csrf_token():[m
+[32m+[m[32m    return {"csrf_token": csrf_token}[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.after_request[m
+[32m+[m[32mdef prevent_auth_form_caching(response):[m
+[32m+[m[32m    if request.method == "GET" or request.path in {"/login", "/ownerlogin", "/adminlogin"}:[m
+[32m+[m[32m        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"[m
+[32m+[m[32m        response.headers["Pragma"] = "no-cache"[m
+[32m+[m[32m    return response[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.before_request[m
+[32m+[m[32mdef protect_state_changing_requests():[m
+[32m+[m[32m    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:[m
+[32m+[m[32m        submitted_token = ([m
+[32m+[m[32m            request.form.get("csrf_token")[m
+[32m+[m[32m            or request.headers.get("X-CSRFToken")[m
+[32m+[m[32m            or request.headers.get("X-CSRF-Token")[m
+[32m+[m[32m       
